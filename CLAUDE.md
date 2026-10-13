@@ -727,7 +727,14 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `StaticAfter` says it on the frame (known upfront: no pending work), bit 1 `StaticBefore` on the next frame (known in hindsight,
     only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and
     `StaticBefore` on the next: that static step gets no animation or prediction error (the drift sums only judged errors), the step
-    into the static frame is judged. Independent flags, not an enum; bits 2 to 7 are reserved (write 0, decoders keep them).
+    into the static frame is judged. Independent flags, not an enum; bits 3 to 7 are reserved (write 0, decoders keep them).
+    - **Bit 2, `FrameRecordLogged`** (experimental; the user, 2026-10-13: "just so we know it exists"): on a **start marker**, the
+      application's word that it logs the run's frame record to a trace. **The application sets it; the SDK never does** (the trace
+      module writes no trace, so it can not know) and it is off unless set. Read from the start marker only
+      (`MarkerPayload.IsFrameRecordLogged`, `RunAnalysis.FrameRecordLogged`); on another marker it says nothing. The tools **note**
+      it and judge nothing by it (`FrameRecordNote`: a line in `analyze`'s output and under the GUI's run, and a line more in the
+      warning of a trace that was given and not joined). For now a note only: not in `summary.json`. A trace is joined with or
+      without it. Not offered by the Unity helper: the trace module is not in the Unity package.
   - **Assumed static** (`TimelineOptions.AssumeStatic`, on by default; `analyze --no-static-guess`, the GUI's "Guess static",
     `GuiSettings.AssumeStatic`): `TimelineAnalyzer.AssumeStatic` flags a frame `StaticAfter | StaticAssumed` when a frame the target
     dropped took the rest's flag: the next presented frame carries `StaticBefore` for a frame never shown, or (the flag lost) the run

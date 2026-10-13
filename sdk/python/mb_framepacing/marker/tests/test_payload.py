@@ -496,6 +496,20 @@ class PayloadTests(unittest.TestCase):
                 self.assertEqual(decoded[0], payload)
                 self.assertEqual(int(decoded[0].flags), int(payload.flags))
 
+    def test_a_start_marker_says_the_application_logs_the_frame_record(self) -> None:
+        # Bit 2 of the flags byte. Only the application sets it: a payload made without it does not carry it
+        self.assertEqual(int(MarkerFlags.FRAME_RECORD_LOGGED), 0x04)
+        plain = Payload(MarkerKind.SEQUENCE_START, 7, 1, MarkerFlags.NO_FLAGS, 0)
+        self.assertEqual(plain.flags & MarkerFlags.FRAME_RECORD_LOGGED, MarkerFlags.NO_FLAGS)
+
+        # It is one of the byte's independent flags, and read back as it was written
+        logged = Payload(MarkerKind.SEQUENCE_START, 7, 1, MarkerFlags.FRAME_RECORD_LOGGED | MarkerFlags.STATIC_AFTER, 0)
+        encoded = encode_payload(logged)
+        self.assertEqual(encoded[16], 0x05)
+        decoded = try_decode_payload(encoded)
+        assert decoded is not None
+        self.assertEqual(decoded[0].flags, MarkerFlags.FRAME_RECORD_LOGGED | MarkerFlags.STATIC_AFTER)
+
     def test_the_start_time_is_in_date_time_ticks(self) -> None:
         time = datetime(2026, 1, 1, tzinfo=UTC)
         self.assertEqual(to_date_time_ticks(time), 639_028_224_000_000_000)

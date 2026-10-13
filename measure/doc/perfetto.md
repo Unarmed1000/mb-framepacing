@@ -64,6 +64,12 @@ mb-framepacing --experimental analyze <capture folder> --trace run.pftrace --cha
 | `--trace-capture-offset-ns <ns>` | The capture's clock minus the application's, when you know it: nothing is worked out from the frames then                         |
 | `--trace-processor <path>`       | The `trace_processor_shell` to read the trace with                                                                                |
 
+**Whether a trace exists.** An application that logs the frame record can say so in the run's start marker
+([its flags](../../sdk/doc/marker-fields.md#flags-frame-record-logged-experimental)). The analysis then notes with the run that
+the application logged its frames to a trace, and, when no trace was joined, that one can be merged with the capture. It is the
+application's word: nothing is judged by it, and a trace is joined with or without it. A trace that is given and not joined with
+such a run gets a line more in its warning, asking whether it is the trace of that run.
+
 A `--trace` or `--trace-app` file that is not there, or no trace processor, stops the command before it starts. What does not
 fit later is a warning, and the analysis is written without the join: a trace that has no frame record of a run, a run whose
 times are not inside the trace, or a trace the capture remembers that has gone since.

@@ -4,7 +4,8 @@ The frame marker is a QR code that the application under test draws into every f
 index**, the **animation time** the frame was rendered for, a **run id**, when the application paces its frames **when it intends
 the frame to be shown**, its **target frame time** and the **preferred frame time** it wants to run at, and optionally the frame's
 **CPU start time** and **CPU busy**: when the CPU started working on the frame and how long it worked on it before presenting it. A
-**flags** byte says when nothing animates: **static after** while this frame is on screen, **static before** while the frame before it was. `mb-framepacing` captures the display output with an
+**flags** byte says when nothing animates: **static after** while this frame is on screen, **static before** while the frame before it was;
+on a start marker it can also say that the application logs each frame to a trace of its own (**frame record logged**, experimental). `mb-framepacing` captures the display output with an
 HDMI/DP capture card, decodes the marker in every captured frame, and compares the animation timeline with the capture timeline.
 Special **start** and **end** markers bracket a test run so the analyzer can cut the capture to exactly the measured window.
 
@@ -26,20 +27,20 @@ Frame, start and end markers start with the same 53 byte header, little endian. 
 which frame, what the frame shows, the frame pacing (what the application wants, what the pacer aims for now, when this frame should
 show) and the CPU's work:
 
-| Offset | Size | Field                 | Notes                                                                                                                                                                                                |
-| ------ | ---- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0      | 2    | Magic                 | ASCII `"MF"` (`0x4D 0x46`)                                                                                                                                                                           |
-| 2      | 1    | Format version        | `1`                                                                                                                                                                                                  |
-| 3      | 1    | Kind                  | `0` = Frame, `1` = SequenceStart, `2` = SequenceEnd (`3` = Sync is the small sync marker, see below)                                                                                                 |
-| 4      | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                                  |
-| 8      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                                       |
-| 16     | 1    | Flags                 | Bit 0 = **static after**, bit 1 = **static before**: nothing animates while this frame, or the frame before it, is on screen (see below). Bits 2 to 7 are reserved: write `0`; decoders ignore them. |
-| 17     | 8    | Animation time        | `i64` two's complement, nanoseconds. The time the frame's animation was evaluated for.                                                                                                               |
-| 25     | 4    | Preferred frame time  | `u32` nanoseconds, `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `16'666'667` for 60 fps, also while the pacer runs slower (see below).                     |
-| 29     | 4    | Target frame time     | `u32` nanoseconds, `0` = unknown. The interval the pacer aims for between the previous frame and this one: `16'666'667` for 60 fps, `33'333'333` for 30 fps.                                         |
-| 33     | 8    | Intended display time | `i64` nanoseconds on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below).                   |
-| 41     | 8    | CPU start time        | `i64` nanoseconds on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                                      |
-| 49     | 4    | CPU busy              | `u32` nanoseconds, `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                       |
+| Offset | Size | Field                 | Notes                                                                                                                                                                                                                                                                             |
+| ------ | ---- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | 2    | Magic                 | ASCII `"MF"` (`0x4D 0x46`)                                                                                                                                                                                                                                                        |
+| 2      | 1    | Format version        | `1`                                                                                                                                                                                                                                                                               |
+| 3      | 1    | Kind                  | `0` = Frame, `1` = SequenceStart, `2` = SequenceEnd (`3` = Sync is the small sync marker, see below)                                                                                                                                                                              |
+| 4      | 4    | Run id                | `u32`. Identifies one test run; the start marker, every frame marker and the end marker of a run carry the same id.                                                                                                                                                               |
+| 8      | 8    | Frame index           | `u64`. Increments by 1 for every frame the application renders, including frames that show a start/end marker.                                                                                                                                                                    |
+| 16     | 1    | Flags                 | Bit 0 = **static after**, bit 1 = **static before**: nothing animates while this frame, or the frame before it, is on screen (see below). Bit 2 on a start marker = **frame record logged** (experimental, see below). Bits 3 to 7 are reserved: write `0`; decoders ignore them. |
+| 17     | 8    | Animation time        | `i64` two's complement, nanoseconds. The time the frame's animation was evaluated for.                                                                                                                                                                                            |
+| 25     | 4    | Preferred frame time  | `u32` nanoseconds, `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `16'666'667` for 60 fps, also while the pacer runs slower (see below).                                                                                                  |
+| 29     | 4    | Target frame time     | `u32` nanoseconds, `0` = unknown. The interval the pacer aims for between the previous frame and this one: `16'666'667` for 60 fps, `33'333'333` for 30 fps.                                                                                                                      |
+| 33     | 8    | Intended display time | `i64` nanoseconds on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below).                                                                                                |
+| 41     | 8    | CPU start time        | `i64` nanoseconds on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                                                                                                                   |
+| 49     | 4    | CPU busy              | `u32` nanoseconds, `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                                                                                                    |
 
 **Every time is a whole number of nanoseconds**, so a platform that counts in nanoseconds (Vulkan and EGL present times,
 `CLOCK_MONOTONIC`) writes its values as they are, and one that counts in ticks of 100 ns multiplies by 100:
@@ -156,7 +157,12 @@ say the same fact, for applications that know it at different moments:
   animate.
 - The two bits are independent flags, not one value: every combination is valid (inside a static stretch rendered every refresh,
   a frame carries both).
-- **Bits 2 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.
+- **Bit 2, frame record logged** (experimental), on a **start marker**: the application logs the
+  [frame record](trace-frame-record.md) of this run to a trace of its own, so there is a trace of the run that its capture can be
+  merged with. It is a statement about the run, read from the start marker only; on a frame, end or sync marker it says nothing
+  (write `0`). Only the application knows whether it logs the record, so the application sets the bit: nothing in the SDK does, and
+  it is `0` unless set. The mb-framepacing tools note it with the run and judge nothing by it.
+- **Bits 3 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.
 
 ### CPU start time and CPU busy
 

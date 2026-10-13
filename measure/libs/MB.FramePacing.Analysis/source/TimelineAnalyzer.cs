@@ -93,6 +93,9 @@ namespace MB.FramePacing.Analysis
       public bool HasStart;
       public bool HasEnd;
 
+      // The start marker says the application logs the run's frame record to a trace
+      public bool FrameRecordLogged;
+
       // The run's rows, as stretches of the capture's rows: not a copy of them
       public readonly RowRanges Rows;
       public readonly List<string> Warnings = new List<string>();
@@ -163,6 +166,7 @@ namespace MB.FramePacing.Analysis
                   SequenceId = row.Start?.SequenceText,
                   StartTimeUtc = row.Start?.StartTimeUtc,
                   HasStart = true,
+                  FrameRecordLogged = payload.IsFrameRecordLogged,
                 };
               }
               continue;
@@ -397,7 +401,8 @@ namespace MB.FramePacing.Analysis
         frames,
         warnings,
         cameraStatistics,
-        pacing
+        pacing,
+        FrameRecordLogged: run.FrameRecordLogged
       );
     }
 

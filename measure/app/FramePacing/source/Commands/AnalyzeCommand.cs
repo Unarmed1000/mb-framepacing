@@ -182,6 +182,7 @@ namespace MB.FramePacing.App.Commands
       foreach (var warning in report.Warnings)
         AnsiConsole.MarkupLineInterpolated($"[yellow]warning:[/] {warning}");
 
+      int runIndex = 0;
       foreach (var run in report.Timeline.Runs)
       {
         AnsiConsole.WriteLine();
@@ -193,6 +194,9 @@ namespace MB.FramePacing.App.Commands
         AnsiConsole.Write(new Rule(Markup.Escape(title)).LeftJustified());
         foreach (var warning in run.Warnings)
           AnsiConsole.MarkupLineInterpolated($"[yellow]warning:[/] {warning}");
+        if (FrameRecordNote.Of(run, report.TraceJoinOf(runIndex) != null) is { } note)
+          AnsiConsole.MarkupLineInterpolated($"[grey]note:[/] {note}");
+        ++runIndex;
 
         var c = run.Counts;
         AnsiConsole.MarkupLineInterpolated(

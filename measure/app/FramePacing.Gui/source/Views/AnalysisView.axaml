@@ -187,6 +187,12 @@
       <TextBlock Text="{Binding SelectedRun.VerdictText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.TargetText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.CountsText, FallbackValue=''}" TextWrapping="Wrap" />
+      <TextBlock
+        Classes="caption"
+        IsVisible="{Binding SelectedRun.HasNote, FallbackValue=False}"
+        Text="{Binding SelectedRun.NoteText, FallbackValue=''}"
+        TextWrapping="Wrap"
+      />
       <ItemsControl ItemsSource="{Binding SelectedRun.Warnings, FallbackValue={x:Null}}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="x:String">

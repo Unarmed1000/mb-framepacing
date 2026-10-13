@@ -129,6 +129,12 @@ namespace MB.FramePacing.Gui.ViewModels
     public string CountsText { get; }
     public string ErrorFramesText { get; }
     public IReadOnlyList<StatisticsRow> Statistics { get; }
+
+    /// <summary>What the run's start marker says beyond its numbers (the application logs a frame record), or empty.</summary>
+    public string NoteText => FrameRecordNote.Of(Run, Chart.Trace != null) ?? string.Empty;
+
+    public bool HasNote => NoteText.Length > 0;
+
     public IReadOnlyList<string> Warnings => Run.Warnings;
     public bool HasWarnings => Run.Warnings.Count > 0;
 

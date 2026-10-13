@@ -38,7 +38,7 @@ class MarkerKind(IntEnum):
 
 
 class MarkerFlags(IntFlag):
-    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 2 to 7 are reserved: write 0; a decoded payload keeps whatever it
+    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 3 to 7 are reserved: write 0; a decoded payload keeps whatever it
     carried."""
 
     NO_FLAGS = 0
@@ -48,6 +48,10 @@ class MarkerFlags(IntFlag):
     STATIC_BEFORE = 2
     """Nothing animated while the frame before this one was on screen: STATIC_AFTER of the previous frame, for an application that only
     knows it once it renders this frame."""
+    FRAME_RECORD_LOGGED = 4
+    """EXPERIMENTAL. On a start marker: the application logs the frame record of this run to its own trace (doc/trace-frame-record.md),
+    so there is a trace the capture of the run can be merged with. Only the application knows: it sets the flag itself, so it is off
+    unless set. It says nothing on a frame, end or sync marker."""
 
 
 @dataclass(frozen=True, slots=True)

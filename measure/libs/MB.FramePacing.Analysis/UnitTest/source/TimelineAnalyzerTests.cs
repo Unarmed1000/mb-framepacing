@@ -54,14 +54,20 @@ namespace MB.FramePacing.Analysis.UnitTest
         return this;
       }
 
-      public RowBuilder Start(uint runId, int captures = 3, string name = "test") =>
+      public RowBuilder Start(
+        uint runId,
+        int captures = 3,
+        string name = "test",
+        MB.FramePacing.Marker.MarkerFlags flags = MB.FramePacing.Marker.MarkerFlags.NoFlags
+      ) =>
         Show(
           0,
           0,
           captures,
           runId,
           MarkerKind.SequenceStart,
-          StartMetadata.FromTag(new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc).Ticks, name)
+          StartMetadata.FromTag(new DateTime(2026, 9, 23, 0, 0, 0, DateTimeKind.Utc).Ticks, name),
+          flags: flags
         );
 
       public RowBuilder End(uint runId, int captures = 3) => Show(999_999, 0, captures, runId, MarkerKind.SequenceEnd);
@@ -72,6 +78,31 @@ namespace MB.FramePacing.Analysis.UnitTest
           Rows.Add(new CaptureRow(Next, status == CaptureStatus.NotRecorded ? default : new NanosecondTickCount(Next * Period), status, default));
         return this;
       }
+    }
+
+    /// <summary>
+    /// EXPERIMENTAL. A start marker's frame record flag is the application's word that it logged the run's frames to a trace: the run
+    /// carries it and the analysis notes it. On a frame marker the bit says nothing.
+    /// </summary>
+    [Test]
+    public void FrameRecordLogged_IsReadFromTheStartMarkerOnly()
+    {
+      const MB.FramePacing.Marker.MarkerFlags Logged = MB.FramePacing.Marker.MarkerFlags.FrameRecordLogged;
+      var said = new RowBuilder().Start(1, flags: Logged);
+      said.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4).End(1);
+      var unsaid = new RowBuilder().Start(1);
+      unsaid.Show(1, 0, 4, flags: Logged).Show(2, 16, 4, flags: Logged).Show(3, 32, 4).End(1);
+
+      var with = TimelineAnalyzer.Analyze(said.Rows).Runs.Single();
+      var without = TimelineAnalyzer.Analyze(unsaid.Rows).Runs.Single();
+
+      Assert.That(with.FrameRecordLogged, Is.True);
+      Assert.That(FrameRecordNote.Of(with, joined: false), Is.EqualTo(FrameRecordNote.Available));
+      Assert.That(FrameRecordNote.Of(with, joined: true), Is.EqualTo(FrameRecordNote.Joined));
+      Assert.That(without.FrameRecordLogged, Is.False, "off unless the start marker says so");
+      Assert.That(FrameRecordNote.Of(without, joined: false), Is.Null);
+      Assert.That(without.Frames.Select(f => f.Flags), Is.All.EqualTo(PresentedFrameFlags.None), "the bit on a frame marker changes nothing");
+      Assert.That(with.Frames.Count, Is.EqualTo(without.Frames.Count));
     }
 
     [Test]

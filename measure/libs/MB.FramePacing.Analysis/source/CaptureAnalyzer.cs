@@ -177,7 +177,10 @@ namespace MB.FramePacing.Analysis
           }
           catch (TraceException ex)
           {
-            warnings.Add($"Run {run.RunId}: the Perfetto trace '{traceName}' was not joined: {ex.Message}");
+            warnings.Add(
+              $"Run {run.RunId}: the Perfetto trace '{traceName}' was not joined: {ex.Message}"
+                + (run.FrameRecordLogged ? " " + FrameRecordNote.NotJoined : string.Empty)
+            );
           }
         }
         joins.Add(join);

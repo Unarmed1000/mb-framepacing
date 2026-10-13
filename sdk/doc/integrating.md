@@ -309,6 +309,8 @@ the capture's measurements as tracks in the trace, and what the trace says of ea
 application logs one slice per frame to its trace, [the frame record](trace-frame-record.md), with the values of the frame's
 marker. The SDK's experimental trace module defines the record's strings and works out what to log from the payload you
 already make; you log it with your own tracing. It is needed for that merge only: a measurement needs nothing but the marker.
+Say in the run's start marker that you log it (`FM::MarkerFlags::FrameRecordLogged`, off unless you set it), so that whoever
+analyses the capture knows a trace of the run exists.
 
 ## A complete integration to look at
 

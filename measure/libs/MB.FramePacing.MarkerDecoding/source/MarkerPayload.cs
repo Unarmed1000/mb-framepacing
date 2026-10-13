@@ -23,7 +23,8 @@ namespace MB.FramePacing.MarkerDecoding
   /// <param name="FrameIndex">The application's own rendered-frame counter. Unrelated to the capture card's frame counter.</param>
   /// <param name="Flags">
   /// The marker's flags: <see cref="FM.MarkerFlags.StaticAfter"/> when nothing animates while the frame is on screen,
-  /// <see cref="FM.MarkerFlags.StaticBefore"/> when nothing animated while the frame before it was.
+  /// <see cref="FM.MarkerFlags.StaticBefore"/> when nothing animated while the frame before it was, and on a start marker
+  /// <see cref="FM.MarkerFlags.FrameRecordLogged"/> (experimental) when the application says it logs the run's frame record to a trace.
   /// </param>
   /// <param name="AnimationTime">The animation time the frame was rendered for.</param>
   /// <param name="PreferredFrameTime">
@@ -62,6 +63,12 @@ namespace MB.FramePacing.MarkerDecoding
 
     /// <summary>Nothing animated while the frame before this one was on screen: that frame is static after, known one frame later.</summary>
     public bool IsStaticBefore => (Flags & FM.MarkerFlags.StaticBefore) != 0;
+
+    /// <summary>
+    /// EXPERIMENTAL. A start marker says the application logs the frame record of the run to its own trace: a trace of the run exists.
+    /// The application's word, read from the start marker only; the bit means nothing on another kind of marker.
+    /// </summary>
+    public bool IsFrameRecordLogged => Kind == MarkerKind.SequenceStart && (Flags & FM.MarkerFlags.FrameRecordLogged) != 0;
 
     /// <summary>
     /// The same frame as <paramref name="other"/>: the same run id and frame index, which is all a sync marker carries. Frame indices of

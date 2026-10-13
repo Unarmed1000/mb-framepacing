@@ -98,6 +98,21 @@ literal that ends with a zero, and the name's `CStr()` does too: they can be giv
 
 `sdk/test-data/trace/frame-records.csv` holds payloads with the record each gives; the tests of both languages read it.
 
+## Say so in the start marker
+
+A capture does not show whether a trace of the run exists. An application that logs the frame record says so in the run's start
+marker, with bit 2 of the marker's flags byte ([the marker format](marker-format.md#flags)):
+
+```cpp
+// The start marker of a run whose frames are logged to the trace
+const FM::Payload start(FM::MarkerKind::SequenceStart, runId, frameIndex, FM::MarkerFlags::FrameRecordLogged, animationTime);
+```
+
+The application sets it, as it logs the record: the trace module writes no trace and can not know, so nothing in the SDK sets the
+flag and it is off unless set. Set it only for a run whose frames are logged, and combine it with the other flags of that frame
+where they apply (`FM::MarkerFlags::FrameRecordLogged | FM::MarkerFlags::StaticAfter`). It says nothing on a frame, end or sync
+marker. The tools note it with the run; a trace is merged with or without it.
+
 ## What the tools do with it
 
 [A capture and a Perfetto trace](../../measure/doc/perfetto.md) has the whole of it. In short:

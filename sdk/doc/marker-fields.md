@@ -86,7 +86,8 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   - bit 1, **static before**, on the next frame: the application only knows once it renders that frame (it woke up on input after
     waiting).
 - **Value:** set whichever bit the application knows, or both; they are independent flags. Inside a static stretch that is rendered
-  every refresh, a frame carries both. Bits 2 to 7 are reserved: write `0`.
+  every refresh, a frame carries both. Bit 2 is the start marker's frame record flag (the next section). Bits 3 to 7 are reserved:
+  write `0`.
 - **What the analysis does:** either bit makes the step from the static frame to the next a **static step**.
   - Its animation error is not judged (and it has no prediction error), so an animation clock that pauses while idle does not look like
     a huge error. The drift adds up only the judged errors. The step **into** the static frame is judged as usual.
@@ -110,6 +111,22 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
     no frames are presented while idle, the first frame after it shows an error as long as the pause.
   - The animation clock pauses one frame early: the frame that reaches the rest pose gets the paused time, and the step into it (which
     is judged) shows an error. Pause the clock after the last frame that animates.
+
+### Flags: frame record logged (experimental)
+
+- **Means:** the application logs [the frame record](trace-frame-record.md) of this run to a trace of its own: a slice per frame
+  with the values of the frame's marker, which is what lets the tools merge a trace of the run with its capture. The flag says
+  that such a trace exists.
+- **Value:** bit 2 of the flags byte, on the **start marker** of the run (`MarkerFlags::FrameRecordLogged`). On a frame, end or
+  sync marker it says nothing: write `0` there.
+- **Changes:** never within a run. It is the start marker's statement about the whole run.
+- **Unknown (`0`):** the default. The SDK never sets the bit: its trace module works out what to log and writes no trace, so only
+  the application knows whether the record is logged. Set it when the run's frames are logged, and leave it out when tracing is
+  switched off for the run.
+- **What the analysis does:** it notes with the run that the application says a trace exists, and that it can be merged with the
+  capture when none was. Nothing is measured or judged by the flag, and a trace is merged with or without it.
+- **Goes wrong when:** it is set for a run whose trace was not recorded (the note sends you looking for a trace that is not
+  there), or left out for a run that has one (nothing says a trace exists).
 
 ### Animation time
 
