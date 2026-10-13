@@ -121,12 +121,12 @@ namespace MB.FramePacing.App.Commands
     public static Option<string?> Name(string where) =>
       new Option<string?>("--name") { Description = $"A name for the runs, shown in the reports instead of the sequence id ({where})." };
 
-    /// <summary>--target-fps: the frame rate the application aims for; late frames are measured against it.</summary>
+    /// <summary>--target-fps: the frame rate the application aims for; the display time steps are measured against it.</summary>
     public static Option<double?> TargetFps(string where) =>
       new Option<double?>("--target-fps")
       {
         Description =
-          $"The frame rate the application aims for, e.g. 30 on a 60 Hz display; frames shown a refresh later are late ({where}). "
+          $"The frame rate the application aims for, e.g. 30 on a 60 Hz display: what the display time steps are measured against ({where}). "
           + "Default: the pacing in the markers, else one refresh per frame (the display's native rate).",
         Validators =
         {

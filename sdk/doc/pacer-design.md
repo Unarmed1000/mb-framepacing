@@ -2262,6 +2262,30 @@ refresh.
     is the display's side holding the loop, whatever the wait is called. Still one system and the start of a run, and
     not run there since.
 
+18. **What the frame window counts as a late frame**: open. Since 2026-10-13 the measuring tools and the count from
+    display reports (`DisplayErrorState::LateFrames`) have one rule: a frame is late when its display time step is half a
+    refresh or more longer than its animation time step. The swap interval rule's count (`FrameWindowState::LateFrames`)
+    is not that rule. It has no display times, and it counts a frame that did not make its time, which is what the rule
+    slows down on. Where the two differ, with the display as the pacer reckons it:
+
+    - **Work over the frame's time, the step kept** (the reserve covered it, or the frame after kept its step): counted,
+      with an animation step equal to the step on the display
+      (`WithTheAimOfSmoothnessAFrameThatRunsLongWithinTheReserveIsMadeUpFor`).
+    - **A start too late for its vertical blank**: the frame is for a later one and its animation step is the refreshes
+      to that one, so the two steps are equal; counted once the frame is judged
+      (`AFrameThatStartsTooLateForItsVerticalBlankIsForTheFirstItCanMakeAndItsAnimationTimeIsForThat`: a step of four
+      periods, one late frame).
+    - **A loss that repeats, on the clock's grid**: the animation step is longer by the loss, and a frame that loses as
+      much again is still counted.
+    - **The frame before the pause after start-up, on the clock's grid**: on screen for the pause too with an animation
+      step of its swap interval, and not counted (`tier-loop-timer-low-latency-gpu-90-unreported.csv`, frames 121 and
+      122: shown five refreshes apart, a step of one, no late frame in the frame window, four refreshes behind the
+      clock).
+
+    Nothing of the pacer is changed by this. Counting by the one rule would change when the rule slows down (no longer
+    on work over a frame's time or on a late start) and with it the golden data. To decide, with runs: whether the
+    count keeps what it means under a name that is not "late", or follows the rule.
+
 ## What changes for whom
 
 - The pacer's public types change throughout (the SDK is at 0.1.0 with no release): `FramePacer`'s calls, `FrameSchedule`, the

@@ -12,7 +12,10 @@ using System;
 
 namespace MB.FramePacing.Analysis
 {
-  /// <summary>Pacing of one run. A frame is late when it is shown at least one refresh later than the target frame time.</summary>
+  /// <summary>
+  /// Pacing of one run. A frame is late when its display time step is half a refresh or more longer than its animation time step, whatever
+  /// the targets come from.
+  /// </summary>
   /// <param name="RefreshPeriod">
   /// The display's refresh period: the capture period for a capture card (it captures at the display's refresh rate), calculated from the
   /// frames for an EXPERIMENTAL camera capture.
@@ -25,13 +28,13 @@ namespace MB.FramePacing.Analysis
   /// <param name="Source">Where the targets come from: the pacer's schedule or target frame time in the markers, a given target frame rate, or
   /// the display's native refresh rate.</param>
   /// <param name="LateFrames">
-  /// Presented frames shown late: at least half a refresh after their intended time with a schedule, otherwise at least one refresh later than
-  /// their target frame time after the previous frame.
+  /// Presented frames shown late: their display time step is half a refresh or more longer than their animation time step.
   /// </param>
   /// <param name="LateShare">Late frames as a share of the presented frames with a display time step (0..1).</param>
   /// <param name="WorstLateShare">The highest share of late frames in any <see cref="LateShare.WindowSeconds"/> window (0..1).</param>
   /// <param name="ErrorFramesWithUnevenDisplay">
-  /// Frames with animation error where this or the previous frame was shown late or early, or that follow skipped frames: bad pacing.
+  /// Frames with animation error where this or the previous frame's display time step was off its target, or that follow skipped frames: bad
+  /// pacing.
   /// </param>
   /// <param name="ErrorFramesWithEvenDisplay">Frames with animation error on an even display: delta time jitter.</param>
   /// <param name="Verdict">Which of the two dominates.</param>

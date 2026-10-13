@@ -141,7 +141,7 @@ Three clocks meet: the capture's, the application's, which the markers' times ar
 
 **What this can not tell.** The frame record ties the application to the trace, not the capture card to the application: a
 delay that the whole run shares can not be told from the difference between those two clocks. When every frame of a run is a
-refresh late, the tracks are a refresh early against the trace. Differences between frames (a frame that stayed a refresh
+refresh behind its plan, the tracks are a refresh early against the trace. Differences between frames (a frame that stayed a refresh
 longer, a late frame) are exact. The marker's fields have the same limit and say so.
 
 ## Do they line up

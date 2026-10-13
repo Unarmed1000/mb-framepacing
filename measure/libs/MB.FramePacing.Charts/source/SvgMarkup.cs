@@ -65,7 +65,7 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// The report's own classes, in the same palette: the error threshold band, the refresh lines the animation errors reach, the held steps of the display time step (after the web page's
-    /// frame chart: green as planned, red held too long, faint risers), the range of the animation time step over it (its line is CHART_STYLE's
+    /// frame chart: green as planned, red before a late frame, faint risers), the range of the animation time step over it (its line is CHART_STYLE's
     /// step-line), the frametime (the web page's step-line blue) and CPU busy, the late
     /// share, the late strip cells and the marks above the strip, the distribution cards' bars and curves, the marks of values beyond a scale,
     /// warning values, the static stretches (violet bands behind the panels, violet strip cells) and the panel keys' swatch colours (key-*:

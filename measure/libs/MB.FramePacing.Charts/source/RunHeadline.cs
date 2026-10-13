@@ -103,7 +103,7 @@ namespace MB.FramePacing.Charts
           pacing != null ? Number(pacing.LateFrames) : "-",
           pacing != null ? Percent(pacing.LateShare) : string.Empty,
           pacing?.LateFrames > 0,
-          "Frames shown at least one refresh later than the target frame time after the previous frame.",
+          "Frames shown half a refresh or more later than their animation time step put them: the frame before stayed on screen that much longer.",
           pacing != null
         ),
       };
@@ -156,7 +156,7 @@ namespace MB.FramePacing.Charts
         $"{pacing.ErrorFramesWithUnevenDisplay} error frame(s) at uneven display, {pacing.ErrorFramesWithEvenDisplay} on an even display";
       return pacing.Verdict switch
       {
-        PacingVerdict.BadPacing => $"mostly bad pacing: frames shown late or early, or dropped ({counts}).",
+        PacingVerdict.BadPacing => $"mostly bad pacing: display time steps off their target, or frames dropped ({counts}).",
         PacingVerdict.DeltaTimeJitter => $"mostly delta time jitter: an even display with uneven animation steps ({counts}).",
         PacingVerdict.Both => $"both bad pacing and delta time jitter ({counts}).",
         _ => "no animation error above the threshold.",

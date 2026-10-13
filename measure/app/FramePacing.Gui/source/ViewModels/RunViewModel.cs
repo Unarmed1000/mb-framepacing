@@ -43,17 +43,16 @@ namespace MB.FramePacing.Gui.ViewModels
       if (run.Pacing is { } pacing)
       {
         string target = pacing.TargetFrameTime.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
-        TargetText = pacing.Source switch
+        string against = pacing.Source switch
         {
-          PacingSource.Schedule =>
-            $"Late = shown half a refresh or more after the frame's intended display time (the pacer's schedule in the markers, typically {target} ms per frame).",
-          PacingSource.TargetFrameTime =>
-            $"Late = on screen half a refresh or more beyond each frame's target frame time (the pacer's target in the markers, typically {target} ms).",
-          PacingSource.PreferredFrameTime =>
-            $"Late = on screen half a refresh or more beyond the frame time the application wants (its preferred frame time in the markers, typically {target} ms).",
-          PacingSource.GivenTarget => $"Late = on screen half a refresh or more beyond the {target} ms target (the given target frame rate).",
-          _ => $"Late = on screen half a refresh or more beyond the {target} ms target (no pacing information: the display's native refresh rate).",
+          PacingSource.Schedule => $"the pacer's schedule in the markers (typically {target} ms per frame)",
+          PacingSource.TargetFrameTime => $"each frame's target frame time (the pacer's target in the markers, typically {target} ms)",
+          PacingSource.PreferredFrameTime => $"the frame time the application wants (its preferred frame time in the markers, typically {target} ms)",
+          PacingSource.GivenTarget => $"the {target} ms target (the given target frame rate)",
+          _ => $"the {target} ms target (no pacing information: the display's native refresh rate)",
         };
+        TargetText =
+          $"Late = shown half a refresh or more later than the frame's animation time step put it. The display time steps are measured against {against}.";
         RefreshText =
           string.Create(
             CultureInfo.InvariantCulture,

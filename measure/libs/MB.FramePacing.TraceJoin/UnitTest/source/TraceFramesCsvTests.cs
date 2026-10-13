@@ -31,7 +31,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.That(TraceFramesCsv.ToText(rows), Is.EqualTo(stored));
       Assert.That(rows[0].FrameIndex, Is.EqualTo(388));
       Assert.That(rows.Count(row => row.SurfaceFrameToken != null), Is.GreaterThan(380));
-      Assert.That(rows.Count(row => row.PresentType == "Late Present"), Is.EqualTo(92));
+      Assert.That(rows.Count(row => row.PresentType == "Late Present"), Is.EqualTo(33));
       Assert.That(rows.All(row => row.DisplayMinusVBlankNs == 0), Is.True);
       Assert.That(rows.Count(row => row.CpuRunnableNs > 0), Is.GreaterThan(30));
     }

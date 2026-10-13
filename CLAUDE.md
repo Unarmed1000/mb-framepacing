@@ -604,8 +604,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - The frame timeline (`FrameTimelineCard`, `render --timeline`, at most 40 frames) is explained's timing diagram from the data: CPU
       boxes (CPU start time + CPU busy, overlapping ones in further lanes) placed on the capture's clock by `PacerToCapture` (display time
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells. A
-        static frame's cells are violet (`strip-static-a`/`-b`) and the error row says "static" on the static step after it; a frame presented on demand is never
-        "held longer" (no interval to be late for).
+        static frame's cells are violet (`strip-static-a`/`-b`) and the error row says "static" on the static step after it; a frame is
+        "held longer" (amber) for the refreshes beyond the time a late next frame was animated for: the `Late` flag, never a test of
+        the card's own.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, and the GUI's
       Display card the report's display box (`RunHeadline.Display`, `DisplaySummary`), so add or change a number there, not in the GUI.
       A tile without a number shows "-" with `HasValue` false.
@@ -619,8 +620,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       `TextRunsShape` (pieces of text, each in its own classes) that the renderer lays out end to end (a `<text>` with `<tspan>`s in SVG,
       measured pieces in `CardView`), so no width is guessed. Swatches are coloured characters in the `key-*` classes (■ fill, ━ line,
       ┅ refresh and reference lines, ▐▌ for colours that alternate per frame).
-    - **Holds and strip cells by kind** (`RunChartData.HoldKinds`, `HoldKind`): unknown (a capture gap, dashed grey), late (red), an
-      older frame came back (out of order, pink), frames dropped by the target (orange), as planned (green). Dropped = skipped frame
+    - **Holds and strip cells by kind** (`RunChartData.HoldKinds`, `HoldKind`): unknown (a capture gap, dashed grey), an older frame
+      came back (out of order, pink; it outranks late, as the frame after it is late by its step and the older frame is why), late
+      (red), frames dropped by the target (orange), as planned (green). Dropped = skipped frame
       indices over a gap-free capture that never came back out of order (`DroppedBeforeFrame`); the strip colours the refreshes where
       they were due orange and the out-of-order refreshes (`PresentedFrame.OlderFrames`, CSV `olderFrames`) pink (anywhere in a frame's cells).
     - **Reference lines** (`frame-time-lines`, shown by default): the target (light grey) and preferred frame time (amber, only where it
@@ -671,11 +673,28 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `AnalysisBenchmarks` (`--long-running`): the timeline of an hour at 240 Hz takes 0.35 s. Each frame is still made twice (the
     pacing pass copies it to add its values): measured as about 0.05 s and 269 MB of short-lived garbage, left as it is.
   - Late frames, the 2 s late share and the "which cause" verdict: `PacingAnalyzer` → `RunPacing` (`runs[].pacing` in
-    summary.json). Every frame's target comes from, in order: the pacer's intended display times in the markers (`PacingSource.Schedule`:
-    lateness against the schedule, and the animation error split into pacing and prediction error), its target frame time in the
-    markers, the target frame rate (`--target-fps`, GUI "Target frame rate", stored in capture.json, overridable at analysis time),
-    and otherwise one refresh (the native rate). Without a schedule, a frame after frames the target dropped (`DroppedFrames`) is due one
-    target per frame later (1 + dropped): dropped, not late. The synthetic game writes a schedule; its prediction error is 0 by construction.
+    summary.json).
+    - **Late is one rule** (agreed with the user, 2026-10-13): a frame is late when its display time step is half a refresh or more
+      longer than its animation time step (`AnimationError <= -half`), whatever the markers carry. It is the rule of the pacer's
+      `DisplayErrorCounter`, so the two counts can be held against each other. **Never a frame's position** against a clock or a
+      plan: a pacer's animation timer and the display diverge for good after a lost refresh, and only the frame whose step was
+      long is late. `Lateness` (with a schedule: how long after its intended time a frame appeared) is that position: a value in
+      the CSV and the hover that no flag or colour follows from. A static or an uncertain step has no late frame.
+    - What the rule costs, accepted by the user with the renders: a timer's step that is half a refresh short on an even display
+      is late too (`60-naive-5ms`: 64 late frames with the cause delta time jitter, red on holds of one refresh), and a hold twice
+      its target is green when the next frame was animated for nearly that. References tried and dropped, each for a case it
+      fails: the intended display time (frames that stay behind; a grid that slides against the display), the step between
+      intended times (a pacer that moves its plan after a loss), the target frame time (a step lengthened on purpose; the native
+      refresh is a guess), and "a pacer is active" (the markers do not say whose the animation time is).
+    - The pacer's frame window count (`FrameWindowState::LateFrames`) is another thing, "did not make its time": open as decision
+      18 of `sdk/doc/pacer-design.md`.
+    - Every frame's **target** (what the display time steps, the cause and the late share's amber are measured against; not late)
+      comes from, in order: the pacer's intended display times in the markers (`PacingSource.Schedule`: lateness against the
+      schedule, and the animation error split into pacing and prediction error), its target frame time in the markers, the target
+      frame rate (`--target-fps`, GUI "Target frame rate", stored in capture.json, overridable at analysis time), and otherwise one
+      refresh (the native rate). Without a schedule, a frame after frames the target dropped (`DroppedFrames`) is due one target per
+      frame later (1 + dropped): dropped, not off its target. The synthetic game writes a schedule; its prediction error is 0 by
+      construction.
 - **Markers (format version 1, `sdk/doc/marker-format.md`):** a 53 byte header shared by frame, start and end, its fields grouped by
   category: format (magic, version, kind), which run and frame (run id, frame index), what the frame shows (flags, animation time),
   pacing (preferred frame time, target frame time, intended display time), the CPU's work (CPU start time and CPU busy, named as

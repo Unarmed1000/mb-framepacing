@@ -64,7 +64,8 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   that never reach the display. A frame keeps its index for every refresh it stays on screen. `u64`: it never wraps.
 - **What the analysis does:**
   - A frame index skipped over a capture without gaps, and never shown later, is a **dropped frame**. Without the pacer's schedule,
-    the frame after dropped frames is due one target frame time per dropped frame later, so it is dropped, not late.
+    the frame after dropped frames is due one target frame time per dropped frame later, so its longer step is on its target:
+    frames were dropped, the step is not off.
   - An index that goes back by at most 1000 is an older frame shown again after a newer one: **out of order**. The newer frame
     stays the one presented.
   - An index that goes back by more than 1000 starts a new segment, with a warning (an application that restarted). Steps are never
@@ -92,8 +93,8 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   - The static frame's time on screen (the next frame's display time step) is left out of the average fps, the 1 % and 0.1 % lows and
     the display time step statistics and histogram; the report says how many (**excluding N static frames**).
   - The report draws static stretches in violet, and leaves them out of the display time step and frametime scales.
-  - A static step is never in the late share's amber ("held longer than the preferred frame time"). It can still be late: see
-    "A renderer that sleeps until something changes" below for a renderer that stops presenting while static.
+  - A static step is never in the late share's amber ("held longer than the preferred frame time") and never late: nothing
+    animated, so nothing was shown later than it was animated for.
   - Static before speaks for the frame index before it only. When the target dropped a frame next to a rest, the flag can be lost
     (the dropped frame carried it) or orphaned (it speaks for the dropped frame). The analysis then **assumes** the rest is static and
     flags the frame that held it `StaticAssumed`, so the report says it apart from a rest the markers stated:
@@ -116,8 +117,15 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   uses. It is not a measurement of when the frame reaches the screen; the capture measures that.
 - **Value:** the same value the frame's animation used, in nanoseconds. Negative values are allowed.
 - **Changes:** every frame, by the application's animation time step (its delta time).
-- **What the analysis does:** the **animation error** of a step is the animation time step minus the display time step: how far the
-  motion on screen moved off real time. It is the report's main number; the drift sums it over the run.
+- **What the analysis does:**
+  - The **animation error** of a step is the animation time step minus the display time step: how far the motion on screen moved
+    off real time. It is the report's main number; the drift sums it over the run.
+  - A frame is **late** when its display time step is half a refresh or more longer than its animation time step (an animation
+    error of minus half a refresh or beyond): the frame before it stayed on screen that much longer than this frame was animated
+    for. It is one rule, whatever pacing fields the markers carry. A step that is not judged (a static step, a capture gap) has no
+    late frame.
+  - Late says nothing of where a frame is against a clock or a plan. After a lost refresh that a pacer does not catch up with,
+    the frames that follow are a refresh behind for the rest of the run, with steps that are right: one frame is late.
 - **Goes wrong when:**
   - It comes from a separate wall clock read while drawing the marker instead of the animation's own clock: the report then measures
     the render loop's timing, not what the viewer saw.
@@ -140,7 +148,8 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **What the analysis does:**
   - The value is rounded up to whole refreshes, with 5 % slack (59.9 fps on 60 Hz is one refresh, 60 fps on 144 Hz three).
   - The **late share's amber**: a frame on screen at least half a refresh longer than the preferred frame time, without being late.
-    The pacer intended it, but the application runs slower than it wants. On demand frames and static steps are never amber.
+    The frame was animated for that time, but the application runs slower than it wants. On demand frames and static steps are
+    never amber.
   - Without a target frame time and a schedule, frames are measured against it.
   - The report's display box says "preferred N fps" (or "on demand").
 - **Goes wrong when:** a game that deliberately runs at 30 fps writes the target but not the preferred frame time: the analysis
@@ -153,10 +162,12 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **Changes:** on the frame where the pacer changes its rate (an adaptive pacer dropping from 60 to 30 fps writes `33'333'333` from the first
   frame it paces at 30).
 - **Unknown (`0`):** the preferred frame time stands in, then `--target-fps`, then one refresh.
-- **What the analysis does:** without the pacer's schedule, every frame is measured against the frame before it: it is **late**
-  when its display time step is at least half a refresh longer than its target (rounded up to whole refreshes, as above, and one
-  target per dropped frame longer after dropped frames). An on-demand frame is never late without a schedule.
-- **Goes wrong when:** it holds the display's refresh period while a frame limiter holds a lower rate: every limited frame is late.
+- **What the analysis does:** without the pacer's schedule, every frame's display time step is measured against its target
+  (rounded up to whole refreshes, as above, and one target per dropped frame longer after dropped frames). A step half a refresh or
+  more off it is **off its target**: the report draws the target as a reference line, and an animation error at such a step counts
+  as bad pacing. An on-demand frame has no target. Whether a frame is late does not depend on the target (see "Animation time").
+- **Goes wrong when:** it holds the display's refresh period while a frame limiter holds a lower rate: every limited frame's step is
+  off its target.
 
 ### Intended display time
 
@@ -171,14 +182,15 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **What the analysis does:**
   - It lines the pacer's clock up with the capture's clock from the run's **on-time frames**: the earliest group of at least a quarter
     of the frames that appear within half a refresh of each other, relative to their intended times.
-  - A frame shown half a refresh or more after its intended time, relative to that, is **late**. That also finds the frames that
-    stay late after a hitch, which a step by step comparison misses.
+  - How long after its intended time a frame appeared, relative to that, is its **lateness** (`latenessNs`). It also shows the
+    frames that stay behind after a hitch, which a step by step comparison misses: they are behind the plan with steps that are
+    right, so they are not late.
   - It splits every animation error exactly: **pacing error** (the display time step minus the intended step: shown off the plan)
     and **prediction error** (the animation time step minus the intended step: animated for another moment than planned).
   - The frame timeline card places the CPU start times on the capture's clock with the same alignment.
 - **Goes wrong when:**
   - It comes from another clock than the CPU start time: the frame timeline card places the CPU work wrongly.
-  - Most of the run is consistently late (a full frame queue for the whole run): a delay the whole run shares cannot be told from
+  - Most of the run is consistently behind its plan (a full frame queue for the whole run): a delay the whole run shares cannot be told from
     the difference between the two clocks, so only changes of it show.
 
 ### CPU start time
@@ -227,41 +239,44 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 Times are nanoseconds. `0` = unknown; "on demand" = `0xFFFFFFFF`.
 
 **A fixed 60 fps loop with vsync on a 60 Hz display, without a present timing API.** Preferred and target frame time `16'666'667` on
-every frame, intended display time `0`. The analysis measures every frame against the one before it: a step of two refreshes or
-more is late, unless the frame index shows that frames between were dropped.
+every frame, intended display time `0`. The analysis measures every frame against the one before it: a frame shown two refreshes
+after it and animated for one is late. After dropped frames a game that renders every frame animated for them too, and the frame
+is not late.
 
 **A 30 fps lock on a 60 Hz display.** Preferred and target frame time `33'333'333`. Steps of two refreshes are on target; a step of three
-is late. Nothing is amber: the game runs at the rate it wants. Without the preferred frame time every frame would be amber.
+that was animated for two is late. Nothing is amber: the game runs at the rate it wants. Without the preferred frame time every frame
+would be amber.
 
 **An adaptive pacer lowering from 60 to 30 fps for a busy stretch.** The preferred frame time stays `16'666'667`; the target frame time
 is `16'666'667`, then `33'333'333` from the first frame paced at 30; the intended display times are the present times the pacer
 requests:
 
-| Frame | Target       | Preferred    | Intended display time | Report                                   |
-| ----- | ------------ | ------------ | --------------------- | ---------------------------------------- |
-| 100   | `16'666'667` | `16'666'667` | T                     | on time                                  |
-| 101   | `33'333'333` | `16'666'667` | T + `33'333'333`      | on time, amber: below its preferred rate |
-| 102   | `33'333'333` | `16'666'667` | T + `66'666'667`      | shown a refresh after its plan: late     |
+| Frame | Target       | Preferred    | Intended display time | Report                                               |
+| ----- | ------------ | ------------ | --------------------- | ---------------------------------------------------- |
+| 100   | `16'666'667` | `16'666'667` | T                     | on time                                              |
+| 101   | `33'333'333` | `16'666'667` | T + `33'333'333`      | on time, amber: below its preferred rate             |
+| 102   | `33'333'333` | `16'666'667` | T + `66'666'667`      | shown a refresh later than it was animated for: late |
 
-The late share shows the lowered stretch in amber and the frames shown after their plan in red.
+The late share shows the lowered stretch in amber and the late frames in red.
 
 **A frame rate cap just under the refresh rate (117 fps on 120 Hz).** Preferred and target frame time `8'547'009`. A capture card needs
 a fixed refresh rate, so the display refreshes every `8'333'333`: the target rounds up to one refresh (5 % slack), and the refreshes
-where the cap makes a frame wait a second refresh are measured as late.
+where the cap makes a frame wait a second refresh are measured as late: the frame was animated for 8.5 ms and shown 16.7 ms after the
+one before it.
 
 **An idle device at 1 fps.** While idle, preferred and target frame time `1'000'000'000`, and static after on the idle frames when
 nothing moves. Steps of one second are on target and not amber; the idle frames' time is left out of the frame rates and drawn in
 violet. Back to 60 fps, both fields return to `16'666'667` on the first frame paced at 60.
 
 **An on-demand renderer (an editor, a UI that redraws on input).** Preferred and target frame time on demand on every frame, no
-intended display time. No wait for the next frame is late and nothing is amber; the animation errors of the frames it does present
-are judged as usual.
+intended display time. No wait for the next frame is off a target and nothing is amber; the animation errors of the frames it does
+present are judged as usual, and a frame is late only when it was animated for less than it waited.
 
 **A renderer that sleeps until something changes.** It renders every refresh while an animation runs, then stops presenting until
 input arrives. When it knows, while rendering the frame that ends the animation, that nothing is pending, it sets static after on
 that frame. When it only knows on waking, it sets static before on the first frame it renders then. Either way the wait is a static
-step: left out of the frame rates, not judged, violet. The wait had no interval to meet, so that first frame also writes target frame
-time on demand, or it is late by the length of the wait.
+step: left out of the frame rates, not judged, never late, violet. The wait had no interval to meet, so that first frame also writes
+target frame time on demand, or its step is off its target by the length of the wait.
 
 **A static menu in a game that keeps rendering at 60 fps.** Preferred and target frame time `16'666'667`, and static after on every
 frame of the menu while nothing in it moves (it knows each frame has no pending work). The animation clock may pause after the last

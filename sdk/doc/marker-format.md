@@ -103,7 +103,7 @@ wall clock. Examples: `NanosecondTimeSpan.FromSeconds(t)` in C#, `MB::FramePacin
 
 Only the application's frame pacer knows what it is aiming for. A capture cannot tell a pacer that deliberately runs at 30 fps
 (an adaptive pacer dropping to 30 for a busy stretch, a 30 fps cap) from a game that fails to hold 60, it cannot tell a game that wants 30 fps from
-one that was forced down to it, and it cannot see that every frame after a hitch stays a refresh late in a full frame queue. The
+one that was forced down to it, and it cannot see that every frame after a hitch stays a refresh behind its plan in a full frame queue. The
 pacing fields tell the analysis:
 
 - **Intended display time:** the time the pacer aims for this frame to become visible: the vsync it targets, the present time it
@@ -112,8 +112,10 @@ pacing fields tell the analysis:
   adopts (OpenXR `predictedDisplayTime`, Android Choreographer's expected presentation time, `CADisplayLink.targetTimestamp`). It is the
   pacer's plan; what the game animated the frame for is its animation time, and in a well paced game the two agree. Use a steady clock
   (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`) in nanoseconds; its epoch does not matter, only the
-  differences between frames. The analysis lines the clock up with the capture clock itself. A frame shown half a refresh or more
-  after its intended time is **late**; that also finds frames that stay late after a hitch.
+  differences between frames. The analysis lines the clock up with the capture clock itself and reports how long after its
+  intended time each frame appeared, its **lateness**; that also shows frames that stay behind after a hitch. Whether a frame is
+  **late** is not decided by it: a frame is late when its display time step is half a refresh or more longer than its animation
+  time step, and a frame that stays behind has a step that is right.
 - **Target frame time:** the interval the pacer aims for before this frame (`1 / target frame rate`). Fill it even without an
   intended display time, for example from a frame limiter. It changes on the frame where the pacer changes its rate.
 - **Preferred frame time:** the interval the application wants to run at: what it would aim for if nothing held it back. It differs
@@ -124,7 +126,7 @@ pacing fields tell the analysis:
   - A device that saves power while idle and presents 1 frame per second: preferred and target `1'000'000'000` while idle. Idle at the
     rate it wants is not a problem.
   - A renderer that presents only when something changes: `0xFFFFFFFF` (**on demand**) in both. There is no interval to aim for, so
-    no wait for the next frame is late. The value is allowed in the target frame time too.
+    no wait for the next frame is off a target. The value is allowed in the target frame time too.
   - With variable refresh (VRR) the rates need not be whole refreshes: a pacer on a 144 Hz display can drop from 60 to 48 fps
     (`20'833'333`) or cap at 117 fps. The fields are intervals, so nothing changes.
 - Without a target frame time the analysis measures each frame against the preferred frame time: a game that writes only that it
@@ -150,7 +152,8 @@ say the same fact, for applications that know it at different moments:
 - Either bit, or both, makes the step from that frame to the next a **static step**. The analysis does not judge its animation
   error, because there is no motion to be off: an animation clock that pauses while nothing animates would otherwise make the first
   frame after an idle stretch look as far off as the stretch was long. The step into the static frame is judged as usual. A static
-  step can still be late; the static frame's time on screen is left out of the frame rates, which describe the frames that animate.
+  step has no late frame either; the static frame's time on screen is left out of the frame rates, which describe the frames that
+  animate.
 - The two bits are independent flags, not one value: every combination is valid (inside a static stretch rendered every refresh,
   a frame carries both).
 - **Bits 2 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.

@@ -26,8 +26,8 @@ namespace MB.FramePacing.Analysis
     Torn = 4,
 
     /// <summary>
-    /// Shown half a refresh or more after its intended display time, or without a schedule half a refresh or more beyond its target frame
-    /// time after the previous frame (see <see cref="RunPacing"/>).
+    /// Shown half a refresh or more later than its animation time step put it: its display time step from the frame before is that much
+    /// longer than its animation time step (see <see cref="RunPacing"/>).
     /// </summary>
     Late = 8,
 

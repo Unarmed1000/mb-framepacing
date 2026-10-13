@@ -238,11 +238,11 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// Frames on screen longer than one refresh as the pacer intended count in the late share and make it amber; a frame later than its
-    /// target makes it red for the window, then amber again; where every frame takes one refresh it is green.
+    /// Frames on screen longer than the application prefers without being late count in the late share and make it amber; a late frame
+    /// makes it red for the window, then amber again; where every frame takes one refresh it is green.
     /// </summary>
     [Test]
-    public void LateShare_IsAmberWhenHeldLongerAsIntended_AndRedWhenLate()
+    public void LateShare_IsAmberWhenHeldLongerWithoutBeingLate_AndRedWhenLate()
     {
       // The application prefers one refresh per frame; from frame 1400 its pacer runs at two
       var (drawing, frames) = LateShareCard(i => Refresh);
@@ -268,15 +268,15 @@ namespace MB.FramePacing.Charts.UnitTest
       var amber = Points("late-line-adapted");
       Assert.That(green.Max(p => p.X), Is.EqualTo(Seconds(1400)).Within(tolerance), "green while every frame takes one refresh");
       Assert.That(green.Max(p => p.Y), Is.Zero);
-      Assert.That(red.Min(p => p.X), Is.EqualTo(Seconds(1800)).Within(tolerance), "red from the frame that missed the raised target");
+      Assert.That(red.Min(p => p.X), Is.EqualTo(Seconds(1800)).Within(tolerance), "red from the late frame");
       Assert.That(red.Max(p => p.X), Is.EqualTo(Seconds(1800) + 2).Within(tolerance + 0.01), "red for the 2 s window");
       Assert.That(
         amber.Where(p => p.X < Seconds(1800)).Max(p => p.Y),
         Is.GreaterThan(99),
-        "frames held longer as intended count: the line rises in amber"
+        "frames held longer without being late count: the line rises in amber"
       );
       Assert.That(amber.Max(p => p.X), Is.EqualTo(Seconds(2399)).Within(tolerance), "amber again after the late frame's window");
-      Assert.That(KeyWords(drawing).Contains("longer than the application prefers, as the pacer intended"), "the key says what amber means");
+      Assert.That(KeyWords(drawing).Contains("on screen longer than the application prefers, not late"), "the key says what amber means");
     }
 
     /// <summary>

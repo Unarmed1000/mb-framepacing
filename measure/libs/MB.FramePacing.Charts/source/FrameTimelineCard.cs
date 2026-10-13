@@ -188,10 +188,13 @@ namespace MB.FramePacing.Charts
         var frame = frames[i];
         int from = shownAt[i];
         int to = i + 1 < frames.Count ? shownAt[i + 1] : endRefresh;
-        // How long the frame is meant to stay: the next frame's target (its swap interval), the last frame's own. A frame presented on
-        // demand has no interval to aim for: the wait for it is never late
-        var next = i + 1 < frames.Count ? frames[i + 1] : frame;
-        var intendedHold = OnDemand(next) ? NanosecondTimeSpan.MaxValue : next.TargetFrameTime ?? refresh;
+        // How long the frame is meant to stay: as long as it does, unless the next frame is late. Then it is the time the next frame was
+        // animated for (its animation time step), and the refreshes beyond that are the ones it was held longer
+        var next = i + 1 < frames.Count ? frames[i + 1] : null;
+        var intendedHold =
+          next != null && (next.Flags & PresentedFrameFlags.Late) != 0 && next.AnimationDelta is { } animated
+            ? animated
+            : NanosecondTimeSpan.MaxValue;
         // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
         for (int k = from; k < to; ++k)
@@ -262,14 +265,6 @@ namespace MB.FramePacing.Charts
       return presented.Count > 0 ? (presented.Min(), false) : (null, false);
     }
 
-    /// <summary>The frame is presented on demand: its target (or, without one, its preferred frame time) says so, as the analysis reads it.</summary>
-    private static bool OnDemand(PresentedFrame frame)
-    {
-      var onDemand = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
-      return frame.MarkerTargetFrameTime == onDemand
-        || (frame.MarkerTargetFrameTime == NanosecondTimeDuration.Zero && frame.MarkerPreferredFrameTime == onDemand);
-    }
-
     /// <summary>A frame's short name in the boxes and cells: the last three digits of its frame index.</summary>
     private static string Label(PresentedFrame frame) => "#" + (frame.FrameIndex % 1000).ToString("000", CultureInfo.InvariantCulture);
 
@@ -277,7 +272,7 @@ namespace MB.FramePacing.Charts
     {
       ("ok", "the frame's first refresh, within the error threshold"),
       ("off", "the frame's first refresh, off by more than the error threshold"),
-      ("hold", "held as intended (the next frame's target)"),
+      ("hold", "held as the next frame was animated for"),
       ("again", "held longer: the next frame is late"),
       ("strip-static-a", "static: nothing animates"),
     };

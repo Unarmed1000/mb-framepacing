@@ -348,9 +348,9 @@
 <rect class="off" x="435.7" y="435.0" width="14" height="14" rx="4"/>
 <text x="457.7" y="447.0" text-anchor="start" class="sub">the frame's first refresh, off by more than the error threshold</text>
 <rect class="hold" x="920.4" y="435.0" width="14" height="14" rx="4"/>
-<text x="942.4" y="447.0" text-anchor="start" class="sub">held as intended (the next frame's target)</text>
-<rect class="again" x="1260.2" y="435.0" width="14" height="14" rx="4"/>
-<text x="1282.2" y="447.0" text-anchor="start" class="sub">held longer: the next frame is late</text>
+<text x="942.4" y="447.0" text-anchor="start" class="sub">held as the next frame was animated for</text>
+<rect class="again" x="1239.5" y="435.0" width="14" height="14" rx="4"/>
+<text x="1261.5" y="447.0" text-anchor="start" class="sub">held longer: the next frame is late</text>
 <text x="20.0" y="472.0" text-anchor="start" class="sub">Animation error = animation time step − display time step: + shown too soon, − shown too late; error threshold 1 ms</text>
 </g>
 </svg>

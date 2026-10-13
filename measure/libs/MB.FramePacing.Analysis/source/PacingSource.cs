@@ -10,6 +10,10 @@
 
 namespace MB.FramePacing.Analysis
 {
+  /// <summary>
+  /// Where a run's target frame times come from: what the display time steps, the pacing error and the late share's amber are measured
+  /// against. The late verdict does not depend on it.
+  /// </summary>
   public enum PacingSource
   {
     /// <summary>The markers carry intended display times: every frame is measured against the pacer's schedule.</summary>

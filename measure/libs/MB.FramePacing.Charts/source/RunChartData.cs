@@ -138,8 +138,9 @@ namespace MB.FramePacing.Charts
       m_droppedBefore = Once(() => DroppedFrames.Before(Frames));
       m_holdKinds = Once(() =>
       {
-        // A hold's kind, the first that applies: not known (a capture gap made the next step uncertain), late, an older frame came back
-        // while it was the newest, frames never shown before the next, as planned
+        // A hold's kind, the first that applies: not known (a capture gap made the next step uncertain), an older frame came back while
+        // it was the newest (the next frame is then late by its step, and the older frame is why), late, frames never shown before the
+        // next, as planned
         var kinds = new HoldKind[count];
         for (int i = 0; i + 1 < count; ++i)
         {
@@ -148,8 +149,8 @@ namespace MB.FramePacing.Charts
           var next = Frames[i + 1];
           kinds[i] =
             (next.Flags & PresentedFrameFlags.UncertainStep) != 0 ? HoldKind.Unknown
-            : (next.Flags & PresentedFrameFlags.Late) != 0 ? HoldKind.Late
             : Frames[i].OlderFrames is { Count: > 0 } ? HoldKind.OlderFrameBack
+            : (next.Flags & PresentedFrameFlags.Late) != 0 ? HoldKind.Late
             : DroppedBeforeFrame[i + 1] > 0 ? HoldKind.FramesDropped
             : HoldKind.AsPlanned;
         }

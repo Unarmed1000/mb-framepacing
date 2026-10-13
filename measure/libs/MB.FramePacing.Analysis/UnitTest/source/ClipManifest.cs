@@ -242,9 +242,17 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     public long? AnimationErrorNanoseconds(int frame) => IsJudged(frame) ? AnimationStepNanoseconds(frame) - DisplayStepNanoseconds(frame) : null;
 
-    public bool IsLate(int frame) => RenderedLate[Presented[frame]] > 0;
+    /// <summary>
+    /// The frame is late (frame 1 on): its display time step is half a refresh or more longer than its animation time step. A step that is
+    /// not judged has no late frame. Half a refresh is cut to the nanosecond, as the analysis has it.
+    /// </summary>
+    public bool IsLate(int frame) =>
+      frame > 0 && AnimationErrorNanoseconds(frame) is { } error && error <= -((RefreshNanoseconds(1) - RefreshNanoseconds(0)) / 2);
 
-    /// <summary>How many refreshes after the one it was rendered for the frame is first shown (negative: early, out of order).</summary>
+    /// <summary>
+    /// How many refreshes after the one it was rendered for the frame is first shown (negative: early, out of order). Its place against the
+    /// pacer's plan, which is the frame's lateness and not whether it is late: a frame that stays behind after a hitch has a step that is right.
+    /// </summary>
     public int LateRefreshes(int frame) => RenderedLate[Presented[frame]]!.Value;
 
     public long CpuStartNanoseconds(int frame) => RenderedCpuStartNs[Presented[frame]];

@@ -2,7 +2,7 @@
 //* File Description
 //* ----------------
 //* A run, or a section of one, as one card (shapes: CardDrawing, written as SVG by SvgCardWriter, drawn by the GUI) in the style of mb-framepacing-explained's example charts (generate_charts.py): the headline
-//* tiles, the animation error per frame as signed bars, the display time step as held steps (green as planned, red held too long), the share
+//* tiles, the animation error per frame as signed bars, the display time step as held steps (green as planned, red where the next frame was late), the share
 //* of late frames in the last 2 s, and the refresh strip; opt-in, the animation time step over the display time step (as generate_charts.py
 //* draws them), and for a card in a document its own title, a strip of the first seconds and a tiles row of its own width (ReportOptions).
 //* The x axis is seconds since the run's first frame, as on the
@@ -417,7 +417,7 @@ namespace MB.FramePacing.Charts
     /// <summary>The key entries of the hold kinds besides "as planned", in the key's order.</summary>
     private static readonly (HoldKind Kind, string Text)[] g_holdKeys =
     {
-      (HoldKind.Late, "held too long: the next frame was late"),
+      (HoldKind.Late, "held: the next frame was late"),
       (HoldKind.OlderFrameBack, "held: an older frame came back"),
       (HoldKind.FramesDropped, "held: frames never shown before the next"),
       (HoldKind.Unknown, "not known: a capture gap"),
@@ -670,7 +670,8 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
-    /// The display time step as held steps (green as planned, red held too long). With <paramref name="animation"/>, the animation time step
+    /// The display time step as held steps (green as planned, red where the next frame was late). With <paramref name="animation"/>, the animation time
+    /// step
     /// under it as a blue line on the same holds and scale: an even display with an uneven animation is delta time jitter.
     /// </summary>
     private static void StepPanel(
@@ -782,7 +783,7 @@ namespace MB.FramePacing.Charts
       }
       else
       {
-        // Per pixel column: the range of its holds faint, in the colour of the first kind it holds (red if any was held too long), and its
+        // Per pixel column: the range of its holds faint, in the colour of the first kind it holds (red if any was before a late frame), and its
         // median hold as the solid line in that hold's kind
         var ranges = Enum.GetValues<HoldKind>().ToDictionary(kind => kind, _ => new StringBuilder());
         var medians = Enum.GetValues<HoldKind>().ToDictionary(kind => kind, _ => new StringBuilder());
@@ -1158,8 +1159,8 @@ namespace MB.FramePacing.Charts
         );
       }
       bool staticLate = StaticBands(parts, view, lateY, lateY + LateH, label: false);
-      // Red where a frame in the window was late (later than its target: the pacer's intent in the markers, else one refresh), amber
-      // where frames were only on screen longer than the application prefers, as the pacer intended, green otherwise; each stretch starts
+      // Red where a frame in the window was late (shown later than its animation time step put it), amber where frames were only on
+      // screen longer than the application prefers, green otherwise; each stretch starts
       // where the previous one ended, so the line is whole
       var paths = new Dictionary<string, StringBuilder>
       {
@@ -1214,8 +1215,8 @@ namespace MB.FramePacing.Charts
         var (style, text) in new[]
         {
           ("late-line-none", "none late"),
-          ("late-line-adapted", "longer than the application prefers, as the pacer intended"),
-          ("late-line", "late: longer than the pacer intended"),
+          ("late-line-adapted", "on screen longer than the application prefers, not late"),
+          ("late-line", "late: shown later than its animation time step"),
         }
       )
       {

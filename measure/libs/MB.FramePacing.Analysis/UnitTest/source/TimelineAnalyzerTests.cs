@@ -216,6 +216,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(frames[3].AnimationError?.Nanoseconds, Is.EqualTo(0), "the step to the static frame: judged");
       Assert.That(frames[4].AnimationError?.Nanoseconds, Is.Null, "the step from it");
       Assert.That(frames[4].DisplayDelta?.Nanoseconds, Is.EqualTo(1000 * Ms), "the static frame's time on screen");
+      Assert.That(frames.Any(f => f.Flags.HasFlag(PresentedFrameFlags.Late)), Is.False, "nothing animated over the rest: no frame was shown late");
       Assert.That(
         frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.StaticBefore)),
         Is.EqualTo(new[] { false, false, false, false, true, false })
@@ -332,9 +333,12 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(gap.After.Flags.HasFlag(PresentedFrameFlags.UncertainStep), "and the step is uncertain, not static");
     }
 
-    /// <summary>An application that presents on demand has no interval to be late against: a long wait for its next frame is not late.</summary>
+    /// <summary>
+    /// An application that presents on demand has no interval to aim for, so no target. A long wait for its next frame is not late: the frame
+    /// was animated for the time it came after.
+    /// </summary>
     [Test]
-    public void OnDemand_IsNeverLateByTheTargetRule()
+    public void OnDemand_HasNoTarget_AndAWaitItAnimatedForIsNotLate()
     {
       long OnDemand = MarkerPayload.OnDemandFrameTime.Nanoseconds;
       var rows = new RowBuilder().Start(1);

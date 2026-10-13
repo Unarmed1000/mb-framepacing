@@ -242,8 +242,8 @@ mb-framepacing render capture-20260924-153000 --timeline --from 12.5 --to 12.8  
 The **frame timeline** (`--timeline`, at most 40 frames) draws a short stretch as a timing diagram: every refresh (bright where a frame
 could be aimed at its target, faint where not), each frame's CPU work from its CPU start time for its CPU busy (boxes that overlap go to
 further lanes), its present arrow, what every refresh showed (green: the frame's first refresh within the error threshold, red: off by
-more, dark green: held as its successor's target intends, amber: held longer because the next frame is late, violet: a static frame,
-where nothing animates; a frame presented on demand is never held longer, since it has no interval to be late for) and each frame's
+more, dark green: held as the next frame was animated for, amber: held longer because the next frame is late, violet: a static frame,
+where nothing animates) and each frame's
 animation time step, display time step and animation error. The CPU times are on the pacer's clock; the markers' intended display
 times place them on the capture's clock (on-time frames appear at their intended vsync), otherwise they are placed so that no frame
 is presented after it first appears.
@@ -325,7 +325,7 @@ The headline numbers on the Analyze page (the report card shows the same):
 | Error p99          | 99 % of the frames have a smaller \|animation error\|; needs 100 frames                                                                                                                                                             |
 | Error p99.9        | 99.9 % of the frames have a smaller \|animation error\|; needs 1000 frames                                                                                                                                                          |
 | Worst error        | The largest absolute animation error, and whether that frame was shown too soon or too late                                                                                                                                         |
-| Late frames        | Frames shown later than planned (see below), and their share of the run                                                                                                                                                             |
+| Late frames        | Frames shown half a refresh or more later than their animation time step put them (see below), and their share of the run                                                                                                           |
 
 Beside them, the **Display** card (the report's display box, top right) shows the refresh rate and whether it is a capture card's fixed
 refresh (vsync) or calculated from a camera, the time per refresh with what the frames targeted in whole refreshes, and what the
@@ -340,21 +340,28 @@ CSV).
 Gamers Nexus's error per frame and percent error stay in `summary.json` (`statistics.errorPerFrameMs`, `statistics.percentError`)
 for comparisons with their numbers.
 
-Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at late,
-early or dropped frames) or from **delta time jitter** (the display stays even, the animation steps do not), and the line after it
-what "late" is measured against, with the typical target frame time. The refresh rate used, compared with the expected display
-rate when one was given, is the Display card's tooltip. What "late" is
-measured against, in order: the intended display times the application's frame pacer writes into the marker (then **Detailed
-statistics** also shows the pacing and prediction error), its target frame time in the marker, its preferred frame time in the marker
-(a game that wants 30 fps on a 60 Hz display is measured against two refreshes), the **target frame rate** given at
-capture or analysis time (rounded up to whole refreshes), and otherwise the display's native refresh rate.
+Below the tiles, **Cause** tells whether the animation error comes mostly from **bad pacing** (the error frames are at display
+time steps off their target, or at dropped frames) or from **delta time jitter** (the display stays even, the animation steps do
+not), and the line after it what "late" means and what the display time steps are measured against, with the typical target frame
+time. The refresh rate used, compared with the expected display rate when one was given, is the Display card's tooltip.
+
+A frame is **late** when its display time step is half a refresh or more longer than its animation time step: the frame before it
+stayed on screen that much longer than this frame was animated for. It is one rule, whatever the markers carry. A frame that
+stays a refresh behind after a late one has a step that is right and is not late (with the pacer's intended display times in the
+markers, `latenessNs` in the frames CSV says where each frame is against the plan). A static step and a step across a capture gap
+have no late frame.
+
+What the display time steps are measured against, in order: the intended display times the application's frame pacer writes into
+the marker (then **Detailed statistics** also shows the pacing and prediction error), its target frame time in the marker, its
+preferred frame time in the marker (a game that wants 30 fps on a 60 Hz display is measured against two refreshes), the **target
+frame rate** given at capture or analysis time (rounded up to whole refreshes), and otherwise the display's native refresh rate.
 
 The charts are explained in the README under [Reading the results](../../README.md#reading-the-results). To analyse again, for
 example with a different clock or only one run:
 
 ```sh
 mb-framepacing analyze capture-20260924-153000 --time host --run 7
-mb-framepacing analyze capture-20260924-153000 --target-fps 30        # late frames against a 30 fps target
+mb-framepacing analyze capture-20260924-153000 --target-fps 30        # the display time steps against a 30 fps target
 mb-framepacing analyze capture-20260924-153000 --name "menu scroll"   # this analysis's name for the runs
 mb-framepacing name capture-20260924-153000 "menu scroll"             # store (or with no name, clear) the capture's name
 ```

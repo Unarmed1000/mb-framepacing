@@ -257,16 +257,20 @@ whole refresh an error reaches with a dashed amber line (±16.7 ms at 60 Hz, ±2
 whole refresh early or late. The display rate you expect (`--display-hz`, **Display refresh rate**) is checked against the
 capture's rate.
 
-**Late frames** are shown later than the application meant. When its frame pacer writes the **intended display time** into the
-marker, a frame is late when it appears half a refresh or more after that time, which also catches frames that stay late after a
-hitch; the animation error then splits into **pacing error** (shown off the plan) and **prediction error** (animated for another
-moment than planned). With only a **target frame time** in the marker, or only a **preferred frame time** (the rate the game wants:
-a game that wants 30 fps on a 60 Hz display is measured against two refreshes), or a target frame rate given to the tools
-(`--target-fps`, **Target frame rate** in the GUI, for example 30 for a game locked to 30 fps on a 60 Hz display), a frame is late
-when it appears half a refresh or more beyond its target. Without any of them the target is the display's native refresh rate. Under the headline numbers, **Cause** tells which
-of the two causes of animation error dominates: frames with an error where the display time step jumps are **bad pacing** (late,
-early or dropped frames); frames with an error while the display time step stays even are **delta time jitter** (uneven animation
-steps).
+**Late frames** are shown later than they were animated for: a frame is late when its display time step (how long the frame before
+it stayed on screen) is half a refresh or more longer than its animation time step. It is one rule, whatever the markers carry.
+After a late frame the frames that follow can stay a refresh behind for the rest of a run; their steps are right, so they are not
+late. When the application's frame pacer writes the **intended display time** into the marker, the analysis also knows where every
+frame is against the pacer's plan (its lateness, in the frames CSV), and the animation error splits into **pacing error** (shown off
+the plan) and **prediction error** (animated for another moment than planned). The display time steps are measured against a
+target: the pacer's plan, else the **target frame time** in the marker, else the **preferred frame time** (the rate the game wants:
+a game that wants 30 fps on a 60 Hz display is measured against two refreshes), else a target frame rate given to the tools
+(`--target-fps`, **Target frame rate** in the GUI, for example 30 for a game locked to 30 fps on a 60 Hz display), else the
+display's native refresh rate. Under the headline numbers, **Cause** tells which
+of the two causes of animation error dominates: frames with an error where the display time step is off its target are **bad pacing**
+(steps too long or too short, or dropped frames); frames with an error while the display time step stays even are **delta time
+jitter** (uneven animation steps). A late frame can be either: a slow frame that misses a refresh, or a timer that stepped half a
+refresh short on a display that ran evenly.
 
 The GUI draws the report's cards itself, as wide as the window. The **Timeline** tab shows the report's animation error, display
 time step, frametime, late share and refresh strip panels on one time axis (the events panel and the target and preferred frame
@@ -288,15 +292,15 @@ Every panel says in its title what it shows, and its key on the right names each
 - **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
   nothing. Everything inside the shaded band counts as no error.
 - **Display time step:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
-  when the frame was held too long because the next one was late, orange when frames the application rendered after it never reached
+  when the next frame was late (shown later than it was animated for), orange when frames the application rendered after it never reached
   the display (dropped), pink when an older frame came back out of order while it was the newest, and dashed grey where a capture gap
-  leaves the step unknown. An error bar over a red step is
+  leaves the step unknown. An error bar where the steps jump is
   bad pacing; an error bar while the steps stay flat is delta time jitter.
 - **Frametime and CPU busy** (when the markers carry the CPU start time and CPU busy): the application side on the same grid, each
   frame's frametime (its CPU start to the next frame's) as a blue step and its CPU busy (until it was presented) as a faint bar.
 - **Share of late frames in the last 2 s:** the frames of the 2 s before each frame that were late, or on screen longer than the
   application prefers (its preferred frame time in the markers; else the target frame rate given to the tools, else one refresh). Red
-  where one was late; amber where they only stayed longer than preferred, as the pacer intended (a pacer running slower than the game
+  where one was late; amber where they only stayed longer than preferred without being late (a pacer running slower than the game
   wants); green where every frame ran as the game wants, so a 30 fps lock or an idle screen at 1 fps stays green. A static frame's
   time on screen and frames presented on demand are never amber.
 - **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, static frames in violet; orange where a
@@ -368,7 +372,8 @@ frame time stays 60 fps) for a while, then 60 again:
 ![The report of a game adapting its rate](measure/doc/images/report-example-adaptive.svg)
 
 A naive delta time timer: every frame is shown on time, but the timer is off by up to 5 ms either way, so the animation steps
-are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad pacing):
+are off by up to 10 ms and nearly every frame is off (delta time jitter, not bad pacing). Where a step is half a refresh or more
+short, the frame is late too: shown later than it was animated for, on a display that ran evenly:
 
 ![The report of delta time jitter from a naive timer](measure/doc/images/report-example-jitter.svg)
 
@@ -391,7 +396,7 @@ mb-framepacing import frames/ --timestamps times.csv        # ... or with each i
 
 # The results
 mb-framepacing analyze <capture folder>                     # analyse again
-mb-framepacing analyze <capture folder> --target-fps 30     # ... with late frames judged against 30 fps
+mb-framepacing analyze <capture folder> --target-fps 30     # ... with the display time steps measured against 30 fps
 mb-framepacing name <capture folder> "menu scroll"          # name it; analyse again to use the name
 mb-framepacing render <capture folder> --from 120 --to 125 --png   # the report of 5 s of the run, SVG and PNG
 mb-framepacing render <capture folder> --playback           # the report next to the recording, with a player (HTML)

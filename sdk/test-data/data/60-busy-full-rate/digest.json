@@ -35,7 +35,7 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostNsSum": 118740547300,
+    "hostNsSum": 127590824000,
     "deviceNsCount": 486,
     "deviceNsSum": 1964250000000,
     "sourceDropsSum": 0,
@@ -77,7 +77,7 @@
         "uncertainSteps": 0,
         "cpuBusyCount": 388,
         "pacingSource": "Schedule",
-        "lateFrames": 92,
+        "lateFrames": 33,
         "refreshPeriodNs": 16666667,
         "targetFrameNs": 16666667,
         "histogramBins": 335
@@ -199,7 +199,7 @@
         }
       },
       "flagCounts": {
-        "Late": 92
+        "Late": 33
       },
       "olderFrameCount": 0,
       "olderFrameIndexSum": 0
@@ -217,7 +217,7 @@
     },
     "captureNsSum": 1964250000000,
     "frameIndexSum": 280133,
-    "hostNsSum": 118740547300,
+    "hostNsSum": 127590824000,
     "sourceDropsSum": 0,
     "missedSum": 0,
     "syncCount": 0,

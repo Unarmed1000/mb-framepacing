@@ -17,7 +17,7 @@ namespace MB.FramePacing.Analysis
   internal static class PacingAnalyzer
   {
     // The on-time frames set where the pacer's clock lines up with the capture clock: the earliest group of at least this share of the frames.
-    // Frames shown early (the one after a dropped frame, say) are rarer than that, and frames that stay late after a hitch come after it
+    // Frames shown early (the one after a dropped frame, say) are rarer than that, and frames that stay behind after a hitch come after it
     private const double OnTimeShare = 0.25;
 
     /// <summary>
@@ -25,12 +25,17 @@ namespace MB.FramePacing.Analysis
     /// and returns the run's pacing. Display time steps are whole refreshes, so everything is compared with half a refresh of slack.
     /// <list type="bullet">
     /// <item>
-    /// With intended display times (<see cref="PacingSource.Schedule"/>) every frame gets a pacing error (display time step minus intended step) and a
-    /// prediction error (animation step minus intended step); the animation error is prediction minus pacing error. A frame is late when it is
-    /// shown at least half a refresh after its intended time, measured from the run's on-time frames: that also finds frames that stay late
-    /// after a hitch.
+    /// A frame is late when its display time step is half a refresh or more longer than its animation time step (an animation error of minus
+    /// half a refresh or beyond): the frame before it stayed on screen that much longer than this frame was animated for. One rule, whatever
+    /// the markers carry, and the rule of the pacer's own count from display reports. A static or an uncertain step has no animation error
+    /// and so no late frame.
     /// </item>
-    /// <item>Otherwise a frame is late when it is shown at least one refresh later than its target frame time after the previous frame.</item>
+    /// <item>
+    /// With intended display times (<see cref="PacingSource.Schedule"/>) every frame gets a pacing error (display time step minus intended step) and a
+    /// prediction error (animation step minus intended step); the animation error is prediction minus pacing error. Its lateness is how long
+    /// after its intended time it appeared, measured from the run's on-time frames: a value of its own that the late verdict does not use (a
+    /// frame that stays behind its plan after a hitch has a step that is right).
+    /// </item>
     /// </list>
     /// </summary>
     public static RunPacing Analyze(
@@ -126,10 +131,12 @@ namespace MB.FramePacing.Analysis
           scheduleOffset is { } offset && frame.IntendedDisplayTime != default ? CaptureMinusPacer(frame) - offset : null;
 
         bool isLate = false;
-        if (!uncertain && frame.DisplayDelta is { } display)
+        if (!uncertain && frame.DisplayDelta.HasValue)
         {
           ++counted;
-          isLate = lateness is { } behind ? behind >= half : target is { } aim && display >= aim + half;
+          // Late: the frame before it was on screen half a refresh or more longer than this frame's animation time step. A static step has
+          // no animation error: nothing animated, so nothing was shown late
+          isLate = frame.AnimationError is { } error && error <= -half;
           if (isLate)
             ++late;
         }

@@ -51,7 +51,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// <summary>
     /// The Timeline card: the animation error bar of every frame with an error, at its display time and exactly as high (bars too small to
     /// see keep a minimum height, in the right direction), on the symmetric scale with the error threshold's band; every frame's hold on
-    /// the display time step panel (until the next frame, at its display time step, held too long when the next frame is late); and the
+    /// the display time step panel (until the next frame, at its display time step, red when the next frame is late); and the
     /// 2 s late share at every frame. The display time step and frametime scales leave static frames out (their holds and frametimes are
     /// idle waits, drawn at the top edge), and a violet band behind every stretch of static frames, with the key saying so, on every panel.
     /// </summary>
@@ -129,9 +129,10 @@ namespace MB.FramePacing.Charts.UnitTest
           Is.EqualTo(Math.Min(Ms(manifest.DisplayStepNanoseconds(i)), step.YTo)).Within(0.051 * pixelMs),
           $"{clip}: display time step {i} (at the top edge beyond the scale)"
         );
+        // An older frame that came back outranks late: the next frame is late by its step then, and the older frame is why
         string expectedClass =
-          manifest.IsLate(i) ? "held-late"
-          : manifest.OlderFramesAfter(i - 1).Count > 0 ? "held-older"
+          manifest.OlderFramesAfter(i - 1).Count > 0 ? "held-older"
+          : manifest.IsLate(i) ? "held-late"
           : manifest.DroppedBefore(i) > 0 ? "held-dropped"
           : "held";
         Assert.That(holdClass, Is.EqualTo(expectedClass), $"{clip}: hold {i}'s kind");
@@ -355,7 +356,7 @@ namespace MB.FramePacing.Charts.UnitTest
 
     /// <summary>
     /// The SVG report of each clip, drawn from what the analysis wrote: a bar per frame with an animation error, a held step per frame (red for
-    /// the ones held too long), and the refresh strip's cells, late ones red, as the manifest gives them.
+    /// the ones before a late frame), and the refresh strip's cells, late ones red, as the manifest gives them.
     /// </summary>
     [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
     public void ReportSvg_MatchesTheManifest(string clip)
@@ -378,7 +379,11 @@ namespace MB.FramePacing.Charts.UnitTest
         Is.EqualTo(measured.Length),
         $"{clip}: a hold per frame until the next"
       );
-      Assert.That(Segments("held-late"), Is.EqualTo(measured.Count(manifest.IsLate)), $"{clip}: held too long when the next frame is late");
+      Assert.That(
+        Segments("held-late"),
+        Is.EqualTo(measured.Count(i => manifest.IsLate(i) && manifest.OlderFramesAfter(i - 1).Count == 0)),
+        $"{clip}: red when the next frame is late, unless an older frame came back"
+      );
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
       // Per frame: the refreshes it was seen in, the last ones orange where frames the target dropped before the next were due (each a
       // target frame time after the one before), the rest red for a late frame, violet for a static one; then pink refreshes that showed an
@@ -532,7 +537,11 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(violet, Is.EqualTo(staticLabels.Contains(label)), $"{clip}: {label}'s cell {cls}");
       }
       if (clip == "60-on-demand")
-        Assert.That(cells.Select(c => c.Class), Has.None.EqualTo("again"), "a frame presented on demand is never late for waiting");
+        Assert.That(
+          cells.Select(c => c.Class),
+          Has.None.EqualTo("again"),
+          "the waits of this clip were animated for: no frame is late, none is held longer"
+        );
       Assert.That(
         texts.Count(t => t == "static"),
         Is.EqualTo(frames.Count(f => f.AnimationError?.Nanoseconds is null && (f.Flags & PresentedFrameFlags.StaticBefore) != 0)),

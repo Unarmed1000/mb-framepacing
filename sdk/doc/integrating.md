@@ -217,8 +217,8 @@ work after it: an idle screen, a paused menu). An application that only knows it
 the static frame, so an animation clock that pauses while idle does not look like a huge error ([the flags](marker-fields.md#flags-static-after-and-static-before)).
 
 **Frame pacing (recommended).** If your game paces its frames, put what the pacer aims for into the payload: the **preferred frame time**, the rate
-the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock nanoseconds, any epoch). The analysis then measures every frame against your plan, separates pacing errors from animation timing errors,
-does not count a rate you chose (30 fps for a busy stretch) as late, and shows where the game ran slower than it wanted: a 30 fps
+the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock nanoseconds, any epoch). The analysis then measures every display time step against your plan, separates pacing errors from animation timing errors,
+does not count a rate you chose (30 fps for a busy stretch) as off its target, and shows where the game ran slower than it wanted: a 30 fps
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
 presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. The SDK's own
 [frame pacer](pacer.md) (`mb_framepacing::pacer`), which paces every frame from what your platform can do (a steady clock and the

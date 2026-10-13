@@ -216,7 +216,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
 
       var events = TraceEvents.FrameEvents(run.Frames, alignment);
 
-      Assert.That(events.Count, Is.EqualTo(92));
+      Assert.That(events.Count, Is.EqualTo(33));
       Assert.That(events.All(e => e.Name.StartsWith("late ", StringComparison.Ordinal)), Is.True);
       Assert.That(TraceEvents.CaptureEvents(run.Captures, alignment, TraceEvents.CaptureRangeOf(run.Frames)), Is.Empty);
     }

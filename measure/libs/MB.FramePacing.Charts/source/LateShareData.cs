@@ -38,10 +38,10 @@ namespace MB.FramePacing.Charts
     /// <summary>Per frame: a frame in its window was late.</summary>
     public RankBits AnyLate { get; }
 
-    /// <summary>Per frame: a frame in its window was held longer than a refresh as the pacer intended.</summary>
+    /// <summary>Per frame: a frame in its window was held longer than the application prefers without being late.</summary>
     public RankBits AnyHeld { get; }
 
-    /// <summary>Some frame of the run was held longer than a refresh as the pacer intended.</summary>
+    /// <summary>Some frame of the run was held longer than the application prefers without being late.</summary>
     public bool AnyHeldLonger { get; }
 
     /// <summary>The shares (as their bits) in frame order: a column's lowest and highest.</summary>
@@ -53,8 +53,8 @@ namespace MB.FramePacing.Charts
     public static LateShareData Create(IReadOnlyList<PresentedFrame> frames, RunPacing pacing)
     {
       // Held longer: on screen half a refresh or more beyond the frame time the application wants (its preferred frame time, else one
-      // refresh) without being late: the pacer intended it, but runs slower than the application wants. Never for a static step (the time on
-      // screen of a frame nothing animated after) or on demand
+      // refresh) without being late: the frame was animated for that time, but the run is slower than the application wants. Never for a
+      // static step (the time on screen of a frame nothing animated after) or on demand
       double half = pacing.RefreshPeriod.Nanoseconds / 2.0;
       var held = new bool[frames.Count];
       bool anyHeldLonger = false;

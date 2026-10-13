@@ -169,8 +169,8 @@ class EventTests(unittest.TestCase):
     def test_the_golden_capture_has_its_late_frames(self) -> None:
         golden = frames()
         events = frame_events(golden, align(golden))
-        self.assertEqual(sum(1 for e in events if e.name.startswith("late ")), 92)
-        self.assertEqual(len(events), 92)
+        self.assertEqual(sum(1 for e in events if e.name.startswith("late ")), 33)
+        self.assertEqual(len(events), 33)
         self.assertEqual(capture_events(captures(), align(golden), capture_range_of(golden)), [])
 
     def test_capture_events_are_the_captures_own_gaps(self) -> None:

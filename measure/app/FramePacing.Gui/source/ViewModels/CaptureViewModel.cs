@@ -278,7 +278,9 @@ namespace MB.FramePacing.Gui.ViewModels
     [ObservableProperty]
     public partial bool KeepFrames { get; set; }
 
-    /// <summary>The frame rate the application aims for; late frames are measured against it (empty = judged from the frames).</summary>
+    /// <summary>
+    /// The frame rate the application aims for; the display time steps are measured against it (empty = judged from the frames).
+    /// </summary>
     [ObservableProperty]
     public partial string TargetFpsText { get; set; }
 

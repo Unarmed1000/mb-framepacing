@@ -133,21 +133,24 @@ namespace MB.FramePacing.Analysis.UnitTest
         frames.AddRange(new[] { (1, 16L), (1, 16L), (1, 32L), (1, 0L) });
       var run = Analyze(Rows(frames));
 
-      Assert.That(run.Pacing!.LateFrames, Is.Zero);
+      // One rule for late: a 0 ms step is shown a refresh later than it was animated for. The cause says whose doing it is
+      Assert.That(run.Pacing!.LateFrames, Is.EqualTo(10), "every 0 ms step");
       Assert.That(run.Pacing.ErrorFramesWithEvenDisplay, Is.EqualTo(20), "every 32 and 0 ms step");
       Assert.That(run.Pacing.ErrorFramesWithUnevenDisplay, Is.Zero);
       Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.DeltaTimeJitter));
     }
 
     [Test]
-    public void HalfRate_WithoutPacingInformation_IsLateAgainstTheNativeRate()
+    public void HalfRate_WithoutPacingInformation_IsNotLate()
     {
-      // Nothing says the game aims for half rate: the display's refresh rate is the target, so every frame is a refresh late
+      // Nothing says the game aims for half rate, so the display's refresh rate is the target. Every frame is on screen as long as it was
+      // animated for: none is late, whatever the target is guessed to be
       var run = Analyze(Rows(Steady(20, refreshes: 2)));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
       Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
-      Assert.That(run.Pacing.LateFrames, Is.EqualTo(19));
+      Assert.That(run.Pacing.LateFrames, Is.Zero);
+      Assert.That(run.Frames.Skip(1).All(f => f.DisplayDelta > f.PreferredFrameTime), "longer than preferred: the late share's amber");
     }
 
     [Test]
@@ -202,9 +205,10 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
-    public void Schedule_FindsFramesThatStayLateAfterAHitch()
+    public void Schedule_AFrameThatStaysBehindAfterAHitchIsNotLate()
     {
-      // A full frame queue: after frame 10 misses a refresh, every later frame is shown a refresh after its intended time, with even steps
+      // A full frame queue: after frame 10 misses a refresh, every later frame is shown a refresh after its intended time, with even steps.
+      // Frame 10 is late; the frames after it stay behind the plan with a step that is right, which their lateness says and no flag
       var frames = new List<(int, long, long, long)>();
       long intended = 1000;
       for (int i = 0; i < 30; ++i, intended += 16)
@@ -212,16 +216,18 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(PacedRows(frames));
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule));
-      Assert.That(run.Frames.Take(10).Count(IsLate), Is.Zero);
-      Assert.That(run.Frames.Skip(10).All(IsLate), Is.True, "every frame after the hitch stays a refresh late");
-      Assert.That(run.Frames[20].Lateness?.Nanoseconds, Is.EqualTo(16 * Ms));
-      Assert.That(run.Frames[20].DisplayDelta?.Nanoseconds, Is.EqualTo(16 * Ms), "the steps look even; only the schedule shows the delay");
+      Assert.That(IsLate(run.Frames[10]));
+      Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1), "only the frame whose step was long");
+      Assert.That(run.Frames[20].Lateness?.Nanoseconds, Is.EqualTo(16 * Ms), "a refresh behind its intended time");
+      Assert.That(run.Frames[20].DisplayDelta?.Nanoseconds, Is.EqualTo(16 * Ms), "the steps are even; only the schedule shows the delay");
+      Assert.That(run.Frames[20].AnimationError?.Nanoseconds, Is.Zero);
     }
 
     [Test]
     public void Schedule_SplitsTheAnimationErrorIntoPacingAndPrediction()
     {
-      // The pacer shows every frame on time, but the game animates with a naive delta time: all of the error is prediction error
+      // The pacer shows every frame on time, but the game animates with a naive delta time: all of the error is prediction error. A 0 ms
+      // step is still shown a refresh later than it was animated for: late, by the one rule
       var frames = new List<(int, long, long, long)>();
       long intended = 1000;
       for (int i = 0; i < 20; ++i, intended += 16)
@@ -244,7 +250,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.PacingError?.Nanoseconds, Is.Zero);
         Assert.That(frame.AnimationError?.Nanoseconds, Is.EqualTo(frame.PredictionError?.Nanoseconds - frame.PacingError?.Nanoseconds));
       }
-      Assert.That(run.Pacing!.LateFrames, Is.Zero);
+      Assert.That(run.Pacing!.LateFrames, Is.EqualTo(5), "every 0 ms step");
       Assert.That(run.Pacing.PredictionErrorMs!.Max, Is.EqualTo(16));
       Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.DeltaTimeJitter));
     }
@@ -252,27 +258,74 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void GivenTargetFps_IsTheTarget()
     {
-      // A game meant to run at 62.5 fps that only manages half: every frame is late
+      // A game meant to run at 62.5 fps that only manages half, and animates for the time each frame is shown: slower than its target (every
+      // display time step is off it) and not late
       var run = Analyze(Rows(Steady(20, refreshes: 2)), targetFps: 62.5);
 
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.GivenTarget));
       Assert.That(run.Pacing.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(16)));
-      Assert.That(run.Pacing.LateFrames, Is.EqualTo(19), "all but the first frame, which has no display time step");
+      Assert.That(run.Pacing.LateFrames, Is.Zero);
+      Assert.That(
+        run.Frames.Skip(1).All(f => f.DisplayDelta?.Nanoseconds == 32 * Ms && f.TargetFrameTime?.Nanoseconds == 16 * Ms),
+        "all but the first frame, which has no display time step"
+      );
     }
 
     [Test]
     public void TargetBetweenRefreshes_RoundsUp()
     {
-      // 60 fps on a 7 ms (about 143 Hz) display alternates 2 and 3 refreshes: 3 is the target, 4 is late
+      // 60 fps on a 7 ms (about 143 Hz) display alternates 2 and 3 refreshes, each frame animated for the time the frame before it was meant
+      // to stay: 3 is the target. Frame 11 stays 4, so frame 12 is shown a refresh later than it was animated for
       var frames = new List<(int, long)>();
-      for (int i = 0; i < 10; ++i)
-        frames.AddRange(new[] { (2, 14L), (3, 21L) });
-      frames[11] = (4, 21);
+      for (int i = 0; i < 20; ++i)
+        frames.Add((i % 2 == 0 ? 2 : 3, i == 0 || i % 2 != 0 ? 14L : 21L));
+      frames[11] = (4, 14);
       var run = Analyze(Rows(frames, refresh: 7 * Ms), targetFps: 60);
 
       Assert.That(run.Pacing!.TargetFrameTime, Is.EqualTo(NanosecondTimeSpan.FromMilliseconds(21)));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1));
       Assert.That(IsLate(run.Frames[12]));
+    }
+
+    [Test]
+    public void AStepLengthenedWithTheDisplay_IsNotLate()
+    {
+      // A pacer that knows a frame will stay four refreshes animates the next one for that: on screen long, and as animated for
+      var frames = Steady(30).ToList();
+      frames[9] = (4, 16);
+      frames[10] = (1, 64);
+      var run = Analyze(Rows(frames));
+
+      Assert.That(run.Frames[10].DisplayDelta?.Nanoseconds, Is.EqualTo(64 * Ms));
+      Assert.That(run.Frames[10].AnimationError?.Nanoseconds, Is.Zero);
+      Assert.That(run.Pacing!.LateFrames, Is.Zero);
+    }
+
+    [Test]
+    public void TwoLostRefreshesInARow_AreTwoLateFrames()
+    {
+      // Frames 10 and 11 each arrive a refresh after they were animated for, and the animation does not catch up
+      var frames = Steady(30).ToList();
+      frames[9] = (2, 16);
+      frames[10] = (2, 16);
+      var run = Analyze(Rows(frames));
+
+      Assert.That(run.Frames.Select((f, i) => (f, i)).Where(x => IsLate(x.f)).Select(x => x.i), Is.EqualTo(new[] { 10, 11 }));
+      Assert.That(run.Frames[12].AnimationError?.Nanoseconds, Is.Zero, "the frames after them are behind the clock and not late");
+    }
+
+    [Test]
+    public void LessThanHalfARefreshLonger_IsNotLate()
+    {
+      // 7 ms more on screen than animated for at a 16 ms refresh is under half a refresh; 8 ms is half
+      var under = Steady(20).ToList();
+      under[10] = (1, 9);
+      var half = Steady(20).ToList();
+      half[10] = (1, 8);
+
+      Assert.That(Analyze(Rows(under)).Pacing!.LateFrames, Is.Zero);
+      var run = Analyze(Rows(half));
+      Assert.That(run.Frames.Select((f, i) => (f, i)).Where(x => IsLate(x.f)).Select(x => x.i), Is.EqualTo(new[] { 10 }));
     }
 
     [Test]

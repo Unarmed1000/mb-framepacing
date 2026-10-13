@@ -96,7 +96,7 @@ of C# rectification, well above 1000 fps on one core.
   period. The error threshold is the same for every source (1 ms, `--error-threshold-ms`), so a slower camera's noise counts as
   error frames; the analysis warns when the camera period is longer than the threshold.
 - **Vsync off:** a frame the main marker never saw (presented below it and replaced before the next scanout reached it) has no data
-  of its own and counts as skipped; the frames around it can be marked late although their animation error is about 0.
+  of its own and counts as skipped.
 - The synthetic camera models a simple exponential panel response and a global shutter. Rolling shutter cameras (most phones)
   and overdrive are not modelled.
 

@@ -141,10 +141,16 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       );
       // Sections have no annotations
       Assert.That(record.Annotations, Is.Empty);
-      // The made-up system says a late frame was presented at its intended time, which the capture measured a refresh later: those frames
-      // are off, and the number says how many
+      // The made-up system says every frame was presented at its intended time. The capture measured the frames that are behind their plan
+      // (a lateness of half a 60 Hz refresh or more: the late ones and those that stay behind after them) a refresh later: those frames are
+      // off, and the number says how many
+      const long HalfRefreshNs = 8_333_333;
       Assert.That(lineUp.PresentDifferenceMedianNs, Is.EqualTo(-3_000_000));
-      Assert.That(lineUp.PresentDifferenceOffFrames, Is.EqualTo(run.Frames.Count(frame => frame.Flags.Contains("Late"))));
+      Assert.That(
+        lineUp.PresentDifferenceOffFrames,
+        Is.EqualTo(run.Frames.Count(frame => frame.Lateness is { } lateness && lateness.Nanoseconds >= HalfRefreshNs))
+      );
+      Assert.That(lineUp.PresentDifferenceOffFrames, Is.EqualTo(92));
     }
 
     private static TraceData Data(IReadOnlyList<ThreadState> states) =>
