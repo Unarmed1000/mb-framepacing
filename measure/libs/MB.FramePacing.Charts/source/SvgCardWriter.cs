@@ -93,6 +93,9 @@ namespace MB.FramePacing.Charts
         case PathShape p:
           Line(parts, $"<path class=\"{p.Class}\" d=\"{p.Data}\"/>");
           break;
+        case TextShape t when t.Link.Length > 0:
+          Line(parts, $"<a href=\"{Escape(t.Link)}\">{Text(t.X, t.Y, t.Content, t.Class, t.Anchor)}</a>");
+          break;
         case TextShape t:
           Line(parts, Text(t.X, t.Y, t.Content, t.Class, t.Anchor));
           break;

@@ -65,7 +65,7 @@
           />
         </Grid>
         <!-- EXPERIMENTAL: a Perfetto trace of the run, joined at the next Analyze (only with the experimental features on) -->
-        <Panel IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
           <Grid
             ColumnDefinitions="Auto,*,Auto,Auto,300"
             ColumnSpacing="8"
@@ -91,7 +91,15 @@
               ToolTip.Tip="The application's process name in the trace (* and ? as in a file name): the system's own account of the frames and the CPU's time need it."
             />
           </Grid>
-        </Panel>
+          <!-- A wrapper carries the tooltip: a disabled button shows none -->
+          <Border
+            Grid.Column="1"
+            Background="Transparent"
+            ToolTip.Tip="Open the selected run's augmented trace in Perfetto's viewer at ui.perfetto.dev (experimental), at the run with the capture's tracks pinned. The trace is served once from 127.0.0.1:9001; the viewer runs in the browser and does not upload it. For a run that was joined with a trace."
+          >
+            <Button Content="Open in Perfetto" Command="{Binding OpenInPerfettoCommand}" />
+          </Border>
+        </Grid>
       </StackPanel>
     </Border>
 

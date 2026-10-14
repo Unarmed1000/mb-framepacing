@@ -99,6 +99,8 @@ namespace MB.FramePacing.Gui.ViewModels
 
     /// <summary>Show the experimental features (the Settings page's switch): here, the Perfetto trace of the run.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOpenInPerfetto))]
+    [NotifyCanExecuteChangedFor(nameof(OpenInPerfettoCommand))]
     public partial bool ExperimentalFeatures { get; set; }
 
     partial void OnExperimentalFeaturesChanged(bool value) => Trace.Show(value ? RememberedTrace(CaptureDirectory) : null);
@@ -219,6 +221,8 @@ namespace MB.FramePacing.Gui.ViewModels
     [NotifyPropertyChangedFor(nameof(HasRun))]
     [NotifyPropertyChangedFor(nameof(CanSavePlayback))]
     [NotifyCanExecuteChangedFor(nameof(SavePlaybackCommand))]
+    [NotifyPropertyChangedFor(nameof(CanOpenInPerfetto))]
+    [NotifyCanExecuteChangedFor(nameof(OpenInPerfettoCommand))]
     public partial RunViewModel? SelectedRun { get; set; }
 
     /// <summary>The Timeline card of the section: a sliding window around it when zoomed.</summary>
@@ -746,29 +750,99 @@ namespace MB.FramePacing.Gui.ViewModels
       try
       {
         var options = ReportOptions.Default with { ClampStatic = ClampStatic };
-        var files = await Task.Run(() => ChartFiles.Write(report, options));
         ErrorText = string.Empty;
-        SummaryText = $"{files.Count} chart(s) written to {report.OutputDirectory}";
-        // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts
+        // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts, first: the report card names it
+        IReadOnlyList<AugmentedTraceFile> traces = Array.Empty<AugmentedTraceFile>();
         if (report.TraceJoins.Any(join => join != null))
         {
-          SummaryText += "; writing the augmented trace...";
+          SummaryText = "Writing the augmented trace...";
           string? processor = TraceViewModel.FindProcessor(out _);
-          var traces = await Task.Run(() => AugmentedTraceFiles.Write(report, processor));
-          SummaryText =
-            $"{files.Count} chart(s) and {traces.Count} augmented trace(s) written to {report.OutputDirectory} "
-            + $"({string.Join(", ", traces.Select(trace => Path.GetFileName(trace.Path)))}: the trace with the capture's measurements as "
-            + "tracks; it names the device and its programs, as the trace does)";
+          traces = await Task.Run(() => AugmentedTraceFiles.Write(report, processor));
           var problems = traces.SelectMany(trace => trace.Problems).ToList();
           if (problems.Count > 0)
             ErrorText = "The augmented trace does not read back as written: " + string.Join("; ", problems);
         }
+        var files = await Task.Run(() => ChartFiles.Write(report, options));
+        SummaryText =
+          traces.Count == 0
+            ? $"{files.Count} chart(s) written to {report.OutputDirectory}"
+            : $"{files.Count} chart(s) and {traces.Count} augmented trace(s) written to {report.OutputDirectory} "
+              + $"({string.Join(", ", traces.Select(trace => Path.GetFileName(trace.Path)))}: the trace with the capture's measurements as "
+              + "tracks; it names the device and its programs, as the trace does)";
       }
       catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or TraceException)
       {
         ErrorText = "Could not write the charts: " + ex.Message;
       }
     }
+
+    /// <summary>Experimental: the selected run's augmented trace is being handed to Perfetto's viewer.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOpenInPerfetto))]
+    [NotifyCanExecuteChangedFor(nameof(OpenInPerfettoCommand))]
+    public partial bool IsOpeningPerfetto { get; set; }
+
+    /// <summary>Experimental: the selected run was joined with a Perfetto trace, so it has an augmented trace to open.</summary>
+    public bool CanOpenInPerfetto => ExperimentalFeatures && !IsOpeningPerfetto && SelectedJoinIndex() != null;
+
+    /// <summary>The selected run's place in the report when it was joined with a trace.</summary>
+    private int? SelectedJoinIndex()
+    {
+      if (m_report is not { } report || SelectedRun is not { } run)
+        return null;
+      int index = Runs.IndexOf(run);
+      return index >= 0 && report.TraceJoinOf(index) != null ? index : null;
+    }
+
+    /// <summary>
+    /// Experimental: open the selected run's augmented trace in Perfetto's viewer at ui.perfetto.dev (written first when Save charts has not
+    /// written it), served once from 127.0.0.1:9001, at the run's stretch of time with the capture's tracks pinned.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanOpenInPerfetto))]
+    private async Task OpenInPerfettoAsync()
+    {
+      if (m_report is not { } report || SelectedJoinIndex() is not { } index)
+        return;
+      IsOpeningPerfetto = true;
+      try
+      {
+        string? processor = TraceViewModel.FindProcessor(out _);
+        string path = Path.Combine(report.OutputDirectory, TraceAugmenter.FileName(CaptureAnalyzer.RunFilePrefixes(report.Timeline.Runs)[index]));
+        if (!File.Exists(path))
+        {
+          SummaryText = "Writing the augmented trace...";
+          _ = await Task.Run(() => AugmentedTraceFiles.Write(report, processor));
+        }
+        var visible = processor != null ? await Task.Run(() => PerfettoUi.AddedRangeOf(path, processor)) : null;
+        using var server = PerfettoTraceServer.Start(path);
+        m_dialogs.OpenUrl(PerfettoUi.Link(server.TraceUrl, visible));
+        SummaryText =
+          $"Handing {Path.GetFileName(path)} to ui.perfetto.dev from {server.TraceUrl}: the browser may ask whether the site may reach this "
+          + "computer; allow it.";
+        if (await server.ServeAsync(OpenInPerfettoTimeout))
+        {
+          ErrorText = string.Empty;
+          SummaryText = $"{Path.GetFileName(path)} is in Perfetto's viewer (it runs in the browser: the trace is not uploaded).";
+        }
+        else
+        {
+          ErrorText =
+            $"The browser did not ask for the trace within {OpenInPerfettoTimeout.TotalMinutes:0} minutes: the site may not have been allowed "
+            + "to reach this computer. Open in Perfetto again.";
+        }
+      }
+      catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or TraceException)
+      {
+        ErrorText = "Could not open the trace in Perfetto: " + ex.Message;
+      }
+      finally
+      {
+        IsOpeningPerfetto = false;
+      }
+    }
+
+    /// <summary>How long the browser has to ask for the trace.</summary>
+    private static readonly TimeSpan OpenInPerfettoTimeout = TimeSpan.FromMinutes(2);
 
     private bool CanAnalyze() => !IsBusy && !string.IsNullOrWhiteSpace(CaptureDirectory);
 
@@ -824,6 +898,8 @@ namespace MB.FramePacing.Gui.ViewModels
         PlaybackProblem = playbackCapture.Problem(playbackCapture.NamesNoVideo ? "the picked video" : null) ?? string.Empty;
         OnPropertyChanged(nameof(CanSavePlayback));
         SavePlaybackCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanOpenInPerfetto));
+        OpenInPerfettoCommand.NotifyCanExecuteChanged();
         ProgressPercent = 100;
       }
       catch (Exception ex)

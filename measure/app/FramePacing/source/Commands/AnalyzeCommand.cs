@@ -143,6 +143,9 @@ namespace MB.FramePacing.App.Commands
             report = CaptureAnalyzer.Analyze(directory, options, new Progress<double>(value => task.Value = value));
             task.Value = 1.0;
           });
+        // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts, first: the report card names it
+        if (charts)
+          TraceInput.WriteAugmented(report!, options.TraceProcessorPath);
         var chartFiles = charts ? ChartFiles.Write(report!) : Array.Empty<string>();
         Print(report!);
         if (chartFiles.Count > 0)
@@ -160,9 +163,6 @@ namespace MB.FramePacing.App.Commands
           foreach (string line in lines)
             AnsiConsole.MarkupLineInterpolated($"{line}");
         }
-        // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts
-        if (charts)
-          TraceInput.WriteAugmented(report!, options.TraceProcessorPath);
         playback?.Invoke(report!);
         return Program.ResultSuccess;
       }

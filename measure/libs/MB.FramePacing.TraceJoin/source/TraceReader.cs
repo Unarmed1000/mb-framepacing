@@ -269,6 +269,22 @@ namespace MB.FramePacing.TraceJoin
       return (Counts(slices), Counts(values));
     }
 
+    /// <summary>
+    /// Where the tracks the tools added are, on the trace's own clock: from the first of their slices, moments and values to the end of
+    /// the last; null for a trace without them.
+    /// </summary>
+    public static (long FirstNs, long LastNs)? AddedRange(ITraceQueries trace)
+    {
+      string added =
+        $"(SELECT t.id FROM track t JOIN track root ON t.parent_id = root.id WHERE root.name GLOB {Quoted(TraceTrackWriter.RootNamePrefix + "*")})";
+      var rows = trace.Query(
+        "SELECT MIN(first) AS first, MAX(last) AS last FROM ("
+          + $"SELECT MIN(ts) AS first, MAX(ts + dur) AS last FROM slice WHERE track_id IN {added} "
+          + $"UNION ALL SELECT MIN(ts) AS first, MAX(ts) AS last FROM counter WHERE track_id IN {added})"
+      );
+      return rows.RowCount > 0 && rows.WholeOrNull(0, 0) is { } first && rows.WholeOrNull(0, 1) is { } last ? (first, last) : null;
+    }
+
     /// <summary>What a trace has to go by. The threads are those of the processes that fit <paramref name="processGlob"/> when one is given.</summary>
     public static TraceInfo Inspect(ITraceQueries trace, string? processGlob = null)
     {

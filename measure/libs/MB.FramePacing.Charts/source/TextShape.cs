@@ -9,5 +9,6 @@
 
 namespace MB.FramePacing.Charts
 {
-  public sealed record TextShape(double X, double Y, string Content, string Class = "", string Anchor = "middle") : CardShape;
+  /// <summary>A line of text. <paramref name="Link"/>, where not empty, is a file or address the text links to in a file (the GUI draws no link).</summary>
+  public sealed record TextShape(double X, double Y, string Content, string Class = "", string Anchor = "middle", string Link = "") : CardShape;
 }

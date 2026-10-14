@@ -95,6 +95,8 @@ With **Settings → Experimental features** on:
 - The **Analyze** page shows the capture's trace in a row of its own, and the next **Analyze** joins what the row says: the
   capture's trace, another, or none.
 - **Save charts** also writes the augmented trace.
+- **Open in Perfetto**, in the Analyze page's trace row, opens the selected run's augmented trace in Perfetto's viewer
+  ([below](#opening-it-in-perfettos-viewer)), writing it first when Save charts has not.
 - The **Settings** page shows the trace processor in use, and takes yours.
 
 ![The Capture page's Perfetto trace card](images/gui-trace-capture.png)
@@ -119,10 +121,33 @@ of [the analysis output format](../../sdk/doc/analysis-output-format.md).
 An analysis that joins no trace removes the files an earlier one left. The augmented trace is a copy of the whole trace, so it is
 written when you ask for the charts and not by every analysis.
 
+## Opening it in Perfetto's viewer
+
+[Perfetto's viewer](https://ui.perfetto.dev) runs in the browser: Perfetto's documentation says a trace opened there is not
+uploaded anywhere unless you click its Share link. It can not read a file on your disk by itself, so:
+
+- **From the report card:** the card of a run joined with a trace names the augmented trace next to it, as a link to the file.
+  Drop the file on ui.perfetto.dev ("Open trace file").
+- **In one go:** `trace-open` on the command line, or **Open in Perfetto** in the GUI, serves the run's augmented trace once from
+  `http://127.0.0.1:9001` (the one place on this machine the viewer loads a trace from, as Perfetto's own `open_trace_in_ui` does)
+  and opens the viewer at the run, with the capture's tracks expanded and its refreshes, frames on screen and CPU work pinned next to
+  the application's frame record. Current Chrome and Edge ask once whether ui.perfetto.dev may reach this computer: allow it.
+  Nothing else is served, and nothing after the trace was sent once (or after two minutes).
+
+```
+mb-framepacing trace-open --experimental <capture folder>            # the run's augmented trace (--run <id> where there are several)
+mb-framepacing trace-open --experimental <capture folder> --no-browser   # print the link instead
+```
+
+Port 9001 is also where the viewer looks for a trace processor started with `--httpd` (Perfetto's native acceleration): close one
+that holds it first. A report on a web server is not linked to the viewer: that would need the trace served there with a header
+that lets ui.perfetto.dev read it.
+
 ## On the report card and under the pointer
 
 The report card's description gets two lines: that a Perfetto trace was joined and what its times rest on, and for how many of
-the card's frames the trace has the system's own account, its thread's scheduling and a vertical blank.
+the card's frames the trace has the system's own account, its thread's scheduling and a vertical blank. A card written next to the
+run's augmented trace gets a third, with a link to it.
 
 In the GUI, the text for the frame under the pointer gets the trace's lines, each only when the trace has the value:
 

@@ -51,6 +51,12 @@ namespace MB.FramePacing.Charts
     public bool HideEmpty { get; init; }
 
     /// <summary>
+    /// The file name of the run's augmented trace next to the card's file (null: none): a run joined with a Perfetto trace names it in its
+    /// description, with a link, and says how to open it in Perfetto's viewer.
+    /// </summary>
+    public string? AugmentedTraceFile { get; init; }
+
+    /// <summary>
     /// The display time step and frametime panels scale to the frames that animate (the default): a static frame's hold, frametime and aim
     /// (an idle wait of a second) stop at the scale's edge with a mark and their value. Off, every value sets the scale, static ones too.
     /// </summary>

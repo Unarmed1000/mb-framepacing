@@ -15,6 +15,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.TraceJoin;
 
 namespace MB.FramePacing.Charts
 {
@@ -41,6 +42,10 @@ namespace MB.FramePacing.Charts
     {
       var written = new List<string>();
       var section = Section(run, fromSeconds, toSeconds);
+      // A run joined with a Perfetto trace whose augmented trace is next to the card: the card names it
+      string augmented = TraceAugmenter.FileName(prefix);
+      if (run.Trace != null && File.Exists(Path.Combine(directory, augmented)))
+        options = (options ?? ReportOptions.Default) with { AugmentedTraceFile = augmented };
       written.AddRange(WriteOne(ReportCard.Render(section, options), Path.Combine(directory, prefix + "-report" + SectionSuffix(section)), png));
       if (details)
       {

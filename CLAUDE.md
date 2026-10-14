@@ -196,7 +196,17 @@ tools/tests -t tools`; CI's `lint`).
       `TraceJoiner`) and writes `run-<id>-trace.csv`, the tools' own file and **not part of the analysis output format**; an
       analysis that joins none removes it. What does not fit is a warning, but for a trace the analysis itself was given.
     - `--charts` and Save charts also write `run-<id>-augmented.pftrace` (`AugmentedTraceFiles`) and read it back: a trace is
-      copied whole, so not by every analysis (the user's choice: with the charts).
+      copied whole, so not by every analysis (the user's choice: with the charts). It is written before the cards: a report card
+      written next to it names it with a link (`ReportOptions.AugmentedTraceFile`, set by `ReportFiles` when the file is there;
+      the user, 2026-10-14: "the saved report being able to link to the saved augmented file").
+    - **Opening it in ui.perfetto.dev** (`trace-open`, the GUI's Open in Perfetto; the user's choice to keep them beside the
+      link): `PerfettoTraceServer` serves the file once on 127.0.0.1:9001 (the only local origin the viewer's content security
+      policy allows; Perfetto's own `tools/open_trace_in_ui` does the same) with `Access-Control-Allow-Origin:
+https://ui.perfetto.dev`, answers a private network preflight, stops after one send or two minutes; `PerfettoUi.Link` adds
+      `visStart`/`visEnd` (`TraceReader.AddedRange`) and startup commands that expand our group and pin the refreshes, frames on
+      screen, CPU and the application's `mbfp frames`. Checked headless (Edge 155) with the local network access check off: a
+      browser asks the user once; headless can not, so never test it with the check on. A page opened from disk can not hand
+      the viewer a trace (Perfetto's docs): no report links the viewer directly.
     - Presented (the user's choice: hover and description first, no panel): `ChartRun.Trace` (a row per frame, live and from the
       CSV: the card from the files stays the live one), `CardHover`'s `trace, …` lines, two description lines on the report card.
       A run without a trace gives byte for byte the card and hover it gave before.

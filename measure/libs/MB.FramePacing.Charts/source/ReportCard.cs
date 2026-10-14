@@ -141,8 +141,16 @@ namespace MB.FramePacing.Charts
             )
         );
       // Experimental: a Perfetto trace of the run was joined. What it has for these frames, and what its times rest on
+      string? augmentedLine = null;
       if (section.Data.TraceFrames is { } trace)
+      {
         description.AddRange(TraceLines(trace, section.Start, section.End));
+        if (options.AugmentedTraceFile is { } augmented)
+        {
+          augmentedLine = $"Its augmented trace, {augmented}, is next to this card: drop it on ui.perfetto.dev to open it in Perfetto's viewer.";
+          description.Add(augmentedLine);
+        }
+      }
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
       // The section's own numbers only when a tile shows them
@@ -154,6 +162,10 @@ namespace MB.FramePacing.Charts
       double displayH = display is { Wants.Length: > 0 } ? DisplayBoxH + DisplayLineH : DisplayBoxH;
       var layout = Layout.For(options, description.Count, tiles.Count, displayH);
       var parts = Header(title, options.IsShown(ReportItem.Description) ? description : Array.Empty<string>(), options.IsShown(ReportItem.Title));
+      // The augmented trace's line links to the file
+      int linked = augmentedLine != null ? parts.FindIndex(shape => shape is TextShape text && text.Content == augmentedLine) : -1;
+      if (linked >= 0)
+        parts[linked] = ((TextShape)parts[linked]) with { Link = options.AugmentedTraceFile! };
       if (display != null)
         DisplayBox(parts, display, width, displayH);
 

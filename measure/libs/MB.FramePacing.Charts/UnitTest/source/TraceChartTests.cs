@@ -62,6 +62,32 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     [Test]
+    public void TheReportFile_LinksTheAugmentedTraceNextToIt_OnlyWhenItIsThere()
+    {
+      var chart = WithTheTrace();
+      const string Line =
+        "Its augmented trace, run-1-augmented.pftrace, is next to this card: drop it on ui.perfetto.dev to open it in Perfetto's viewer.";
+
+      // Not there: no line
+      string without = File.ReadAllText(ReportFiles.Write(chart, "run-1", m_analysis).Single());
+      Assert.That(without, Does.Not.Contain("augmented trace"));
+
+      File.WriteAllBytes(Path.Combine(m_analysis, "run-1-augmented.pftrace"), new byte[] { 0x0a });
+      string with = File.ReadAllText(ReportFiles.Write(chart, "run-1", m_analysis).Single());
+
+      Assert.That(with, Does.Contain($"<a href=\"run-1-augmented.pftrace\"><text x=\"20.0\""));
+      Assert.That(with, Does.Contain(Line + "</text></a>"));
+      // The card drawn on screen has the line without a link of its own to follow; a run without a trace has neither
+      var card = ReportCard.Build(RunSection.Whole(chart), ReportOptions.Default with { AugmentedTraceFile = "run-1-augmented.pftrace" });
+      Assert.That(card.FlatShapes.OfType<TextShape>().Single(t => t.Content == Line).Link, Is.EqualTo("run-1-augmented.pftrace"));
+      var plain = AnalysisOutput.Read(m_temp.File("analysis"))[0].Chart with { Trace = null };
+      Assert.That(
+        Texts(ReportCard.Build(RunSection.Whole(plain), ReportOptions.Default with { AugmentedTraceFile = "x" })),
+        Has.None.Contains("augmented")
+      );
+    }
+
+    [Test]
     public void WithTheFile_TheDescriptionSaysWhatTheTraceHas()
     {
       var plain = AnalysisOutput.Read(m_analysis)[0].Chart;

@@ -127,6 +127,13 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       var records = TraceReader.FrameRecords(recorded);
       Assert.That(records, Is.Not.Empty);
       Assert.That(TraceReader.FrameRecords(processor), Is.EqualTo(records));
+      // Where the capture's tracks are, for the viewer to open at: inside the trace, and nothing in the recorded trace alone
+      var added = TraceReader.AddedRange(processor);
+      Assert.That(added, Is.Not.Null);
+      var whole = TraceReader.TraceRange(processor);
+      Assert.That(added!.Value.FirstNs, Is.GreaterThanOrEqualTo(whole.FirstNs).And.LessThan(added.Value.LastNs));
+      Assert.That(added.Value.LastNs, Is.LessThanOrEqualTo(whole.LastNs));
+      Assert.That(TraceReader.AddedRange(recorded), Is.Null);
     }
 
     [Test]
