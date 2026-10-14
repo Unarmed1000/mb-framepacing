@@ -103,7 +103,7 @@ namespace MB.FramePacing.Charts
           pacing != null ? Number(pacing.LateFrames) : "-",
           pacing != null ? Percent(pacing.LateShare) : string.Empty,
           pacing?.LateFrames > 0,
-          "Frames shown half a refresh or more later than their animation time step put them: the frame before stayed on screen that much longer.",
+          "Frames the frame before stayed on screen for half a refresh or more longer than they were animated for and than their intended period.",
           pacing != null
         ),
       };

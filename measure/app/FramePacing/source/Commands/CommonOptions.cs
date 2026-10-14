@@ -126,7 +126,7 @@ namespace MB.FramePacing.App.Commands
       new Option<double?>("--target-fps")
       {
         Description =
-          $"The frame rate the application aims for, e.g. 30 on a 60 Hz display: what the display time steps are measured against ({where}). "
+          $"The frame rate the application aims for, e.g. 30 on a 60 Hz display: what the display time steps are measured against, and a frame's intended period when its marker has none ({where}). "
           + "Default: the pacing in the markers, else one refresh per frame (the display's native rate).",
         Validators =
         {

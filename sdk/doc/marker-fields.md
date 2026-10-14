@@ -137,12 +137,20 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **What the analysis does:**
   - The **animation error** of a step is the animation time step minus the display time step: how far the motion on screen moved
     off real time. It is the report's main number; the drift sums it over the run.
-  - A frame is **late** when its display time step is half a refresh or more longer than its animation time step (an animation
-    error of minus half a refresh or beyond): the frame before it stayed on screen that much longer than this frame was animated
-    for. It is one rule, whatever pacing fields the markers carry. A step that is not judged (a static step, a capture gap) has no
-    late frame.
+  - A frame is **late** when its display time step is longer than both its animation time step and its **intended period**, each by
+    half a refresh or more: the frame before it stayed on screen that much longer than this frame was animated for and than the
+    pacer meant it to. The intended period is the marker's target frame time, else the step between this frame's intended display
+    time and the previous frame's, else the preferred frame time, else the target frame rate given to the tools (`--target-fps`),
+    else one refresh, rounded up to whole refreshes and one more per frame the target dropped before it. Half a refresh is the
+    tolerance only: a timer that steps half a refresh short on an even display is not late, the frame was on screen for its
+    intended period. A frame presented on demand has no intended period and is never late; a step that is not judged (a static
+    step, a capture gap) has no late frame.
   - Late says nothing of where a frame is against a clock or a plan. After a lost refresh that a pacer does not catch up with,
     the frames that follow are a refresh behind for the rest of the run, with steps that are right: one frame is late.
+  - A frame has **jitter** (`Jitter` in the frames CSV, yellow on the report's error bars and refresh strip) when its animation
+    error is beyond the error threshold, counts as delta time jitter (the display was even, the animation timer was not: see
+    "Target frame time" and "Intended display time"), is smaller than the intended period, and the frame is not late. A timer off
+    by a whole intended period or more is more than jitter.
 - **Goes wrong when:**
   - It comes from a separate wall clock read while drawing the marker instead of the animation's own clock: the report then measures
     the render loop's timing, not what the viewer saw.
@@ -182,7 +190,8 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **What the analysis does:** without the pacer's schedule, every frame's display time step is measured against its target
   (rounded up to whole refreshes, as above, and one target per dropped frame longer after dropped frames). A step half a refresh or
   more off it is **off its target**: the report draws the target as a reference line, and an animation error at such a step counts
-  as bad pacing. An on-demand frame has no target. Whether a frame is late does not depend on the target (see "Animation time").
+  as bad pacing; one at an even step counts as delta time jitter. An on-demand frame has no target. A frame's target frame time
+  is also its intended period, which a late frame is measured against with its animation time step (see "Animation time").
 - **Goes wrong when:** it holds the display's refresh period while a frame limiter holds a lower rate: every limited frame's step is
   off its target.
 

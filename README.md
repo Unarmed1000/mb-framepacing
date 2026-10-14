@@ -257,8 +257,11 @@ whole refresh an error reaches with a dashed amber line (±16.7 ms at 60 Hz, ±2
 whole refresh early or late. The display rate you expect (`--display-hz`, **Display refresh rate**) is checked against the
 capture's rate.
 
-**Late frames** are shown later than they were animated for: a frame is late when its display time step (how long the frame before
-it stayed on screen) is half a refresh or more longer than its animation time step. It is one rule, whatever the markers carry.
+**Late frames** are shown later than they were animated for and than intended: a frame is late when its display time step (how
+long the frame before it stayed on screen) is longer than both its animation time step and its **intended period**, each by half a
+refresh or more. The intended period is the pacer's target frame time in the marker, else the step of its plan, else the preferred
+frame time, else the target frame rate given to the tools, else one refresh (one more per frame the target dropped); a frame
+presented on demand has none and is never late.
 After a late frame the frames that follow can stay a refresh behind for the rest of a run; their steps are right, so they are not
 late. When the application's frame pacer writes the **intended display time** into the marker, the analysis also knows where every
 frame is against the pacer's plan (its lateness, in the frames CSV), and the animation error splits into **pacing error** (shown off
@@ -269,8 +272,8 @@ a game that wants 30 fps on a 60 Hz display is measured against two refreshes), 
 display's native refresh rate. Under the headline numbers, **Cause** tells which
 of the two causes of animation error dominates: frames with an error where the display time step is off its target are **bad pacing**
 (steps too long or too short, or dropped frames); frames with an error while the display time step stays even are **delta time
-jitter** (uneven animation steps). A late frame can be either: a slow frame that misses a refresh, or a timer that stepped half a
-refresh short on a display that ran evenly.
+jitter** (uneven animation steps). A frame of delta time jitter whose timer is off by less than its intended period, and that is
+not late, has **jitter**, drawn yellow: a timer that stepped short on a display that ran evenly is jitter, not a late frame.
 
 The GUI draws the report's cards itself, as wide as the window. The **Timeline** tab shows the report's animation error, display
 time step, frametime, late share and refresh strip panels on one time axis (the events panel and the target and preferred frame
@@ -289,8 +292,9 @@ The same panels as a report (below) of a test clip, a busy stretch at the full r
 
 Every panel says in its title what it shows, and its key on the right names each colour, listing only what the section shows.
 
-- **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late; a frame without error draws
-  nothing. Everything inside the shaded band counts as no error.
+- **Animation error:** a bar per frame, up when it was shown too soon, down when shown too late, yellow when the error is jitter
+  (the display ran evenly and the animation timer was off by less than the intended period); a frame without error draws nothing.
+  Everything inside the shaded band counts as no error.
 - **Display time step:** how long each frame stayed on screen, as a step until the next frame, on a grid of whole refreshes. It is red
   when the next frame was late (shown later than it was animated for), orange when frames the application rendered after it never reached
   the display (dropped), pink when an older frame came back out of order while it was the newest, and dashed grey where a capture gap
@@ -303,7 +307,8 @@ Every panel says in its title what it shows, and its key on the right names each
   where one was late; amber where they only stayed longer than preferred without being late (a pacer running slower than the game
   wants); green where every frame ran as the game wants, so a 30 fps lock or an idle screen at 1 fps stays green. A static frame's
   time on screen and frames presented on demand are never amber.
-- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, static frames in violet; orange where a
+- **Refresh strip:** one cell per refresh, shaded by the frame on screen, late frames in red, frames with jitter in yellow, static
+  frames in violet; orange where a
   dropped frame was due (the display repeated the frame before), pink where an older frame came back out of order, grey where a capture
   card's captures could not be decoded or were not recorded; what happened to the frames and the capture is in the events panel
   under it. Zoom in to
@@ -343,7 +348,7 @@ The charts can also be written as SVG cards next to the reports (`run-<id>-repor
 `-error-percentiles.svg`, `-display-time-step-histogram.svg`, `-drift.svg`): `--charts` on the command line, **Save charts** in the
 GUI (`render --png` makes PNGs of them). The
 histograms and the pacing numbers are also in `summary.json` (`runs[].histograms`, `runs[].pacing`; the error per frame and
-percent error in `runs[].statistics`), and late frames carry `Late`
+percent error in `runs[].statistics`), and late frames carry `Late` and frames with jitter `Jitter`
 in the `flags` column of `run-<id>-frames.csv`, so you can plot or compare them with your own tools: the files are specified in
 [sdk/doc/analysis-output-format.md](sdk/doc/analysis-output-format.md), and the SDK's [data modules](sdk/README.md#the-data-module) read them.
 

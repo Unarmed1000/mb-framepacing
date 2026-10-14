@@ -26,8 +26,8 @@ namespace MB.FramePacing.Analysis
     Torn = 4,
 
     /// <summary>
-    /// Shown half a refresh or more later than its animation time step put it: its display time step from the frame before is that much
-    /// longer than its animation time step (see <see cref="RunPacing"/>).
+    /// Late: the display time step from the frame before is longer than both the animation time step and the frame's intended period, each
+    /// by half a refresh or more (see <see cref="RunPacing"/>).
     /// </summary>
     Late = 8,
 
@@ -56,5 +56,12 @@ namespace MB.FramePacing.Analysis
     /// frame a StaticBefore flag spoke for (TimelineOptions.AssumeStatic). It counts as static everywhere; the flag tells it apart.
     /// </summary>
     StaticAssumed = 128,
+
+    /// <summary>
+    /// Jitter: an error frame of delta time jitter (the cause the analysis counts it for: the display was even, the animation timer was
+    /// not), whose animation timer is off by less than the frame's intended period, and that is not <see cref="Late"/>. An error of a whole
+    /// intended period or more is not jitter.
+    /// </summary>
+    Jitter = 256,
   }
 }

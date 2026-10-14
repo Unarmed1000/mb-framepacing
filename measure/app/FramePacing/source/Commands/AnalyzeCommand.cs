@@ -245,7 +245,7 @@ namespace MB.FramePacing.App.Commands
         if (run.Pacing is { } pacing)
         {
           AnsiConsole.MarkupLineInterpolated(
-            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), shown half a refresh or more later than their animation time step. Target {pacing.TargetFrameTime.Value.TotalMilliseconds:0.##} ms ({TargetReason(pacing)})."
+            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), each shown half a refresh or more later than it was animated for and than its intended period. Target {pacing.TargetFrameTime.Value.TotalMilliseconds:0.##} ms ({TargetReason(pacing)})."
           );
           AnsiConsole.MarkupLineInterpolated($"{RefreshText(pacing)}");
           if (pacing.PacingErrorMs is { } pacingError && pacing.PredictionErrorMs is { } predictionError)

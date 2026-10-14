@@ -454,6 +454,8 @@ namespace MB.FramePacing.Charts
       ["late-line-adapted"] = "key-amber",
       ["late-line"] = "key-red",
       ["strip-late"] = "key-red",
+      ["bar-jitter"] = "key-jitter",
+      ["strip-jitter"] = "key-jitter",
       ["strip-static-a"] = "key-violet-a",
       ["strip-static-b"] = "key-violet-b",
       ["neutral"] = "key-grey",
@@ -598,8 +600,9 @@ namespace MB.FramePacing.Charts
       }
       if (StaticBands(parts, view, errorY, errorY + ErrorH, label: true))
         panelKey.Add(g_staticKey);
-      parts.AddRange(Key(view.PlotX1, errorY - 16, panelKey));
       var clipped = new List<(double X, double Value, bool Top)>();
+      // A frame with jitter is drawn in the jitter colour; a pixel column of many frames is when every frame with an error in it has jitter
+      bool anyJitter = false;
       if (view.PerFrame)
       {
         double barW = Math.Max(1.0, (section.FrameCount > 0 ? view.PixelsPerFrame : view.PlotX1 - PlotX0) - 0.6);
@@ -610,7 +613,14 @@ namespace MB.FramePacing.Charts
             continue;
           double x = view.XOfFrame(i);
           var (y0, y1) = (Math.Min(zeroY, YOf(value)), Math.Max(zeroY, YOf(value)));
-          view.Move(parts, new RectShape("bar", N(x, 2), N(y0, 1), N(barW, 2), N(Math.Max(MinBarHeight, y1 - y0), 1)), errorY, errorY + ErrorH);
+          bool jitter = (data.Frames[i].Flags & PresentedFrameFlags.Jitter) != 0;
+          anyJitter |= jitter;
+          view.Move(
+            parts,
+            new RectShape(jitter ? "bar-jitter" : "bar", N(x, 2), N(y0, 1), N(barW, 2), N(Math.Max(MinBarHeight, y1 - y0), 1)),
+            errorY,
+            errorY + ErrorH
+          );
           if (Math.Abs(value) > limit)
             clipped.Add((x + (barW / 2), value, value > 0));
         }
@@ -621,6 +631,8 @@ namespace MB.FramePacing.Charts
         // solid, so a stretch with a late frame every so often still reads as mostly on time
         var range = new StringBuilder();
         var typical = new StringBuilder();
+        var jitterRange = new StringBuilder();
+        var jitterTypical = new StringBuilder();
         void Bar(StringBuilder path, int column, double low, double high)
         {
           if (high <= 1e-9 && low >= -1e-9)
@@ -639,14 +651,16 @@ namespace MB.FramePacing.Charts
             continue;
           double min = NanosecondsMs(errors.Values.KthSmallest(start, end, 0));
           double max = MaxMs(errors.Values, start, end);
+          bool jitter = data.OtherErrors.CountIn(frameStart, frameEnd) == 0 && data.Jitter.CountIn(frameStart, frameEnd) > 0;
+          anyJitter |= jitter;
           if (count >= MinFramesForTypical)
           {
-            Bar(range, column, min, max);
-            Bar(typical, column, errors.Values.PercentileMs(start, end, 0.05), errors.Values.PercentileMs(start, end, 0.95));
+            Bar(jitter ? jitterRange : range, column, min, max);
+            Bar(jitter ? jitterTypical : typical, column, errors.Values.PercentileMs(start, end, 0.05), errors.Values.PercentileMs(start, end, 0.95));
           }
           else
           {
-            Bar(typical, column, min, max);
+            Bar(jitter ? jitterTypical : typical, column, min, max);
           }
           if (max > limit)
             clipped.Add((column + 0.5, max, true));
@@ -655,7 +669,12 @@ namespace MB.FramePacing.Charts
         }
         view.MovePath(parts, "bar-range", range, errorY, errorY + ErrorH);
         view.MovePath(parts, "bar", typical, errorY, errorY + ErrorH);
+        view.MovePath(parts, "bar-range-jitter", jitterRange, errorY, errorY + ErrorH);
+        view.MovePath(parts, "bar-jitter", jitterTypical, errorY, errorY + ErrorH);
       }
+      if (anyJitter)
+        panelKey.Insert(1, (new[] { "bar-jitter" }, "jitter: off by less than the intended period", false));
+      parts.AddRange(Key(view.PlotX1, errorY - 16, panelKey));
       parts.Add(new LineShape("zero-line", N(PlotX0, 0), N(zeroY, 0), N(view.PlotX1, 0), N(zeroY, 0)));
       parts.Add(new TextShape(PlotX0 - 10, zeroY + 4, "0", "vsync-n", "end"));
       ClipMarks(
@@ -1159,7 +1178,7 @@ namespace MB.FramePacing.Charts
         );
       }
       bool staticLate = StaticBands(parts, view, lateY, lateY + LateH, label: false);
-      // Red where a frame in the window was late (shown later than its animation time step put it), amber where frames were only on
+      // Red where a frame in the window was late (on screen longer than it was animated for and than intended), amber where frames were only on
       // screen longer than the application prefers, green otherwise; each stretch starts
       // where the previous one ended, so the line is whole
       var paths = new Dictionary<string, StringBuilder>
@@ -1216,7 +1235,7 @@ namespace MB.FramePacing.Charts
         {
           ("late-line-none", "none late"),
           ("late-line-adapted", "on screen longer than the application prefers, not late"),
-          ("late-line", "late: shown later than its animation time step"),
+          ("late-line", "late: longer than animated for and than intended"),
         }
       )
       {
@@ -1268,6 +1287,7 @@ namespace MB.FramePacing.Charts
       bool anyUnknown = false;
       bool anyStatic = false;
       bool anyLate = false;
+      bool anyJitter = false;
       bool anyOlder = false;
       bool anyDropped = false;
       for (int i = section.Start; i < section.End; ++i)
@@ -1285,10 +1305,13 @@ namespace MB.FramePacing.Charts
         }
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
         bool isLate = (frame.Flags & PresentedFrameFlags.Late) != 0;
-        anyStatic |= isStatic && !isLate;
+        bool isJitter = !isLate && (frame.Flags & PresentedFrameFlags.Jitter) != 0;
+        anyStatic |= isStatic && !isLate && !isJitter;
         anyLate |= isLate;
+        anyJitter |= isJitter;
         string cls =
-          (frame.Flags & PresentedFrameFlags.Late) != 0 ? "strip-late"
+          isLate ? "strip-late"
+          : isJitter ? "strip-jitter"
           : isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
           : i % 2 == 0 ? "strip-a"
           : "strip-b";
@@ -1330,6 +1353,8 @@ namespace MB.FramePacing.Charts
       var panelKey = new List<(string[] Classes, string Text, bool Line)>();
       if (anyLate)
         panelKey.Add((new[] { "strip-late" }, "late", false));
+      if (anyJitter)
+        panelKey.Add((new[] { "strip-jitter" }, "jitter", false));
       if (anyStatic)
         panelKey.Add((new[] { "strip-static-a", "strip-static-b" }, "static", false));
       if (anyDropped)

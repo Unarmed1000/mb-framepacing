@@ -13,8 +13,8 @@ using System;
 namespace MB.FramePacing.Analysis
 {
   /// <summary>
-  /// Pacing of one run. A frame is late when its display time step is half a refresh or more longer than its animation time step, whatever
-  /// the targets come from.
+  /// Pacing of one run. A frame is late when its display time step is longer than both its animation time step and its intended period,
+  /// each by half a refresh or more.
   /// </summary>
   /// <param name="RefreshPeriod">
   /// The display's refresh period: the capture period for a capture card (it captures at the display's refresh rate), calculated from the
@@ -28,7 +28,8 @@ namespace MB.FramePacing.Analysis
   /// <param name="Source">Where the targets come from: the pacer's schedule or target frame time in the markers, a given target frame rate, or
   /// the display's native refresh rate.</param>
   /// <param name="LateFrames">
-  /// Presented frames shown late: their display time step is half a refresh or more longer than their animation time step.
+  /// Presented frames shown late: their display time step is longer than both their animation time step and their intended period, each by
+  /// half a refresh or more.
   /// </param>
   /// <param name="LateShare">Late frames as a share of the presented frames with a display time step (0..1).</param>
   /// <param name="WorstLateShare">The highest share of late frames in any <see cref="LateShare.WindowSeconds"/> window (0..1).</param>

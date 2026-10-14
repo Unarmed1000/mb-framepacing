@@ -89,8 +89,13 @@ namespace MB.FramePacing.Charts.UnitTest
       var band = drawing.FlatShapes.OfType<RectShape>().Single(r => r.Class == "band");
       Assert.That(error.ValueY(band.Y.Value), Is.EqualTo(1.0).Within(1e-9), $"{clip}: 1 ms threshold band");
       var withError = judged.Where(i => manifest.AnimationErrorNanoseconds(i) != 0).ToArray();
-      var bars = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class == "bar").ToArray();
+      var bars = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class is "bar" or "bar-jitter").ToArray();
       Assert.That(bars.Select(b => error.ValueX(b.X.Value)), Is.EqualTo(withError.Select(Seconds)).Within(1e-9), $"{clip}: a bar per error");
+      Assert.That(
+        bars.Select(b => b.Class == "bar-jitter"),
+        Is.EqualTo(withError.Select(manifest.IsJitter)),
+        $"{clip}: the jitter colour on a bar exactly when the frame has jitter"
+      );
       double zeroY = error.PixelY(0);
       for (int k = 0; k < bars.Length; ++k)
       {
@@ -370,10 +375,11 @@ namespace MB.FramePacing.Charts.UnitTest
 
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
       Assert.That(
-        Of("bar").Count(),
+        Of("bar").Count() + Of("bar-jitter").Count(),
         Is.EqualTo(measured.Count(i => manifest.AnimationErrorNanoseconds(i) is { } e && e != 0)),
         $"{clip}: a bar per frame with an error"
       );
+      Assert.That(Of("bar-jitter").Count(), Is.EqualTo(measured.Count(manifest.IsJitter)), $"{clip}: a jitter bar per frame with jitter");
       int Segments(string cls) => Of(cls).Sum(e => ((string)e.Attribute("d")!).Count(c => c == 'M'));
       Assert.That(
         new[] { "held", "held-late", "held-older", "held-dropped", "held-unknown" }.Sum(Segments),
@@ -403,16 +409,22 @@ namespace MB.FramePacing.Charts.UnitTest
       );
       Assert.That(
         StaticCells(),
-        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !(i > 0 && manifest.IsLate(i))).Sum(Own)),
+        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !manifest.IsLate(i) && !manifest.IsJitter(i)).Sum(Own)),
         $"{clip}: a violet cell per refresh of every static frame"
       );
       Assert.That(
-        Of("strip-late").Count(),
-        Is.EqualTo(all.Where(i => i > 0 && manifest.IsLate(i)).Sum(Own)),
-        $"{clip}: a red cell per refresh of every late frame"
+        Of("strip-jitter").Count(),
+        Is.EqualTo(all.Where(manifest.IsJitter).Sum(Own)),
+        $"{clip}: a jitter cell per refresh of every frame with jitter"
       );
+      Assert.That(Of("strip-late").Count(), Is.EqualTo(all.Where(manifest.IsLate).Sum(Own)), $"{clip}: a red cell per refresh of every late frame");
       Assert.That(
-        Of("strip-late").Count() + Of("strip-a").Count() + Of("strip-b").Count() + StaticCells() + Of("strip-dropped").Count(),
+        Of("strip-late").Count()
+          + Of("strip-jitter").Count()
+          + Of("strip-a").Count()
+          + Of("strip-b").Count()
+          + StaticCells()
+          + Of("strip-dropped").Count(),
         Is.EqualTo(all.Sum(i => (int)manifest.SeenRefreshes(i))),
         $"{clip}: a cell per refresh a frame was seen in"
       );

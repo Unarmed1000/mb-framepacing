@@ -12,7 +12,7 @@ namespace MB.FramePacing.Analysis
 {
   /// <summary>
   /// Where a run's target frame times come from: what the display time steps, the pacing error and the late share's amber are measured
-  /// against. The late verdict does not depend on it.
+  /// against, and where a frame's intended period comes from when its marker carries no target frame time.
   /// </summary>
   public enum PacingSource
   {

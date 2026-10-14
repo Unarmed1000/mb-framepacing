@@ -52,7 +52,7 @@ namespace MB.FramePacing.Gui.ViewModels
           _ => $"the {target} ms target (no pacing information: the display's native refresh rate)",
         };
         TargetText =
-          $"Late = shown half a refresh or more later than the frame's animation time step put it. The display time steps are measured against {against}.";
+          $"Late = on screen half a refresh or more longer than the frame was animated for and than its intended period. The display time steps are measured against {against}.";
         RefreshText =
           string.Create(
             CultureInfo.InvariantCulture,

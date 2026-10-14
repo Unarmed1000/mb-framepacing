@@ -690,18 +690,25 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     pacing pass copies it to add its values): measured as about 0.05 s and 269 MB of short-lived garbage, left as it is.
   - Late frames, the 2 s late share and the "which cause" verdict: `PacingAnalyzer` → `RunPacing` (`runs[].pacing` in
     summary.json).
-    - **Late is one rule** (agreed with the user, 2026-10-13): a frame is late when its display time step is half a refresh or more
-      longer than its animation time step (`AnimationError <= -half`), whatever the markers carry. It is the rule of the pacer's
-      `DisplayErrorCounter`, so the two counts can be held against each other. **Never a frame's position** against a clock or a
-      plan: a pacer's animation timer and the display diverge for good after a lost refresh, and only the frame whose step was
-      long is late. `Lateness` (with a schedule: how long after its intended time a frame appeared) is that position: a value in
-      the CSV and the hover that no flag or colour follows from. A static or an uncertain step has no late frame.
-    - What the rule costs, accepted by the user with the renders: a timer's step that is half a refresh short on an even display
-      is late too (`60-naive-5ms`: 64 late frames with the cause delta time jitter, red on holds of one refresh), and a hold twice
-      its target is green when the next frame was animated for nearly that. References tried and dropped, each for a case it
-      fails: the intended display time (frames that stay behind; a grid that slides against the display), the step between
-      intended times (a pacer that moves its plan after a loss), the target frame time (a step lengthened on purpose; the native
-      refresh is a guess), and "a pacer is active" (the markers do not say whose the animation time is).
+    - **Late is one rule** (the user, 2026-10-14, option 1: "I never said refresh period I said INTENDED period"): a frame is late
+      when its display time step is longer than both its animation time step and its **intended period**, each by half a refresh
+      or more (`AnimationError <= -half` and `display >= period + half`). Half a refresh is the tolerance only. The intended
+      period (`PacingAnalyzer`): the marker's target frame time, else the step between the plan's intended display times, else the
+      preferred frame time, else `--target-fps`, else one refresh, in whole refreshes and times (1 + dropped); on demand there is
+      none and the frame is never late. The target frame time comes before the plan's step: a pacer that plans from where the
+      frame before was shown lengthens the step after a lost refresh, and a second loss in a row would not count. **Never a
+      frame's position** against a clock or a plan: a pacer's animation timer and the display diverge for good after a lost
+      refresh, and only the frame whose step was long is late. `Lateness` (with a schedule: how long after its intended time a
+      frame appeared) is that position: a value in the CSV and the hover that no flag or colour follows from. A static or an
+      uncertain step has no late frame. On the 22 clips: 231 late frames, `60-naive-5ms` none (it had 64 by the rule of
+      2026-10-13, which only compared the two steps).
+    - The pacer's `DisplayErrorCounter` still counts by the steps alone (the rule of 2026-10-13): `sdk/doc/pacer.md` and decision
+      18 of `pacer-design.md` say so. Not changed without the user's word.
+    - **Jitter** (`PresentedFrameFlags.Jitter`, the user, 2026-10-14: "jitter animation timer off by less than a intended refresh
+      period"): an error frame that the cause split (`PacingAnalyzer.Split`) counts as delta time jitter, off by less than its
+      intended period, and not late. Yellow (`#e3b341`) on the error bars (`bar-jitter`; a pixel column of many frames when every
+      error frame in it has jitter: `RunChartData.Jitter`, `OtherErrors`) and the refresh strip (`strip-jitter`, after late,
+      before static); nowhere else. `ClipManifest.IsJitter` mirrors it for the clip tests.
     - The pacer's frame window count (`FrameWindowState::LateFrames`) is another thing, "did not make its time": open as decision
       18 of `sdk/doc/pacer-design.md`.
     - Every frame's **target** (what the display time steps, the cause and the late share's amber are measured against; not late)

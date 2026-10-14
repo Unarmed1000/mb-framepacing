@@ -243,11 +243,45 @@ namespace MB.FramePacing.Analysis.UnitTest
     public long? AnimationErrorNanoseconds(int frame) => IsJudged(frame) ? AnimationStepNanoseconds(frame) - DisplayStepNanoseconds(frame) : null;
 
     /// <summary>
-    /// The frame is late (frame 1 on): its display time step is half a refresh or more longer than its animation time step. A step that is
-    /// not judged has no late frame. Half a refresh is cut to the nanosecond, as the analysis has it.
+    /// The period the pacer intended for the frame (frame 1 on): its swap interval, one per frame the target dropped before it; null on
+    /// demand. The clips' markers always carry a target frame time, which comes first.
     /// </summary>
-    public bool IsLate(int frame) =>
-      frame > 0 && AnimationErrorNanoseconds(frame) is { } error && error <= -((RefreshNanoseconds(1) - RefreshNanoseconds(0)) / 2);
+    public long? IntendedPeriodNanoseconds(int frame) =>
+      SwapIntervalRefreshes(frame) is { } refreshes ? (1 + DroppedBefore(frame)) * refreshes * (RefreshNanoseconds(1) - RefreshNanoseconds(0)) : null;
+
+    /// <summary>
+    /// The frame is late (frame 1 on): its display time step is longer than both its animation time step and its intended period, each by
+    /// half a refresh or more. A step that is not judged, or on demand, has no late frame. Half a refresh is cut to the nanosecond, as the
+    /// analysis has it.
+    /// </summary>
+    public bool IsLate(int frame)
+    {
+      long half = (RefreshNanoseconds(1) - RefreshNanoseconds(0)) / 2;
+      return frame > 0
+        && AnimationErrorNanoseconds(frame) is { } error
+        && error <= -half
+        && IntendedPeriodNanoseconds(frame) is { } period
+        && DisplayStepNanoseconds(frame) >= period + half;
+    }
+
+    /// <summary>
+    /// The frame has jitter (frame 1 on): an error beyond the error threshold that the cause split counts as delta time jitter (with a
+    /// schedule: the display time step is nearer the intended step than the animation time step is; without one: neither this step nor the
+    /// one before is off its target and no frame was skipped), off by less than the intended period, and not late.
+    /// </summary>
+    public bool IsJitter(int frame)
+    {
+      if (frame <= 0 || AnimationErrorNanoseconds(frame) is not { } error || Math.Abs(error) <= ErrorThresholdNanoseconds || IsLate(frame))
+        return false;
+      if (IntendedPeriodNanoseconds(frame) is not { } period || Math.Abs(error) >= period)
+        return false;
+      long refresh = RefreshNanoseconds(1) - RefreshNanoseconds(0);
+      bool OffTarget(int f) => TargetRefreshes(f) is { } target && Math.Abs(DisplayStepNanoseconds(f) - (target * refresh)) >= refresh / 2;
+      bool pacing = IntendedStepNanoseconds(frame) is { } intended
+        ? Math.Abs(DisplayStepNanoseconds(frame) - intended) >= Math.Abs(AnimationStepNanoseconds(frame) - intended)
+        : OffTarget(frame) || SkippedBefore(frame) > 0 || (frame > 1 && OffTarget(frame - 1));
+      return !pacing;
+    }
 
     /// <summary>
     /// How many refreshes after the one it was rendered for the frame is first shown (negative: early, out of order). Its place against the

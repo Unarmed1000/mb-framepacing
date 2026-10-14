@@ -78,6 +78,8 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     private static bool IsLate(PresentedFrame frame) => frame.Flags.HasFlag(PresentedFrameFlags.Late);
 
+    private static bool IsJitter(PresentedFrame frame) => frame.Flags.HasFlag(PresentedFrameFlags.Jitter);
+
     [Test]
     public void SteadyFullRate_HasNoLateFrames()
     {
@@ -133,8 +135,10 @@ namespace MB.FramePacing.Analysis.UnitTest
         frames.AddRange(new[] { (1, 16L), (1, 16L), (1, 32L), (1, 0L) });
       var run = Analyze(Rows(frames));
 
-      // One rule for late: a 0 ms step is shown a refresh later than it was animated for. The cause says whose doing it is
-      Assert.That(run.Pacing!.LateFrames, Is.EqualTo(10), "every 0 ms step");
+      // Every frame is on screen for its intended refresh: none is late, however its animation step was off. The timer is off by a whole
+      // intended period, which is more than jitter
+      Assert.That(run.Pacing!.LateFrames, Is.Zero);
+      Assert.That(run.Frames.Count(IsJitter), Is.Zero, "off by a whole intended period");
       Assert.That(run.Pacing.ErrorFramesWithEvenDisplay, Is.EqualTo(20), "every 32 and 0 ms step");
       Assert.That(run.Pacing.ErrorFramesWithUnevenDisplay, Is.Zero);
       Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.DeltaTimeJitter));
@@ -226,8 +230,8 @@ namespace MB.FramePacing.Analysis.UnitTest
     [Test]
     public void Schedule_SplitsTheAnimationErrorIntoPacingAndPrediction()
     {
-      // The pacer shows every frame on time, but the game animates with a naive delta time: all of the error is prediction error. A 0 ms
-      // step is still shown a refresh later than it was animated for: late, by the one rule
+      // The pacer shows every frame on time, but the game animates with a naive delta time: all of the error is prediction error, and no
+      // frame is late (each is on screen for its intended period)
       var frames = new List<(int, long, long, long)>();
       long intended = 1000;
       for (int i = 0; i < 20; ++i, intended += 16)
@@ -250,7 +254,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.PacingError?.Nanoseconds, Is.Zero);
         Assert.That(frame.AnimationError?.Nanoseconds, Is.EqualTo(frame.PredictionError?.Nanoseconds - frame.PacingError?.Nanoseconds));
       }
-      Assert.That(run.Pacing!.LateFrames, Is.EqualTo(5), "every 0 ms step");
+      Assert.That(run.Pacing!.LateFrames, Is.Zero);
       Assert.That(run.Pacing.PredictionErrorMs!.Max, Is.EqualTo(16));
       Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.DeltaTimeJitter));
     }
@@ -315,17 +319,32 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
-    public void LessThanHalfARefreshLonger_IsNotLate()
+    public void AShortAnimationStepOnAnEvenDisplay_IsJitter_NotLate()
     {
-      // 7 ms more on screen than animated for at a 16 ms refresh is under half a refresh; 8 ms is half
-      var under = Steady(20).ToList();
-      under[10] = (1, 9);
-      var half = Steady(20).ToList();
-      half[10] = (1, 8);
+      // 7 or 8 ms more on screen than animated for at a 16 ms refresh, but on screen for the intended refresh: not late. The timer is off
+      // by less than the intended period on an even display: jitter
+      foreach (long animation in new[] { 9L, 8L })
+      {
+        var frames = Steady(20).ToList();
+        frames[10] = (1, animation);
+        var run = Analyze(Rows(frames));
 
-      Assert.That(Analyze(Rows(under)).Pacing!.LateFrames, Is.Zero);
-      var run = Analyze(Rows(half));
-      Assert.That(run.Frames.Select((f, i) => (f, i)).Where(x => IsLate(x.f)).Select(x => x.i), Is.EqualTo(new[] { 10 }));
+        Assert.That(run.Pacing!.LateFrames, Is.Zero, $"{animation} ms");
+        Assert.That(run.Frames.Select((f, i) => (f, i)).Where(x => IsJitter(x.f)).Select(x => x.i), Is.EqualTo(new[] { 10 }), $"{animation} ms");
+      }
+    }
+
+    [Test]
+    public void ALateFrame_HasNoJitter()
+    {
+      // Frame 10 stays a refresh longer: frame 11 is on screen half a refresh or more later than animated for and than intended. Late, and
+      // not jitter
+      var frames = Steady(20).ToList();
+      frames[10] = (2, 16);
+      var run = Analyze(Rows(frames));
+
+      Assert.That(run.Frames.Select((f, i) => (f, i)).Where(x => IsLate(x.f)).Select(x => x.i), Is.EqualTo(new[] { 11 }));
+      Assert.That(run.Frames.Count(IsJitter), Is.Zero);
     }
 
     [Test]

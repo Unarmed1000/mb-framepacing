@@ -430,7 +430,8 @@ second:
 - a frame is **judged** when it and the frame before it were both reported as shown. Its animation error is its animation time
   step less the time between the two display times;
 - an error of more than 1 ms either way is an **error frame**; half a refresh or more is a frame **at another refresh** than it
-  was made for, and **late** when it is the later one;
+  was made for, and **late** when it is the later one (the tools also ask that the display time step is half a refresh or more
+  longer than the frame's intended period; this count does not ask that yet);
 - the time **from a frame's start to its display**, of every frame reported as shown: their number, the times added up and the
   longest. It grows by a refresh for every frame more that waits to be shown.
 

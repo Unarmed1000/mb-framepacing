@@ -27,7 +27,7 @@
             Width="120"
             Text="{Binding TargetFpsText}"
             PlaceholderText="Target fps"
-            ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: what the display time steps are measured against. Empty = the target stored with the capture, else the pacing in the markers, else one refresh per frame."
+            ToolTip.Tip="The frame rate the application aims for, e.g. 30 on a 60 Hz display: what the display time steps are measured against, and a frame's intended period when its marker has none. Empty = the target stored with the capture, else the pacing in the markers, else one refresh per frame."
           />
           <TextBox
             Grid.Column="4"

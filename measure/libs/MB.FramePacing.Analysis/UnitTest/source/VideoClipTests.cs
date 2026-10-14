@@ -240,6 +240,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         Assert.That(frame.AnimationDelta?.Nanoseconds, Is.EqualTo(manifest.AnimationStepNanoseconds(i)), where + ": animation time step");
         Assert.That(frame.AnimationError?.Nanoseconds, Is.EqualTo(manifest.AnimationErrorNanoseconds(i)), where + ": animation error");
         Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Late), Is.EqualTo(manifest.IsLate(i)), where + ": late");
+        Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.Jitter), Is.EqualTo(manifest.IsJitter(i)), where + ": jitter");
         Assert.That(frame.TargetFrameTime?.Nanoseconds, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
         long? intended = manifest.IntendedStepNanoseconds(i);
         Assert.That(frame.PacingError?.Nanoseconds, Is.EqualTo(manifest.DisplayStepNanoseconds(i) - intended), where + ": pacing error");

@@ -14,7 +14,10 @@ namespace MB.FramePacing.Charts
     /// <summary>The next frame came as planned (no late verdict, nothing lost).</summary>
     AsPlanned,
 
-    /// <summary>The next frame was late: on screen half a refresh or more longer than the next frame's animation time step.</summary>
+    /// <summary>
+    /// The next frame was late: this frame stayed on screen half a refresh or more longer than the next one was animated for and than its
+    /// intended period.
+    /// </summary>
     Late,
 
     /// <summary>While this frame was the newest, the display showed an older frame again (frames presented out of order).</summary>
