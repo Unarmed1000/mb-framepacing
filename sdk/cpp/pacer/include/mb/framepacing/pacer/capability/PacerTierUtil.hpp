@@ -68,31 +68,18 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     return number > (3u * SubTiersPerMajorTier) ? SubTiersPerMajorTier : (((number - 1u) % SubTiersPerMajorTier) + 1u);
   }
 
-  //! Whether a pacer is built for the tier. None is for the major tier of a duration on the present yet: it is rated, and paced
-  //! as the frame loop's tier of the same capabilities (PacedAs).
-  [[nodiscard]] constexpr bool HasPacer(const PacerTier tier) noexcept
+  //! Whether a pacer is built for the tier: for every tier (TierPacer), since the second major tier has its own (decision 20 of
+  //! sdk/doc/pacer-design.md). Kept for applications that asked before.
+  [[nodiscard]] constexpr bool HasPacer(const PacerTier /*tier*/) noexcept
   {
-    return MajorOf(tier) != PacerMajorTier::DisplayPlacesAfterDuration;
+    return true;
   }
 
-  //! The tier a set of that tier is paced as: the tier itself where a pacer is built for it, and for a tier of a duration on the
-  //! present the frame loop's tier of the same capabilities, with the duration given on every present: 2.1 as 3.1 (vertical
-  //! blank times and a wait), 2.2 as 3.3 (a wait), 2.3 as 3.2 (vertical blank times), 2.4 as 3.4.
+  //! The tier a set of that tier is paced as: the tier itself, as every tier has a pacer (HasPacer). Until decision 20 a tier of
+  //! the second major tier was paced as the frame loop's tier of the same capabilities. Kept for applications that asked before.
   [[nodiscard]] constexpr PacerTier PacedAs(const PacerTier tier) noexcept
   {
-    switch (tier)
-    {
-    case PacerTier::AfterDurationVBlankWaitForPresent:
-      return PacerTier::VBlankWaitForPresent;
-    case PacerTier::AfterDurationTimerWaitForPresent:
-      return PacerTier::TimerWaitForPresent;
-    case PacerTier::AfterDurationVBlankDisplayTimes:
-      return PacerTier::VBlankPeriodOnly;
-    case PacerTier::AfterDurationTimerDisplayTimes:
-      return PacerTier::TimerPeriodOnly;
-    default:
-      return tier;
-    }
+    return tier;
   }
 
   //! Whether the set reaches the tier: it has what the tier's major tier needs (a time on the present; a duration on the present),

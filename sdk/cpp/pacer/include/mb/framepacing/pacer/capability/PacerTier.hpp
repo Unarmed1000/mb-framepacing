@@ -25,10 +25,9 @@ namespace MB::FramePacing::Pacer
   //! each other, the second major tier against 3.1 first (the record has what is measured).
   //!
   //! The second major tier (AfterDuration...) needs to know where a frame was shown, as every later duration counts from it: its
-  //! sub tiers without a wait for a present are reached only with display times (DisplayTimes, the "+"). It is rated and has no
-  //! pacer of its own yet: a set that reaches it is paced as the frame loop's tier of the same capabilities, with the duration
-  //! given on every present (PacerTierUtil::PacedAs). The first (AtTime...) is paced by TierPacer and built against the
-  //! simulation's display only: no system has been measured with it.
+  //! sub tiers without a wait for a present are reached only with display times (DisplayTimes, the "+"). TierPacer paces both
+  //! major tiers where the display's side places the frame (the second since decision 20), built against the simulation's
+  //! display only: no system has been measured with them.
   enum class PacerTier : uint8_t
   {
     //! 1.1: a time on the present, vertical blank times and a wait for a present

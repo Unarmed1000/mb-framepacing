@@ -5,7 +5,8 @@
 // periods on the clock, a swap interval from the rule, an animation time that advances by the swap interval and by a loss that
 // repeats. With a wait for a present the loop is held until the display took an earlier frame and the grid follows the ends of
 // the waits that held it; without one there is a pause after start-up, a whole period after a late present, and the system's
-// own waits.
+// own waits. Where the display's side places a frame after the one before it, the aim of low latency follows the display's
+// slip behind the grid from the display times.
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/pacer/placement/DisplayPlacementUtil.hpp>
 #include <mb/framepacing/pacer/rule/SwapIntervalChange.hpp>
@@ -48,6 +49,47 @@ namespace MB::FramePacing::Pacer
     const NanosecondTimeSpan gap = time - m_startTime;
     const NanosecondTimeSpan reach = std::max(m_rule.Settings().FrameWindowLength(), m_rule.Refresh().TimeFor(int64_t{2} * (m_nextSlot - m_slot)));
     return gap < NanosecondTimeSpan() || gap > reach;
+  }
+
+  bool ClockGridLoopPacer::DisplayPlaces(const uint32_t swapInterval) const noexcept
+  {
+    return DisplayPlacementUtil::DisplayPlaces(m_presentTiming, m_displayHoldsUpTo, swapInterval);
+  }
+
+  bool ClockGridLoopPacer::FollowsTheDisplaysSlip() const noexcept
+  {
+    // With the aim of low latency, where the display's side places a frame after the one before it, from the display times. A
+    // wait for a present holds the loop until the display took a frame, which keeps the frames that wait few by itself
+    return m_usesDisplayTimes && !m_waitsForPresent && m_rule.Settings().Aim() == PacerAim::LowLatency &&
+           DisplayPlacementUtil::PlacesAfterFrameBefore(m_presentTiming, m_displayHoldsUpTo, m_swapInterval);
+  }
+
+  void ClockGridLoopPacer::SetUsesDisplayTimes(const bool usesDisplayTimes) noexcept
+  {
+    if (usesDisplayTimes != m_usesDisplayTimes)
+    {
+      m_slip.Restart();
+    }
+    m_usesDisplayTimes = usesDisplayTimes;
+  }
+
+  void ClockGridLoopPacer::AddDisplayReport(const DisplayReport& report) noexcept
+  {
+    // Not followed, or no grid to move (the next frame starts one): what was seen of the slip is no longer the grid's
+    if (!FollowsTheDisplaysSlip() || !m_hasGrid || m_takenOver)
+    {
+      m_slip.Restart();
+      return;
+    }
+    const int64_t slip = m_slip.AddDisplayReport(report, m_rule.Refresh());
+    if (slip > 0)
+    {
+      // The frames on their way are shown that much later, and the ones after them would wait for the display as long: the grid
+      // moves, and the next frame starts that much later. The animation time does not step over it
+      m_origin = m_origin + m_rule.Refresh().TimeFor(slip);
+      m_refreshesBehindClock += static_cast<uint64_t>(slip);
+      m_displaySlipRefreshes += static_cast<uint64_t>(slip);
+    }
   }
 
   uint32_t ClockGridLoopPacer::FramesInFlightNow() const noexcept
@@ -293,6 +335,7 @@ namespace MB::FramePacing::Pacer
       m_slot = 0;
       m_behind = 0;
       m_hasGrid = true;
+      m_slip.Restart();
     }
     else if (m_takenOver || m_wait.WaitRanOut())
     {
@@ -313,6 +356,8 @@ namespace MB::FramePacing::Pacer
       // one is due a swap interval later, and none is made back to back with it
       m_slot = m_takenOver ? Reserve() : 0;
       m_behind = 0;
+      // A grid placed anew: the display's lag behind it is measured anew
+      m_slip.Restart();
       m_rule.RebaseNewest(NanosecondTimeSpan(period.TimeFor(m_slot).Nanoseconds() - period.TimeFor(m_swapInterval).Nanoseconds()));
     }
     else
@@ -329,6 +374,11 @@ namespace MB::FramePacing::Pacer
       const int64_t slot = letThrough ? m_nextSlot : SlotFor(cpuStartTime);
       lost = slot - m_nextSlot;
       lostBefore = m_lost;
+      if (lost > 0)
+      {
+        // The frame before was late by that many steps, and is shown that much later: this frame is planned from there
+        m_slip.Replan(m_frameId, TimeOfSlot(m_dueSlot + lost));
+      }
       // Where in its step a present is made when it is on time
       if (m_hasPresentTime && m_presentTime <= TimeOfSlot(m_dueSlot))
       {
@@ -394,6 +444,7 @@ namespace MB::FramePacing::Pacer
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
     m_nextFrameStartTime = schedule.NextFrameStartTime;
+    m_slip.AddFrame(m_frameId, schedule.IntendedDisplayTime);
     return schedule;
   }
 
@@ -411,9 +462,10 @@ namespace MB::FramePacing::Pacer
     plan.CpuBusy = busy;
     // The time the present is given, where it takes one. With a time before which the frame is not shown the display's side
     // shows it at the refresh nearest to the step it is due at, however many refreshes that is after the frame before it,
-    // and the frame is presented when it is done
+    // and where it places a frame after the one before it, it keeps that one on screen for its swap interval: the frame is
+    // presented when it is done
     DisplayPlacementUtil::Place(plan, m_presentTiming, TimeOfSlot(m_dueSlot), m_swapInterval, m_rule.Refresh());
-    if (m_presentTiming != PresentTiming::AtTime && m_swapInterval > 1)
+    if (!DisplayPlaces(m_swapInterval) && m_swapInterval > 1)
     {
       // The present holds a frame for one refresh. A frame of more is held by the loop: presented in the period before the step
       // the next frame is due at, the margin into it
@@ -533,7 +585,7 @@ namespace MB::FramePacing::Pacer
       // frame and more the frame margin into the period before its step: the grid's step for the first frame is where that
       // puts its present on the next one the other part would have made. The frame starts there and no sooner (a present
       // at once after the last one would leave a frame more waiting), or later when the other part said so
-      const bool holdsPresents = m_presentTiming != PresentTiming::AtTime && m_rule.SwapInterval() > 1;
+      const bool holdsPresents = !DisplayPlaces(m_rule.SwapInterval()) && m_rule.SwapInterval() > 1;
       // A swap interval's time and a frame margin: far inside the range
       const int64_t heldNanoseconds =
         holdsPresents ? m_rule.Refresh().TimeFor(int64_t{m_rule.SwapInterval()} - 1).Nanoseconds() + m_rule.Settings().FrameMargin().Nanoseconds()

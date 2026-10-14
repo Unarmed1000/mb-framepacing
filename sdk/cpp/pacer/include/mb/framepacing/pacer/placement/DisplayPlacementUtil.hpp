@@ -6,20 +6,23 @@
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
+#include <mb/framepacing/pacer/capability/PacerTierUtil.hpp>
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/placement/PresentTiming.hpp>
 #include <algorithm>
 #include <cstdint>
 
 //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built; the simulation only, no system has
-//! been measured with it). The values a timed present is given, which every tier with a timed present (PacerTier 1 to 4)
-//! gives its presents. With a time before which a frame is not shown the display's side places the frame: it is shown at the
-//! refresh it is for whenever before it the present is made. A time the frame before it stays on screen at least places
-//! nothing by itself, as it counts from wherever that frame was shown: it keeps a frame from being shown a refresh early.
-//! Functions of values alone.
+//! been measured with it). The values a timed present is given, which every tier with a timed present gives its presents, and
+//! who places a frame. With a time before which a frame is not shown the display's side places the frame: it is shown at the
+//! refresh it is for whenever before it the present is made (the first major tier). A time the frame before it stays on screen
+//! at least counts from wherever that frame was shown: where the pacer sees where frames were shown, the display's side places
+//! a frame after the one before it (the second major tier, HoldsUpTo), and else it keeps a frame from being shown a refresh
+//! early. Functions of values alone.
 namespace MB::FramePacing::Pacer::DisplayPlacementUtil
 {
   //! A frame may be shown from this share of a refresh period before the refresh it is for: one in this many. Half a period is as
@@ -37,6 +40,36 @@ namespace MB::FramePacing::Pacer::DisplayPlacementUtil
       return PresentTiming::AtTime;
     }
     return active.Has(PacerCapability::PresentAfterDuration) ? PresentTiming::AfterDuration : PresentTiming::Untimed;
+  }
+
+  //! The longest swap interval with which the display's side places a frame after the one before it, with the active
+  //! capabilities: the second major tier (a duration on the present, or a swap interval of two or more on it, and a wait for a
+  //! present or display times to see where frames were shown). Any with a duration (PacerSettings::MaxSwapInterval), the
+  //! present's longest swap interval without one, and 0 where the display's side does not: without a way to see where frames
+  //! were shown, and with a time before which a frame is not shown, which places the frame by itself.
+  [[nodiscard]] constexpr uint32_t HoldsUpTo(const PacerCapabilities& active) noexcept
+  {
+    if (PacerTierUtil::HasPresentAtTime(active) || !PacerTierUtil::HasPresentAfterDuration(active) ||
+        !PacerTierUtil::SeesWhereFramesWereShown(active))
+    {
+      return 0u;
+    }
+    return active.Has(PacerCapability::PresentAfterDuration) ? PacerSettings::MaxSwapInterval : active.MaxPresentSwapInterval();
+  }
+
+  //! Whether the display's side places a frame of that swap interval after the one before it: with the timing and the longest
+  //! swap interval it does that for (HoldsUpTo). The frame is then presented when it is done, and the display's side keeps the
+  //! frame before it on screen for its swap interval: the loop holds no present.
+  [[nodiscard]] constexpr bool PlacesAfterFrameBefore(const PresentTiming timing, const uint32_t holdsUpTo, const uint32_t swapInterval) noexcept
+  {
+    return timing != PresentTiming::AtTime && swapInterval <= holdsUpTo;
+  }
+
+  //! Whether the display's side places a frame of that swap interval: at a time (PresentTiming::AtTime), or after the one before
+  //! it (PlacesAfterFrameBefore). Else the loop does, by when it presents.
+  [[nodiscard]] constexpr bool DisplayPlaces(const PresentTiming timing, const uint32_t holdsUpTo, const uint32_t swapInterval) noexcept
+  {
+    return timing == PresentTiming::AtTime || PlacesAfterFrameBefore(timing, holdsUpTo, swapInterval);
   }
 
   //! PresentPlan::SwapInterval for a frame of that swap interval. Where the present takes a swap interval

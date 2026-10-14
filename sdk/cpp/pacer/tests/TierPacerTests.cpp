@@ -27,8 +27,11 @@
 #include <mb/framepacing/pacer/frame/SystemWaitKind.hpp>
 #include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
+#include <mb/framepacing/pacer/placement/PresentTiming.hpp>
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
+#include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
+#include <mb/framepacing/pacer/tier/VBlankLoopPacer.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
@@ -482,21 +485,32 @@ TEST(TierPacer, AWaitThePlanAsksForMayTakeFiftyMillisecondsAtTheLeast)
   EXPECT_EQ(gpuPlan.WaitForGpuWorkTimeout.Nanoseconds(), 50'000'000);
 }
 
-TEST(TierPacer, ADurationOnThePresentIsRatedTheSecondMajorTierAndPacedAsTheFrameLoop)
+TEST(TierPacer, ADurationOnThePresentIsTheSecondMajorTierWhereThePacerSeesWhereFramesWereShown)
 {
-  // With a wait for a present: rated the second major tier, paced as the frame loop's tier of the same capabilities, as no pacer
-  // is built for it yet; the present still gets its duration
+  // With a wait for a present: the second major tier, rated and paced. The present gets its duration
   Loop loop(Settings(), PacerCapabilities(AfterDuration | VBlank | Wait));
   EXPECT_EQ(loop.Pacer.Rating().Tier, PacerTier::AfterDurationVBlankWaitForPresent);
   EXPECT_TRUE(loop.Pacer.Rating().DisplaySideHolds);
   static_cast<void>(loop.Frame());
-  EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::VBlankWaitForPresent);
-  EXPECT_EQ(loop.Pacer.WorkingTier(), PC::PacerTierUtil::PacedAs(loop.Pacer.ActiveRating().Tier));
+  EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::AfterDurationVBlankWaitForPresent);
+  EXPECT_EQ(loop.Pacer.WorkingTier(), loop.Pacer.ActiveRating().Tier);
+  EXPECT_GT(loop.Present.MinimumDuration.Nanoseconds(), 0);
+  // With the wait on a grid on the clock: 2.2
+  Loop timerWait(Settings(), PacerCapabilities(AfterDuration | Wait));
+  static_cast<void>(timerWait.Frame());
+  EXPECT_EQ(timerWait.Pacer.WorkingTier(), PacerTier::AfterDurationTimerWaitForPresent);
 
-  // With display times and no wait: 2.4, paced as 3.4
+  // With display times and no wait: 2.4, and 2.3 with vertical blank times once one was read
   const PC::TierPacer shown(Settings(), PacerCapabilities(AfterDuration | PacerCapability::DisplayTimes));
   EXPECT_EQ(shown.Rating().Tier, PacerTier::AfterDurationTimerDisplayTimes);
-  EXPECT_EQ(shown.WorkingTier(), PacerTier::TimerPeriodOnly);
+  EXPECT_EQ(shown.WorkingTier(), PacerTier::AfterDurationTimerDisplayTimes);
+  Loop onBlanks(Settings(), PacerCapabilities(AfterDuration | VBlank | PacerCapability::DisplayTimes));
+  EXPECT_EQ(onBlanks.Pacer.WorkingTier(), PacerTier::AfterDurationTimerDisplayTimes);
+  static_cast<void>(onBlanks.Frame());
+  EXPECT_EQ(onBlanks.Pacer.WorkingTier(), PacerTier::AfterDurationVBlankDisplayTimes);
+  // A swap interval of two or more on the present does the same
+  const PC::TierPacer swapInterval(Settings(), PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::DisplayTimes, 2));
+  EXPECT_EQ(swapInterval.WorkingTier(), PacerTier::AfterDurationTimerDisplayTimes);
 
   // Alone: the pacer would not see where frames were shown, so the tier is the loop's, as rated and as paced
   PC::TierPacer timer(Settings(), PacerCapabilities(AfterDuration));
@@ -621,7 +635,8 @@ TEST(TierPacer, ATimeTheFrameBeforeStaysIsGivenNextToWhatTheLoopDoesWithoutOne)
 {
   for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
   {
-    for (const PacerCapability named : {PacerCapability::NoCapabilities, Wait, VBlank, VBlank | Wait})
+    // Without a way to see where frames were shown: the display's side places nothing, and the loop does as without the time
+    for (const PacerCapability named : {PacerCapability::NoCapabilities, VBlank})
     {
       for (const uint32_t swapInterval : {1u, 2u, 3u})
       {
@@ -786,6 +801,7 @@ TEST(TierPacer, ThePauseAfterStartUpIsMadeOnceWhicheverPartPlacesTheFrames)
 
 TEST(TierPacer, DisplayReportsAreCountedAndPaceNothing)
 {
+  // Outside the second major tier: there, with the aim of low latency, they move the frames (the tests after this one)
   for (const PacerCapability named : {PacerCapability::NoCapabilities, Wait, VBlank, VBlank | Wait, VBlank | Wait | AtTime})
   {
     PC::PacerSettings settings = Settings();
@@ -1178,34 +1194,38 @@ TEST(TierPacer, AWaitThatIsNotActiveIsNotTakenAndWaitsThatStoppedLowerTheTierTha
   EXPECT_EQ(both.GpuWaitTimeouts(), 0u);
 
   // Waits for a present that run out stop the waits (a window that is not shown): the tier that paces is the one without
-  // the wait, while the active tier is the one with it
-  PC::TierPacer pacer(Settings(), PacerCapabilities(Wait));
-  int64_t now = Start;
-  for (int32_t frame = 0; frame < 6; ++frame)
+  // the wait, while the active tier is the one with it. With a duration on the present the pacer then does not see where
+  // frames were shown, and the loop places them
+  for (const PacerCapability placed : {PacerCapability::NoCapabilities, AfterDuration})
   {
-    const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
-    if (plan.WaitsForPresent())
+    PC::TierPacer pacer(Settings(), PacerCapabilities(Wait | placed));
+    int64_t now = Start;
+    for (int32_t frame = 0; frame < 6; ++frame)
     {
-      PC::PresentWaitReport wait;
-      wait.FrameId = plan.WaitForPresentFrameId;
-      wait.BeginTime = At(now);
-      now += plan.WaitForPresentTimeout.Nanoseconds();
-      wait.EndTime = At(now);
-      wait.Shown = false;
-      pacer.AddPresentWait(wait);
+      const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
+      if (plan.WaitsForPresent())
+      {
+        PC::PresentWaitReport wait;
+        wait.FrameId = plan.WaitForPresentFrameId;
+        wait.BeginTime = At(now);
+        now += plan.WaitForPresentTimeout.Nanoseconds();
+        wait.EndTime = At(now);
+        wait.Shown = false;
+        pacer.AddPresentWait(wait);
+      }
+      static_cast<void>(pacer.BeginFrame(At(now)));
+      const PC::PresentPlan present = pacer.EndFrame(At(now + Work));
+      PC::PresentReport report;
+      report.FrameId = present.FrameId;
+      report.CallTime = At(now + Work);
+      report.ReturnTime = At(now + Work + 60'000);
+      pacer.AddPresent(report);
+      now += Period;
     }
-    static_cast<void>(pacer.BeginFrame(At(now)));
-    const PC::PresentPlan present = pacer.EndFrame(At(now + Work));
-    PC::PresentReport report;
-    report.FrameId = present.FrameId;
-    report.CallTime = At(now + Work);
-    report.ReturnTime = At(now + Work + 60'000);
-    pacer.AddPresent(report);
-    now += Period;
+    EXPECT_TRUE(pacer.PresentWaitsStopped());
+    EXPECT_EQ(pacer.ActiveRating().Tier, placed == AfterDuration ? PacerTier::AfterDurationTimerWaitForPresent : PacerTier::TimerWaitForPresent);
+    EXPECT_EQ(pacer.WorkingTier(), PacerTier::TimerPeriodOnly);
   }
-  EXPECT_TRUE(pacer.PresentWaitsStopped());
-  EXPECT_EQ(pacer.ActiveRating().Tier, PacerTier::TimerWaitForPresent);
-  EXPECT_EQ(pacer.WorkingTier(), PacerTier::TimerPeriodOnly);
 }
 
 TEST(TierPacer, ChangesOfTheActiveSetAtAnyMomentKeepTheFramesGoingOn)
@@ -1298,4 +1318,141 @@ TEST(TierPacer, AWaitOfTheSystemsAndAFrameBegunAtOnceRightAfterTheGridTookTheFra
     }
     EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::TimerPeriodOnly);
   }
+}
+
+namespace
+{
+  //! A display report of the frame of that schedule: shown at its intended display time and a lag after it
+  PC::DisplayReport ShownAfter(const PC::FrameSchedule& schedule, const int64_t lagNanoseconds)
+  {
+    PC::DisplayReport report;
+    report.FrameId = schedule.FrameId;
+    report.DisplayTime = At(schedule.IntendedDisplayTime.Nanoseconds() + lagNanoseconds);
+    return report;
+  }
+}
+
+TEST(TierPacer, InTheSecondMajorTierWithLowLatencyADisplayThatSlippedStartsTheFramesLater)
+{
+  for (const PacerCapability named : {PacerCapability::NoCapabilities, VBlank})
+  {
+    Loop loop(Settings(), PacerCapabilities(named | AfterDuration | PacerCapability::DisplayTimes));
+    // A report before any frame moves nothing
+    loop.Pacer.AddDisplayReport(ShownAfter(PC::FrameSchedule(), Period));
+    std::array<PC::FrameSchedule, 20> schedules{};
+    for (PC::FrameSchedule& rSchedule : schedules)
+    {
+      rSchedule = loop.Frame();
+    }
+    EXPECT_EQ(loop.Pacer.WorkingTier(), named == VBlank ? PacerTier::AfterDurationVBlankDisplayTimes : PacerTier::AfterDurationTimerDisplayTimes);
+    // Ten frames shown where they were meant to be, then one a refresh late: every frame after it is too, and the frames start a
+    // refresh later from the next one on
+    for (std::size_t index = 0; index < 10; ++index)
+    {
+      loop.Pacer.AddDisplayReport(ShownAfter(schedules[index], 0));
+    }
+    const uint64_t behind = loop.Pacer.RefreshesBehindClock();
+    loop.Pacer.AddDisplayReport(ShownAfter(schedules[10], Period));
+    EXPECT_EQ(loop.Pacer.DisplaySlipRefreshes(), 1u);
+    EXPECT_EQ(loop.Pacer.RefreshesBehindClock(), behind + 1u);
+    // The frames on their way are shown a refresh late as well: no slip of their own
+    for (std::size_t index = 11; index < schedules.size(); ++index)
+    {
+      loop.Pacer.AddDisplayReport(ShownAfter(schedules[index], Period));
+    }
+    EXPECT_EQ(loop.Pacer.DisplaySlipRefreshes(), 1u);
+    // The next frame is for the refresh after the one it would have been for, and its animation step is one refresh: the
+    // animation time does not step over the slip
+    const PC::FrameSchedule next = loop.Frame();
+    EXPECT_EQ(next.IntendedDisplayTime.Nanoseconds() - schedules.back().IntendedDisplayTime.Nanoseconds(), 2 * Period);
+    EXPECT_EQ(next.AnimationStep.Nanoseconds(), Period);
+  }
+}
+
+TEST(TierPacer, InTheSecondMajorTierTheDisplaysSlipIsFollowedOnlyWithLowLatencyAndNoWait)
+{
+  struct Case
+  {
+    PC::PacerAim Aim;
+    PacerCapability Capabilities;
+  };
+  const PacerCapability reported = PacerCapability::DisplayTimes;
+  // Smoothness takes the hit, a wait for a present keeps the frames that wait few by itself, a time on the present places the
+  // frames at their refresh, and without a duration the loop places them: none of them moves
+  for (const Case& each : {Case{PC::PacerAim::Smoothness, AfterDuration | reported}, Case{PC::PacerAim::LowLatency, AfterDuration | reported | Wait},
+                           Case{PC::PacerAim::LowLatency, AtTime | reported}, Case{PC::PacerAim::LowLatency, reported}})
+  {
+    Loop loop(Settings(each.Aim), PacerCapabilities(each.Capabilities));
+    std::array<PC::FrameSchedule, 12> schedules{};
+    for (PC::FrameSchedule& rSchedule : schedules)
+    {
+      rSchedule = loop.Frame();
+    }
+    loop.Pacer.AddDisplayReport(ShownAfter(schedules[0], 0));
+    loop.Pacer.AddDisplayReport(ShownAfter(schedules[1], Period));
+    loop.Pacer.AddDisplayReport(ShownAfter(schedules[2], 3 * Period));
+    EXPECT_EQ(loop.Pacer.DisplaySlipRefreshes(), 0u) << static_cast<uint32_t>(each.Capabilities);
+  }
+
+  // Not while another part takes the frames over: the first frame after the handover places them anew
+  for (const PacerCapability named : {PacerCapability::NoCapabilities, VBlank})
+  {
+    Loop loop(Settings(), PacerCapabilities(VBlank | AfterDuration | reported));
+    loop.Pacer.SetActiveCapabilities(PacerCapabilities(named | AfterDuration | reported));
+    std::array<PC::FrameSchedule, 4> schedules{};
+    for (PC::FrameSchedule& rSchedule : schedules)
+    {
+      rSchedule = loop.Frame();
+    }
+    loop.Pacer.AddDisplayReport(ShownAfter(schedules[0], 0));
+    loop.Pacer.SetActiveCapabilities(PacerCapabilities((named == VBlank ? PacerCapability::NoCapabilities : VBlank) | AfterDuration | reported));
+    loop.Pacer.AddDisplayReport(ShownAfter(schedules[1], Period));
+    EXPECT_EQ(loop.Pacer.DisplaySlipRefreshes(), 0u) << static_cast<uint32_t>(named);
+  }
+}
+
+TEST(TierPacer, ThePartsThatPlaceFramesFollowTheDisplaysSlipOnlyWithDisplayTimes)
+{
+  // The parts on their own: told that display times are reported, or not. Without them a report moves nothing; switched on,
+  // what was seen before is measured anew
+  PC::ClockGridLoopPacer grid(Settings(), false);
+  PC::VBlankLoopPacer vblank(Settings(), false);
+  grid.SetPresentTiming(PC::PresentTiming::AfterDuration);
+  vblank.SetPresentTiming(PC::PresentTiming::AfterDuration);
+  grid.SetDisplayHoldsUpTo(PC::PacerSettings::MaxSwapInterval);
+  vblank.SetDisplayHoldsUpTo(PC::PacerSettings::MaxSwapInterval);
+  std::array<PC::FrameSchedule, 8> gridFrames{};
+  std::array<PC::FrameSchedule, 8> vblankFrames{};
+  const auto begin = [&](const std::size_t from, const std::size_t to)
+  {
+    for (std::size_t index = from; index < to; ++index)
+    {
+      const FP::NanosecondTickCount start = At(Start + (static_cast<int64_t>(index) * Period));
+      gridFrames[index] = grid.BeginFrame(start);
+      static_cast<void>(grid.EndFrame(start + FP::NanosecondTimeSpan(Work)));
+      vblankFrames[index] = vblank.BeginFrame(start);
+      static_cast<void>(vblank.EndFrame(start + FP::NanosecondTimeSpan(Work)));
+    }
+  };
+  begin(0, 4);
+  grid.AddDisplayReport(ShownAfter(gridFrames[0], 0));
+  grid.AddDisplayReport(ShownAfter(gridFrames[1], Period));
+  vblank.AddDisplayReport(ShownAfter(vblankFrames[0], 0));
+  vblank.AddDisplayReport(ShownAfter(vblankFrames[1], Period));
+  EXPECT_EQ(grid.DisplaySlipRefreshes(), 0u);
+  EXPECT_EQ(vblank.DisplaySlipRefreshes(), 0u);
+  grid.SetUsesDisplayTimes(true);
+  vblank.SetUsesDisplayTimes(true);
+  grid.SetUsesDisplayTimes(true);
+  vblank.SetUsesDisplayTimes(true);
+  // The frames begun before are not counted: a frame begun since is
+  grid.AddDisplayReport(ShownAfter(gridFrames[2], 3 * Period));
+  vblank.AddDisplayReport(ShownAfter(vblankFrames[2], 3 * Period));
+  begin(4, 8);
+  grid.AddDisplayReport(ShownAfter(gridFrames[4], 0));
+  grid.AddDisplayReport(ShownAfter(gridFrames[5], Period));
+  vblank.AddDisplayReport(ShownAfter(vblankFrames[4], 0));
+  vblank.AddDisplayReport(ShownAfter(vblankFrames[5], Period));
+  EXPECT_EQ(grid.DisplaySlipRefreshes(), 1u);
+  EXPECT_EQ(vblank.DisplaySlipRefreshes(), 1u);
 }

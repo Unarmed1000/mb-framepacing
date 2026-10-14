@@ -104,8 +104,8 @@ namespace MB::FramePacing::Pacer::PacerTierText
       return "The present takes how long the frame before it stays on screen (or a swap interval of two or more, the same in "
              "whole refreshes), so the display's side places every frame relative to the one before, and the loop may present "
              "early. After a late frame every later duration counts from it: the display stays smooth, and the pacer has to see "
-             "where frames were shown, from a wait for a present or display times, or the latency creeps up. No pacer is built "
-             "for it yet: such a set is paced as the frame loop's tier of the same capabilities.";
+             "where frames were shown, from a wait for a present or display times, or the latency creeps up. With the aim of "
+             "low latency it starts the frames later when it sees that.";
     case PacerMajorTier::LoopPlaces:
       return "The present takes no time before which the frame is not shown, so the frame loop places a frame: it has to make "
              "the present at the right moment in the refresh before the one the frame is for.";
@@ -171,23 +171,23 @@ namespace MB::FramePacing::Pacer::PacerTierText
     case PacerTier::AfterDurationVBlankWaitForPresent:
       return "The present takes how long the frame before it stays, so the display's side shows every frame that long after "
              "the one before. The refreshes are known from vertical blank times, and before a frame the loop waits until the "
-             "display took an earlier present, so the pacer sees a late frame move the ones after it. No pacer is built for it "
-             "yet: the set is paced as tier 3.1, with the duration on every present.";
+             "display took an earlier present, which keeps the frames that wait to be shown as few as asked for after a late "
+             "frame moved the ones after it.";
     case PacerTier::AfterDurationTimerWaitForPresent:
       return "The present takes how long the frame before it stays, so the display's side shows every frame that long after "
              "the one before, counted in refresh periods on the clock. Before a frame the loop waits until the display took an "
-             "earlier present, so the pacer sees a late frame move the ones after it. No pacer is built for it yet: the set is "
-             "paced as tier 3.3, with the duration on every present.";
+             "earlier present, which keeps the frames that wait to be shown as few as asked for after a late frame moved the "
+             "ones after it.";
     case PacerTier::AfterDurationVBlankDisplayTimes:
       return "The present takes how long the frame before it stays, so the display's side shows every frame that long after "
              "the one before. The refreshes are known from vertical blank times, and the application reports when its frames "
-             "were shown, so the pacer sees a late frame move the ones after it. No pacer is built for it yet: the set is "
-             "paced as tier 3.2, with the duration on every present.";
+             "were shown, so the pacer sees a late frame move the ones after it: with the aim of low latency it starts the "
+             "frames that much later.";
     case PacerTier::AfterDurationTimerDisplayTimes:
       return "The present takes how long the frame before it stays, so the display's side shows every frame that long after "
              "the one before, counted in refresh periods on the clock. The application reports when its frames were shown, so "
-             "the pacer sees a late frame move the ones after it. No pacer is built for it yet: the set is paced as tier 3.4, "
-             "with the duration on every present.";
+             "the pacer sees a late frame move the ones after it: with the aim of low latency it starts the frames that much "
+             "later.";
     case PacerTier::VBlankWaitForPresent:
       return "The pacer knows where the display's refreshes are from vertical blank times, and before a frame the loop waits "
              "until the display took an earlier present: every frame is for one refresh, the frames that wait to be shown stay "

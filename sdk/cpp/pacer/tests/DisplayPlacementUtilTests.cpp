@@ -6,6 +6,7 @@
 
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
+#include <mb/framepacing/pacer/PacerSettings.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
@@ -103,4 +104,32 @@ TEST(DisplayPlacementUtil, ThePresentsSwapIntervalIsTheFramesUpToTheLongestThePr
   // With a time the frame before stays, both say the same and both are given
   EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::PresentAfterDuration, 4), 2),
             2u);
+}
+
+TEST(DisplayPlacementUtil, TheDisplaysSidePlacesAFrameAfterTheOneBeforeWhereThePacerSeesWhereFramesWereShown)
+{
+  using PC::PacerCapabilities;
+  using PC::PacerCapability;
+  const PacerCapability seen = PacerCapability::WaitForPresent;
+  const PacerCapability reported = PacerCapability::DisplayTimes;
+  // A duration on the present: any swap interval, with a wait for a present or display times
+  EXPECT_EQ(Placement::HoldsUpTo(PacerCapabilities(PacerCapability::PresentAfterDuration | seen)), PC::PacerSettings::MaxSwapInterval);
+  EXPECT_EQ(Placement::HoldsUpTo(PacerCapabilities(PacerCapability::PresentAfterDuration | reported | PacerCapability::VBlankTimes)),
+            PC::PacerSettings::MaxSwapInterval);
+  // A swap interval on the present: up to its longest, from two
+  EXPECT_EQ(Placement::HoldsUpTo(PacerCapabilities(PacerCapability::PresentSwapInterval | reported, 3)), 3u);
+  EXPECT_EQ(Placement::HoldsUpTo(PacerCapabilities(PacerCapability::PresentSwapInterval | reported, 1)), 0u);
+  // Without a way to see where frames were shown, with a time on the present, or with nothing: none
+  EXPECT_EQ(Placement::HoldsUpTo(PacerCapabilities(PacerCapability::PresentAfterDuration | PacerCapability::VBlankTimes)), 0u);
+  EXPECT_EQ(Placement::HoldsUpTo(PacerCapabilities(PacerCapability::PresentAfterDuration | PacerCapability::PresentAtTime | seen)), 0u);
+  EXPECT_EQ(Placement::HoldsUpTo(PacerCapabilities(seen | reported)), 0u);
+
+  // Who places a frame of a swap interval
+  static_assert(Placement::DisplayPlaces(PresentTiming::AtTime, 0, 3));
+  static_assert(!Placement::PlacesAfterFrameBefore(PresentTiming::AtTime, 4, 3));
+  static_assert(Placement::PlacesAfterFrameBefore(PresentTiming::AfterDuration, 4, 3));
+  static_assert(Placement::PlacesAfterFrameBefore(PresentTiming::Untimed, 4, 4));
+  static_assert(!Placement::PlacesAfterFrameBefore(PresentTiming::Untimed, 4, 5));
+  static_assert(!Placement::DisplayPlaces(PresentTiming::AfterDuration, 0, 1));
+  static_assert(Placement::DisplayPlaces(PresentTiming::AfterDuration, 2, 2));
 }

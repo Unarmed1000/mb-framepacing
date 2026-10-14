@@ -10,6 +10,7 @@
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
+#include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
@@ -19,6 +20,7 @@
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
+#include <mb/framepacing/pacer/hold/DisplaySlipRule.hpp>
 #include <mb/framepacing/pacer/hold/GpuWaitRule.hpp>
 #include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
 #include <mb/framepacing/pacer/placement/PresentTiming.hpp>
@@ -47,8 +49,11 @@ namespace MB::FramePacing::Pacer
   //! (DisplayPlacementUtil). A time before which the frame is not shown has the display's side show it at the vertical
   //! blank it is for: the loop holds no present, and a frame is presented when it is done. With the aim of smoothness
   //! what held the present then holds the next frame's start; with low latency the start is held as without one, and the
-  //! time keeps a frame that is done early from being shown early. A time the frame before it stays on screen at least
-  //! is given next to what the loop does without one.
+  //! time keeps a frame that is done early from being shown early. So it is where the display's side places a frame after
+  //! the one before it (SetDisplayHoldsUpTo: the second major tier), and with the aim of low latency, display times and no
+  //! wait for a present, the frames' vertical blanks move later by the refreshes the display slipped behind them
+  //! (AddDisplayReport, DisplaySlipRule). Else a time the frame before it stays on screen at least is given next to what the
+  //! loop does without one.
   //!
   //! Without the wait: one pause after start-up with the aim of low latency (StartupPauses), for the frames that pile up
   //! behind a new swap chain's first presents. With the wait: the loop is held until the present so many back was shown,
@@ -75,6 +80,13 @@ namespace MB::FramePacing::Pacer
     // The time a present is given. With PresentTiming::AtTime the display's side puts a frame on its vertical blank, else
     // the loop does by when it presents
     PresentTiming m_presentTiming{PresentTiming::Untimed};
+    // The longest swap interval with which the display's side places a frame after the one before it (0: it does not), whether
+    // display times are reported, the slip of the display behind the frames' vertical blanks they show, and the refreshes the
+    // blanks moved for it
+    uint32_t m_displayHoldsUpTo{0};
+    bool m_usesDisplayTimes{false};
+    DisplaySlipRule m_slip;
+    uint64_t m_displaySlipRefreshes{0};
     FrameWorkRule m_frameWork;
     // Where the display's refreshes are: the vertical blanks, from the readings
     VBlankTimeline m_timeline;
@@ -260,6 +272,31 @@ namespace MB::FramePacing::Pacer
       m_presentTiming = timing;
     }
 
+    //! The longest swap interval with which the display's side places a frame after the one before it, from the next frame on
+    //! (DisplayPlacementUtil::HoldsUpTo; 0 where it does not): a frame of up to that many refreshes is presented when it is done,
+    //! and the display's side keeps the frame before it on screen for its swap interval.
+    void SetDisplayHoldsUpTo(const uint32_t swapInterval) noexcept
+    {
+      m_displayHoldsUpTo = swapInterval;
+    }
+
+    //! Whether the platform reports display times (AddDisplayReport). A change starts the display's slip anew.
+    void SetUsesDisplayTimes(bool usesDisplayTimes) noexcept;
+
+    //! What the platform says of a frame that was presented earlier. With the aim of low latency, where the display's side places
+    //! a frame after the one before it and no wait for a present holds the loop, a display that slipped behind the frames'
+    //! vertical blanks (a frame shown late moved the ones after it) moves them later by as many refreshes (DisplaySlipRule): the
+    //! frames that would wait for the display start that much later. The animation time is not moved: it is that many
+    //! refreshes further behind the clock. Otherwise the report changes nothing.
+    void AddDisplayReport(const DisplayReport& report) noexcept;
+
+    //! The refreshes the frames' vertical blanks were moved later by for the display's slip (AddDisplayReport), since the pacer
+    //! was made: counted in RefreshesBehindClock.
+    [[nodiscard]] uint64_t DisplaySlipRefreshes() const noexcept
+    {
+      return m_displaySlipRefreshes;
+    }
+
     //! The vertical blanks are not known any more: the next reading is the first. For a pacer that takes the times up again
     //! after a while without them, or gives them up.
     void ForgetVBlanks() noexcept
@@ -416,6 +453,8 @@ namespace MB::FramePacing::Pacer
     void ForgetReadyPlace() noexcept;
     [[nodiscard]] bool TriesTheReadyPlaceAt(NanosecondTickCount time) const noexcept;
     [[nodiscard]] int64_t StartupPauseAt(NanosecondTickCount cpuStartTime) noexcept;
+    [[nodiscard]] bool DisplayPlaces(uint32_t swapInterval) const noexcept;
+    [[nodiscard]] bool FollowsTheDisplaysSlip() const noexcept;
   };
 }
 

@@ -359,18 +359,10 @@ TEST(PacerTier, ATierIsAMajorTierAndASubTier)
     const PacerTier tier = EveryTier[index];
     EXPECT_EQ(static_cast<uint32_t>(MajorOf(tier)), (index / 4u) + 1u) << index;
     EXPECT_EQ(SubTierOf(tier), (index % 4u) + 1u) << index;
-    // A pacer is built for the first and the third major tier; a tier of the second is paced as the frame loop's tier of the
-    // same capabilities
-    const bool afterDuration = index >= 4u && index < 8u;
-    EXPECT_EQ(HasPacer(tier), !afterDuration) << index;
-    EXPECT_TRUE(HasPacer(PacedAs(tier))) << index;
-    EXPECT_EQ(PacedAs(tier) == tier, !afterDuration) << index;
-    EXPECT_EQ(MajorOf(PacedAs(tier)), afterDuration ? PacerMajorTier::LoopPlaces : MajorOf(tier)) << index;
+    // Every tier has a pacer, the second major tier too (decision 20), and is paced as itself
+    EXPECT_TRUE(HasPacer(tier)) << index;
+    EXPECT_EQ(PacedAs(tier), tier) << index;
   }
-  EXPECT_EQ(PacedAs(PacerTier::AfterDurationVBlankWaitForPresent), PacerTier::VBlankWaitForPresent);
-  EXPECT_EQ(PacedAs(PacerTier::AfterDurationTimerWaitForPresent), PacerTier::TimerWaitForPresent);
-  EXPECT_EQ(PacedAs(PacerTier::AfterDurationVBlankDisplayTimes), PacerTier::VBlankPeriodOnly);
-  EXPECT_EQ(PacedAs(PacerTier::AfterDurationTimerDisplayTimes), PacerTier::TimerPeriodOnly);
   EXPECT_EQ(MajorOf(PacerTier::AtTimeTimerPeriodOnly), PacerMajorTier::DisplayPlacesAtTime);
   EXPECT_EQ(MajorOf(PacerTier::AfterDurationVBlankWaitForPresent), PacerMajorTier::DisplayPlacesAfterDuration);
   EXPECT_EQ(MajorOf(PacerTier::TimerPeriodOnly), PacerMajorTier::LoopPlaces);
@@ -597,13 +589,9 @@ TEST(PacerTierText, EveryTierHasANameOfItsOwnAndADescription)
     EXPECT_EQ(static_cast<uint32_t>(shown[0] - '0'), static_cast<uint32_t>(PC::PacerTierUtil::MajorOf(tier)));
     EXPECT_EQ(shown[1], '.');
     EXPECT_EQ(static_cast<uint32_t>(shown[2] - '0'), PC::PacerTierUtil::SubTierOf(tier));
-    // A tier no pacer is built for says so, and names the tier it is paced as
-    const bool saysNoPacer = Text::DescriptionOf(tier).find("No pacer is built") != std::string_view::npos;
-    EXPECT_EQ(saysNoPacer, !PC::PacerTierUtil::HasPacer(tier));
-    if (saysNoPacer)
-    {
-      EXPECT_NE(Text::DescriptionOf(tier).find(Text::NumberOf(PC::PacerTierUtil::PacedAs(tier))), std::string_view::npos);
-    }
+    // Every tier has a pacer: none says otherwise
+    EXPECT_EQ(Text::DescriptionOf(tier).find("No pacer"), std::string_view::npos);
+    EXPECT_EQ(Text::DescriptionOf(tier).find("paced as"), std::string_view::npos);
   }
   EXPECT_EQ(names.size(), Text::TierCount);
 

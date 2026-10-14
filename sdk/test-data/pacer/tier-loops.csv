@@ -43,8 +43,8 @@ timer-wait-low-latency-slow-display,200,36698,1383928897
 timer-wait-low-latency-two-in-flight,200,39049,1850255046
 timer-wait-low-latency-held-blanks,200,36725,2404101883
 timer-wait-low-latency-at-time,200,36725,2109707407
-timer-wait-low-latency-duration-two-refreshes,200,41354,3759326372
-timer-wait-low-latency-swap-interval-two-refreshes,200,41354,2651617537
+timer-wait-low-latency-duration-two-refreshes,200,37754,3396669855
+timer-wait-low-latency-swap-interval-two-refreshes,200,37754,498653896
 timer-wait-low-latency-gpu-wait,200,41485,1583554336
 timer-wait-low-latency-display-reports,200,40496,2306329172
 timer-wait-low-latency-active-set-changes,200,37136,1100700415
@@ -60,8 +60,8 @@ timer-wait-smoothness-slow-display,200,35870,3406218050
 timer-wait-smoothness-two-in-flight,200,38554,3384772393
 timer-wait-smoothness-held-blanks,200,35870,2799538161
 timer-wait-smoothness-at-time,200,35870,2883271870
-timer-wait-smoothness-duration-two-refreshes,200,41354,3759326372
-timer-wait-smoothness-swap-interval-two-refreshes,200,41354,2651617537
+timer-wait-smoothness-duration-two-refreshes,200,37754,3396669855
+timer-wait-smoothness-swap-interval-two-refreshes,200,37754,498653896
 timer-wait-smoothness-gpu-wait,200,41237,2857502197
 timer-wait-smoothness-display-reports,200,39630,1354073598
 timer-wait-smoothness-active-set-changes,200,36866,4109546337
@@ -111,8 +111,8 @@ vblank-wait-low-latency-slow-display,200,41227,3682942921
 vblank-wait-low-latency-two-in-flight,200,39240,4064214794
 vblank-wait-low-latency-held-blanks,200,41333,1086118359
 vblank-wait-low-latency-at-time,200,37861,2850650216
-vblank-wait-low-latency-duration-two-refreshes,200,37972,2611200769
-vblank-wait-low-latency-swap-interval-two-refreshes,200,37972,4012196888
+vblank-wait-low-latency-duration-two-refreshes,200,37954,980130760
+vblank-wait-low-latency-swap-interval-two-refreshes,200,37954,1324162257
 vblank-wait-low-latency-gpu-wait,200,42411,2640763537
 vblank-wait-low-latency-display-reports,200,44756,1337075571
 vblank-wait-low-latency-active-set-changes,200,39641,299804068
@@ -128,8 +128,8 @@ vblank-wait-smoothness-slow-display,200,38877,1090922301
 vblank-wait-smoothness-two-in-flight,200,37655,4179657665
 vblank-wait-smoothness-held-blanks,200,38859,209888296
 vblank-wait-smoothness-at-time,200,36069,2137496524
-vblank-wait-smoothness-duration-two-refreshes,200,39763,405164021
-vblank-wait-smoothness-swap-interval-two-refreshes,200,39763,1563017319
+vblank-wait-smoothness-duration-two-refreshes,200,37954,3324765211
+vblank-wait-smoothness-swap-interval-two-refreshes,200,37954,2997707522
 vblank-wait-smoothness-gpu-wait,200,40206,625506723
 vblank-wait-smoothness-display-reports,200,42418,1037585309
 vblank-wait-smoothness-active-set-changes,200,38333,2545049998

@@ -2141,13 +2141,13 @@ measured only where a section above says so.
 7. **Measured**: no run of a tier pacer has been captured and analysed with the tools; the sub tiers of major tier 3
    are not measured against each other; major tier 1 has run on no system, as the one at hand has no present with an
    absolute time.
-8. **A pacer for major tier 2** (decision 19, 2026-10-14): rated and paced as the frame loop's tier of the same
-   capabilities, with the duration on every present. To build: the loop that presents early and follows where frames were
-   shown, the simulation's display that takes a duration, and then major tier 2 measured against 3.1 on the system that has
-   only the relative time.
+8. **Major tier 2 measured** (decision 20, 2026-10-15: built against the simulation's display): against 3.1 on the system
+   that has only the relative time, with display times and with a wait for a present, both aims; and what a display's slip
+   the low-latency aim followed looks like in a capture (is the start a refresh later the right answer, and is a display
+   that has no frame waiting moved once and no more, as the rule is built to).
 
 Not planned, and written down above: a pacer that relies on a display's side that skips (the "s"); an aim the pacer picks;
-pacing by display times; variable refresh.
+pacing by display times beyond the display's slip in major tier 2 (decision 20); variable refresh.
 
 ## Decisions needed
 
@@ -2313,9 +2313,9 @@ pacing by display times; variable refresh.
       but each late frame adds a refresh of latency, which the pacer sees only with a wait for a present or display times.
       **Its sub tiers without a wait are reached only with display times** ("+"); a set with neither falls to major tier 3,
       where the loop stays tied to the clock or the vertical blanks and a late frame costs a second error but no latency.
-      Revisit if a measurement shows the duration without display times beating 3.2. **No pacer is built for it yet**: such a
-      set is paced as the frame loop's tier of the same capabilities, with the duration on every present, as before
-      (`PacerTierUtil::PacedAs`). Why it was asked for: on Windows 11 with one vendor's driver the window surface has only the
+      Revisit if a measurement shows the duration without display times beating 3.2. Built as a rating first, paced as the
+      frame loop's tier of the same capabilities with the duration on every present (`PacerTierUtil::PacedAs`, the identity
+      since decision 20, which built its pacer). Why it was asked for: on Windows 11 with one vendor's driver the window surface has only the
       relative time (relative 1, absolute 0, windowed and in borderless full screen), so that system had no tier where the
       display places the frame.
     - **Major tier 3, the frame loop**: unchanged.
@@ -2333,6 +2333,44 @@ pacing by display times; variable refresh.
     - The wait for the GPU's work and its times stay capabilities with no tier and no mark.
     - **What is to be measured**: major tier 2 against 3.1 (the data so far, of one system, on a timer and under CPU load,
       shows nothing of tier 2 ahead), and .2 against .3.
+
+20. **Major tier 2's pacer: the display's side places, and only low latency follows its slip**: decided on 2026-10-14 (the
+    user chose the split of the two aims, "1", after the question whether retiming by display times would stutter) and built
+    on 2026-10-15 against the simulation's display only. `TierPacer` paces 2.1 to 2.4 as tiers of their own: `HasPacer` is
+    true and `PacedAs` the identity for every tier (both kept for applications that asked before).
+
+    - **What changes against the frame loop's tier:** where the display's side places a frame after the one before it
+      (`DisplayPlacementUtil::HoldsUpTo`: a duration on the present for any swap interval, a swap interval on the present up
+      to its longest; with a wait for a present or display times), the loop holds no present: a frame is presented when it
+      is done, and the display's side keeps the frame before it on screen for its swap interval. With the aim of smoothness
+      on vertical blanks the next frame's start is held where the present was, as with a time on the present. The frames
+      are placed on the grid or the vertical blanks as before; a frame of more refreshes than the present's swap interval
+      takes is held by the loop as before.
+    - **Smoothness takes the hit.** A frame shown a refresh late moves every frame after it a refresh later: the display
+      stays smooth, and the frames wait a refresh longer from then on. Nothing is retimed, so nothing stutters a second time.
+      The user's words: "taking the hit and just pace display time correctly as retiming would cause stutter".
+    - **Low latency follows the display's slip** where no wait for a present holds the loop (2.3, 2.4; with a wait, 2.1 and
+      2.2, the wait keeps the frames that wait few by itself): `DisplaySlipRule`, from the display reports, moves the loop's
+      plan later by the refreshes the display slipped (the grid's origin, or the vertical blanks the frames are counted in),
+      so the frames that would wait start that much later and wait no longer. The frames on their way when the plan moved
+      are shown late by the move: no stutter, as one of them was waiting already. **The animation time is not moved** and
+      the swap interval not touched: the loop is that many refreshes further behind the clock (`RefreshesBehindClock`,
+      `DisplaySlipRefreshes`). This is the one place display times pace anything, and only by the user's word.
+    - **The rule:** a frame's lag is its reported display time less its planned one (its intended display time), less the
+      moves its plan did not have yet. The least lag seen is the display's own delay and no slip; a lag that is whole
+      refreshes more (to the nearest refresh, in nanoseconds, so report noise under half a refresh never moves anything) is
+      a slip, and the least is raised by every move it gives. The raise is what keeps a display that has no frame waiting
+      from moving the plan again with every frame (found while building it: a grid a little slower than the display shows
+      a lag that jumps a refresh when the display runs out of frames, and without the raise every frame after it would have
+      moved the plan, halving the frame rate); such a display is moved once. A lag below the least lowers it. What the loop
+      followed by itself is not counted again: a late present plans its frame from where it is shown (`Replan`), and a
+      start the display's side held moves the frames' vertical blanks (`AddMove`).
+    - **Checked** (the simulation only): the slip tests (`DisplaySlipLoopTests`: a display that holds a frame a refresh,
+      both aims, the grid and the vertical blanks, one and two refreshes per frame: low latency back to the time from start
+      to display it had, a refresh further behind the clock; smoothness a refresh longer for good; the display one frame off
+      its swap interval in both), the rule's own tests, and the golden runs: the eight runs of 2.1 and 2.2 at two refreshes
+      per frame changed (no present held, every frame still on screen its two refreshes; on the grid the time from a frame's
+      start to its display went from two refreshes to one, on the vertical blanks it stayed).
 
 ## What changes for whom
 

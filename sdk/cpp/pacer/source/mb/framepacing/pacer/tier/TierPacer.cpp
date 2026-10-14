@@ -14,17 +14,26 @@ namespace MB::FramePacing::Pacer
 {
   namespace
   {
-    //! The tier of the three things a pacer uses: who puts a frame on its refresh, where the refreshes are, and what holds
-    //! the loop. Never a tier of a duration on the present: no pacer is built for it, and the loop places those frames
-    constexpr PacerTier TierOf(const bool timedPresent, const bool onVBlanks, const bool waitsForPresent) noexcept
+    //! The tier of the four things a pacer uses: who puts a frame on its refresh (a time on the present, a duration on it, or
+    //! the loop), where the refreshes are, what holds the loop, and where frames were shown. A duration on the present is the
+    //! second major tier with a wait for a present or display times (else the loop places the frames)
+    constexpr PacerTier TierOf(const PresentTiming placement, const bool onVBlanks, const bool waitsForPresent, const bool displayTimes) noexcept
     {
-      if (timedPresent)
+      if (placement == PresentTiming::AtTime)
       {
         if (onVBlanks)
         {
           return waitsForPresent ? PacerTier::AtTimeVBlankWaitForPresent : PacerTier::AtTimeVBlankPeriodOnly;
         }
         return waitsForPresent ? PacerTier::AtTimeTimerWaitForPresent : PacerTier::AtTimeTimerPeriodOnly;
+      }
+      if (placement == PresentTiming::AfterDuration && (waitsForPresent || displayTimes))
+      {
+        if (waitsForPresent)
+        {
+          return onVBlanks ? PacerTier::AfterDurationVBlankWaitForPresent : PacerTier::AfterDurationTimerWaitForPresent;
+        }
+        return onVBlanks ? PacerTier::AfterDurationVBlankDisplayTimes : PacerTier::AfterDurationTimerDisplayTimes;
       }
       if (onVBlanks)
       {
@@ -43,6 +52,10 @@ namespace MB::FramePacing::Pacer
   {
     m_grid.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
     m_vblank.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
+    m_grid.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(capabilities));
+    m_vblank.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(capabilities));
+    m_grid.SetUsesDisplayTimes(capabilities.Has(PacerCapability::DisplayTimes));
+    m_vblank.SetUsesDisplayTimes(capabilities.Has(PacerCapability::DisplayTimes));
     m_grid.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
     m_vblank.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
   }
@@ -88,8 +101,13 @@ namespace MB::FramePacing::Pacer
     // What is really pacing: the vertical blanks once one was read, and the wait while it is made
     const bool onVBlanks = m_onVBlanks && m_vblank.HasVBlankReading();
     const bool waits = m_active.Has(PacerCapability::WaitForPresent) && !PresentWaitsStopped();
-    // The display's side places a frame with a time before which it is not shown, and with nothing else
-    return TierOf(DisplayPlacementUtil::TimingFor(m_active) == PresentTiming::AtTime, onVBlanks, waits);
+    // The display's side places a frame at a time, or after the one before it where the pacer sees where frames were shown
+    PresentTiming placement = DisplayPlacementUtil::TimingFor(m_active);
+    if (placement != PresentTiming::AtTime)
+    {
+      placement = DisplayPlacementUtil::HoldsUpTo(m_active) > 0 ? PresentTiming::AfterDuration : PresentTiming::Untimed;
+    }
+    return TierOf(placement, onVBlanks, waits, m_active.Has(PacerCapability::DisplayTimes));
   }
 
   bool TierPacer::IsFrameOpen() const noexcept
@@ -112,6 +130,10 @@ namespace MB::FramePacing::Pacer
     const PresentTiming timing = DisplayPlacementUtil::TimingFor(active);
     m_grid.SetPresentTiming(timing);
     m_vblank.SetPresentTiming(timing);
+    m_grid.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(active));
+    m_vblank.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(active));
+    m_grid.SetUsesDisplayTimes(active.Has(PacerCapability::DisplayTimes));
+    m_vblank.SetUsesDisplayTimes(active.Has(PacerCapability::DisplayTimes));
     const bool onVBlanks = active.Has(PacerCapability::VBlankTimes);
     if (onVBlanks != m_onVBlanks)
     {
@@ -330,9 +352,22 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::AddDisplayReport(const DisplayReport& report) noexcept
   {
-    if (m_active.Has(PacerCapability::DisplayTimes))
+    if (!m_active.Has(PacerCapability::DisplayTimes))
     {
-      m_display.AddDisplayReport(report, Refresh());
+      return;
+    }
+    m_display.AddDisplayReport(report, Refresh());
+    // The part that places the frames follows the display's slip where it does (the second major tier, low latency)
+    if (m_isPacing)
+    {
+      if (m_onVBlanks)
+      {
+        m_vblank.AddDisplayReport(report);
+      }
+      else
+      {
+        m_grid.AddDisplayReport(report);
+      }
     }
   }
 

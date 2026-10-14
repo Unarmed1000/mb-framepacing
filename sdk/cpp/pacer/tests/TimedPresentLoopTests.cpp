@@ -406,7 +406,9 @@ TEST(TimedPresentLoop, ASwapIntervalOnThePresentChangesNothingAtOneRefreshPerFra
 {
   for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
   {
-    // One refresh per frame: the present's swap interval is 1, which is what the display does anyway
+    // One refresh per frame: the present's swap interval is 1, which is what the display does anyway. With the wait it is the
+    // second major tier, and the display's side places the frames after the ones before them: the loop holds no present (with
+    // the aim of smoothness it holds the next frame's start instead), and the display shows the same
     Sim::LoopSettings settings = LightLoop(aim, Timed::No);
     const std::vector<Sim::LoopFrame> plain = Sim::SimulateVBlankWaitForPresentLoop(settings);
     settings.MaxPresentSwapInterval = 4;
@@ -415,7 +417,7 @@ TEST(TimedPresentLoop, ASwapIntervalOnThePresentChangesNothingAtOneRefreshPerFra
     for (std::size_t index = 0; index < plain.size(); ++index)
     {
       ASSERT_EQ(plain[index].ShownNanoseconds, withOne[index].ShownNanoseconds) << index;
-      ASSERT_EQ(plain[index].StartNanoseconds, withOne[index].StartNanoseconds) << index;
+      ASSERT_EQ(withOne[index].PresentWaitTargetNanoseconds, 0) << index;
     }
 
     // Four refreshes per frame on a present that takes two at the most: the loop holds the frame for the rest, and where

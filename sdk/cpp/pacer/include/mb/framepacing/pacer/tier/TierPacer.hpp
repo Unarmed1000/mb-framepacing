@@ -46,18 +46,22 @@ namespace MB::FramePacing::Pacer
   //!   EndFrame        the CPU's work is done: the time to wait until before the present, or the time to give the present
   //!   AddPresent      after the present, before the next frame is planned
   //! and, where the application has them, AddGpuWork (the GPU's work on an earlier frame), AddSystemWait (a wait it made
-  //! by itself) and AddDisplayReport (when an earlier frame was shown: statistics only, DisplayErrors).
+  //! by itself) and AddDisplayReport (when an earlier frame was shown: statistics, DisplayErrors, and in the second major tier
+  //! with the aim of low latency the display's slip).
   //!
   //! Which tier paces: where the refreshes are comes from vertical blank times when they are active and from a grid on the clock
   //! when not, the loop is held by a wait for a present when that is active, and where the present takes a time before which
   //! the frame is not shown it is given PresentPlan::NotBeforeTime, with which the display's side puts a frame on its refresh
-  //! and no present is held by the loop. Those are the eight tiers of PacerTier that have a pacer (PacerMajorTier::DisplayPlacesAtTime
-  //! and LoopPlaces). The four where the display's side places the frame are built against the simulation's display only: no
-  //! system has been measured with them. A present that takes a time the frame before it stays is given
-  //! PresentPlan::MinimumDuration next to everything the loop does without it, at whatever tier, and one that takes a swap
-  //! interval is given PresentPlan::SwapInterval the same way: a set that rates the second major tier with them
-  //! (PacerMajorTier::DisplayPlacesAfterDuration) is paced as the frame loop's tier of the same capabilities, as no pacer is built
-  //! for it yet (PacerTierUtil::PacedAs).
+  //! and no present is held by the loop (PacerMajorTier::DisplayPlacesAtTime). A present that takes a time the frame before it
+  //! stays is given PresentPlan::MinimumDuration, and one that takes a swap interval PresentPlan::SwapInterval. Where the pacer
+  //! sees where frames were shown (a wait for a present, or display times) the display's side then places a frame after the one
+  //! before it (PacerMajorTier::DisplayPlacesAfterDuration, DisplayPlacementUtil::HoldsUpTo): the loop holds no present either,
+  //! with the aim of smoothness a frame shown late moves the ones after it (the display stays smooth, and they wait a refresh
+  //! longer), and with the aim of low latency and display times the loop starts its frames later by the refreshes the display
+  //! slipped (DisplaySlipRefreshes; with a wait for a present the wait keeps the frames that wait few). Without a way to see
+  //! where frames were shown the loop places the frames and the values are given next to what it does. The eight tiers where
+  //! the display's side places the frame are built against the simulation's display only: no system has been measured with
+  //! them.
   //!
   //! A set that says the display's side skips a frame that is overdue (PacerCapability::PresentSkipsOverdue) is rated with it
   //! (PacerRating::SkipsOverdue) and paced as without it: every present is taken as shown, which one that was skipped is not.
@@ -140,9 +144,9 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] PacerRating ActiveRating() const noexcept;
 
     //! The tier that is pacing this frame. Below the active tier while something a capability promised is missing (no
-    //! vertical blank reading so far, waits for a present that stopped because none is shown), and where no pacer is built
-    //! for the active tier (PacerTierUtil::PacedAs). While the application is not pacing (IsPacing) it is the tier that
-    //! would pace.
+    //! vertical blank reading so far, waits for a present that stopped because none is shown: with a duration on the present
+    //! and nothing else to see where frames were shown, the loop places the frames). While the application is not pacing
+    //! (IsPacing) it is the tier that would pace.
     [[nodiscard]] PacerTier WorkingTier() const noexcept;
 
     //! A vertical blank of the display the window is on. Taken with PacerCapability::VBlankTimes active.
@@ -181,7 +185,10 @@ namespace MB::FramePacing::Pacer
     void AddSystemWait(const SystemWaitReport& report) noexcept;
 
     //! What the platform says of a frame that was presented earlier: when it was shown, or that it never was. Taken with
-    //! PacerCapability::DisplayTimes active, oldest first. Statistics only: no frame is paced by it.
+    //! PacerCapability::DisplayTimes active, oldest first. Statistics (DisplayErrors), and in the second major tier with the
+    //! aim of low latency and no wait for a present the display's slip: the loop starts its frames later by the refreshes a
+    //! frame shown late moved the ones after it (DisplaySlipRefreshes). Nothing else is paced by it, and never the animation
+    //! time or the swap interval.
     void AddDisplayReport(const DisplayReport& report) noexcept;
 
     //! What the display reports said of the frames so far: the animation error where the application runs (the "+" beside
@@ -275,6 +282,13 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] uint64_t DisplayHeldRefreshes() const noexcept
     {
       return m_vblank.DisplayHeldRefreshes();
+    }
+
+    //! The refreshes the loop started its frames later by for the display's slip (AddDisplayReport), by both parts that place
+    //! frames: counted in RefreshesBehindClock.
+    [[nodiscard]] uint64_t DisplaySlipRefreshes() const noexcept
+    {
+      return m_grid.DisplaySlipRefreshes() + m_vblank.DisplaySlipRefreshes();
     }
 
     //! The frames whose start the display's side held for a share of a refresh period, on the grid on the clock.

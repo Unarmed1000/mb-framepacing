@@ -419,9 +419,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     decision 19, reversing decision 16). **Three major tiers of four sub tiers, written "3.1"**: 1 = a time on the present
     (`PresentAtTime`, the display places against a clock; built against the simulation only); 2 = a duration on the present
     (`PresentAfterDuration`, or `PresentSwapInterval` up to 2 or more; the display places after the frame before) **with a wait
-    for a present or display times** (without either the latency creeps after a late frame: the set falls to 3.x), **rated
-    only, paced as the frame loop's tier of the same capabilities** (`PacedAs`: 2.1→3.1, 2.2→3.3, 2.3→3.2, 2.4→3.4) until its
-    pacer is built and measured against 3.1; 3 = the frame loop. Sub tiers from `WaitForPresent` and `VBlankTimes` (major 2:
+    for a present or display times** (without either the latency creeps after a late frame: the set falls to 3.x), **paced
+    as a tier of its own since decision 20** (2026-10-15, the simulation only; `HasPacer` true and `PacedAs` the identity
+    for every tier, kept for applications): the loop holds no present (`DisplayPlacementUtil::HoldsUpTo`); **smoothness
+    takes the hit** of a frame shown late (the user: "taking the hit ... as retiming would cause stutter"), **low latency
+    with display times and no wait** (2.3, 2.4) starts the frames later by the display's slip (`hold/DisplaySlipRule`,
+    `DisplaySlipRefreshes`; never the animation time); still to be measured against 3.1; 3 = the frame loop. Sub tiers from `WaitForPresent` and `VBlankTimes` (major 2:
     `DisplayTimes` in place of the wait for .3 and .4); the wait first where the display places the frame, the vertical blank
     times first where the loop does, proposals until measured. **Marks:** "+" display times, **"s"** `PresentSkipsOverdue`
     (`PacerRating::SkipsOverdue`, `PacerTierText::SkipsOverdueMark`: describes the system, a rating only until a pacer relies
@@ -432,7 +435,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **Built from parts** (the user: no restart, four whole pacers taken apart under their tests): `TierPacer` (`pacer/tier/`) holds
     two ways of placing frames, `ClockGridLoopPacer` (a grid on the clock) and `VBlankLoopPacer` (the display's vertical blanks),
     and hands a run over between them (`PacerHandover`) when the active set changes; the parts are `hold/PresentWaitRule`,
-    `hold/GpuWaitRule`, `timeline/VBlankTimeline`, `placement/DisplayPlacementUtil`, `display/DisplayErrorCounter`, `tier/FreeRunLoop`,
+    `hold/GpuWaitRule`, `hold/DisplaySlipRule`, `timeline/VBlankTimeline`, `placement/DisplayPlacementUtil`, `display/DisplayErrorCounter`, `tier/FreeRunLoop`,
     `rule/SwapIntervalRule` and `rule/FrameWorkRule`. The four single-tier classes (`TimerPeriodOnlyPacer`, …) are test code
     (`pacer/tests/simulation`): `TierPacer` with its capabilities fixed, kept for their tests.
   - **A frame's calls:** `AddVBlank`, `PlanFrame` (a wait for a present or for the GPU's work, then a start time; planned again
@@ -454,7 +457,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     fastest display's of the desktop.
   - **Display times are statistics only** (the user, 2026-10-04: "stats only, to simplify"): `AddDisplayReport` →
     `DisplayErrors()` (the animation error by the tools' rules, and the time from a frame's start to its display). Never let them
-    change a swap interval or an animation time without the user's word; pacing by them is the guide's "Not used yet".
+    change a swap interval or an animation time without the user's word; pacing by them is the guide's "Not used yet". The
+    one exception, on the user's word (decision 20): major tier 2 with low latency and no wait moves the frames' start by
+    the display's slip, and nothing else.
   - **Fixed refresh rates only** (the user: fixed refresh first, variable refresh once this works, as more tier pacers behind the
     same calls). The test display is a G-SYNC one: ask for its state, and what displays were on at what rates, before reading a
     capture, and what else ran on the machine.

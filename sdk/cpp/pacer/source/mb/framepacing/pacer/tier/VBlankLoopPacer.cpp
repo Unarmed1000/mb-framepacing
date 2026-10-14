@@ -54,6 +54,47 @@ namespace MB::FramePacing::Pacer
     return gap < NanosecondTimeSpan() || gap > reach;
   }
 
+  bool VBlankLoopPacer::DisplayPlaces(const uint32_t swapInterval) const noexcept
+  {
+    return DisplayPlacementUtil::DisplayPlaces(m_presentTiming, m_displayHoldsUpTo, swapInterval);
+  }
+
+  bool VBlankLoopPacer::FollowsTheDisplaysSlip() const noexcept
+  {
+    // With the aim of low latency, where the display's side places a frame after the one before it, from the display times. A
+    // wait for a present holds the loop until the display took a frame, which keeps the frames that wait few by itself
+    return m_usesDisplayTimes && !m_waitsForPresent && m_rule.Settings().Aim() == PacerAim::LowLatency &&
+           DisplayPlacementUtil::PlacesAfterFrameBefore(m_presentTiming, m_displayHoldsUpTo, m_swapInterval);
+  }
+
+  void VBlankLoopPacer::SetUsesDisplayTimes(const bool usesDisplayTimes) noexcept
+  {
+    if (usesDisplayTimes != m_usesDisplayTimes)
+    {
+      m_slip.Restart();
+    }
+    m_usesDisplayTimes = usesDisplayTimes;
+  }
+
+  void VBlankLoopPacer::AddDisplayReport(const DisplayReport& report) noexcept
+  {
+    // Not followed, or no frames to move (the next frame starts them again): what was seen of the slip is no longer theirs
+    if (!FollowsTheDisplaysSlip() || !m_hasFrame || m_takenOver)
+    {
+      m_slip.Restart();
+      return;
+    }
+    const int64_t slip = m_slip.AddDisplayReport(report, m_rule.Refresh());
+    if (slip > 0)
+    {
+      // The frames on their way are shown that much later, and the ones after them would wait for the display as long: the
+      // frames' vertical blanks move, as for a start the display's side held. The animation time does not step over them
+      m_heldSlots += slip;
+      m_refreshesBehindClock += static_cast<uint64_t>(slip);
+      m_displaySlipRefreshes += static_cast<uint64_t>(slip);
+    }
+  }
+
   NanosecondTickCount VBlankLoopPacer::TimeOfBlank(const int64_t slot) const noexcept
   {
     // The frames' vertical blanks are the display's without the ones a start was held over
@@ -321,10 +362,10 @@ namespace MB::FramePacing::Pacer
         plan.StartTime = start;
       }
     }
-    else if (m_presentTiming == PresentTiming::AtTime && m_nextFrameStartTime > now)
+    else if (DisplayPlaces(m_swapInterval) && m_nextFrameStartTime > now)
     {
-      // Smoothness with a time on the present: the frame before this one was presented when it was done, and the display's side
-      // holds it. What would have held its present holds this frame's start: the loop makes its frames as far ahead of the
+      // Smoothness where the display's side places the frames: the frame before this one was presented when it was done, and
+      // the display's side holds it. What would have held its present holds this frame's start: the loop makes its frames as far ahead of the
       // display as without one, whatever else holds it (a wait for a present does, later, while the window is shown)
       plan.StartTime = m_nextFrameStartTime;
     }
@@ -463,6 +504,11 @@ namespace MB::FramePacing::Pacer
         }
       }
       const int64_t lost = previousShown - m_displaySlot;
+      if (lost > 0)
+      {
+        // The frame before is shown that much later, and this frame is planned from there
+        m_slip.Replan(m_frameId, TimeOfBlank(previousShown));
+      }
       const NanosecondTimeSpan cpuWork = m_frameEnded ? m_work : NanosecondTimeDuration(cpuStartTime - m_startTime).Value();
       const NanosecondTimeSpan work = m_frameEnded ? m_frameWork.WorkOf(cpuWork, FramesInFlightNow()) : cpuWork;
       const bool late = lost > 0 || m_startedLate || (m_frameEnded && work > period.TimeFor(m_swapInterval));
@@ -486,6 +532,8 @@ namespace MB::FramePacing::Pacer
         m_rule.Clear();
         m_pauseSlots = 0;
       }
+      // Frames placed anew: the display's lag behind them is measured anew
+      m_slip.Restart();
     }
 
     const uint32_t swapInterval = m_rule.SwapInterval();
@@ -512,6 +560,8 @@ namespace MB::FramePacing::Pacer
       m_heldSlots += held;
       displaySlot -= held;
       m_refreshesBehindClock += static_cast<uint64_t>(held);
+      // The frames on their way are shown that much later: no slip of the display's
+      m_slip.AddMove(held);
       m_displayHeldRefreshes += static_cast<uint64_t>(held);
     }
     m_displayHeld = NanosecondTimeSpan();
@@ -569,6 +619,7 @@ namespace MB::FramePacing::Pacer
     schedule.Change = change;
     m_lastAnimationTime = animationTime;
     m_nextFrameStartTime = schedule.NextFrameStartTime;
+    m_slip.AddFrame(m_frameId, schedule.IntendedDisplayTime);
     return schedule;
   }
 
@@ -585,9 +636,10 @@ namespace MB::FramePacing::Pacer
     plan.FrameId = m_frameId;
     plan.CpuBusy = busy;
     // The time the present is given, where it takes one. With a time before which the frame is not shown the display's side
-    // shows it at the vertical blank it is for, and the frame is presented when it is done
+    // shows it at the vertical blank it is for, and where it places a frame after the one before it, it keeps that one on
+    // screen for its swap interval: the frame is presented when it is done
     DisplayPlacementUtil::Place(plan, m_presentTiming, TimeOfBlank(m_displaySlot), m_swapInterval, m_rule.Refresh());
-    if (m_presentTiming != PresentTiming::AtTime)
+    if (!DisplayPlaces(m_swapInterval))
     {
       // Smoothness: made early, and the present waits for the time that has the frame ready at its place. Low latency:
       // presented at once, unless it is done before its refresh begins
@@ -663,7 +715,7 @@ namespace MB::FramePacing::Pacer
       handover.HasPresentTime = true;
       handover.LastPresentTime = m_presentTime;
       // A swap interval after this one's, or where the presents are held to their place, the next frame's place
-      const bool holdsPresents = m_presentTiming != PresentTiming::AtTime && m_rule.Settings().Aim() == PacerAim::Smoothness;
+      const bool holdsPresents = !DisplayPlaces(m_rule.SwapInterval()) && m_rule.Settings().Aim() == PacerAim::Smoothness;
       handover.NextPresentTime = holdsPresents ? PresentTimeFor(m_displaySlot + m_pauseSlots + int64_t{m_rule.SwapInterval()})
                                                : m_presentTime + m_rule.Refresh().TimeFor(int64_t{m_swapInterval});
     }

@@ -10,6 +10,7 @@
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/RefreshTime.hpp>
 #include <mb/framepacing/pacer/capability/PacerTier.hpp>
+#include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
 #include <mb/framepacing/pacer/frame/FrameStartPlan.hpp>
 #include <mb/framepacing/pacer/frame/GpuWaitReport.hpp>
@@ -18,6 +19,7 @@
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
+#include <mb/framepacing/pacer/hold/DisplaySlipRule.hpp>
 #include <mb/framepacing/pacer/hold/GpuWaitRule.hpp>
 #include <mb/framepacing/pacer/hold/PresentWaitRule.hpp>
 #include <mb/framepacing/pacer/placement/PresentTiming.hpp>
@@ -41,9 +43,12 @@ namespace MB::FramePacing::Pacer
   //!
   //! With a timed present (SetPresentTiming; the simulation only, not measured) the present is given a time
   //! (DisplayPlacementUtil). A time before which the frame is not shown has the display's side show it at the refresh
-  //! nearest to the step it is due at: the loop holds no present, and a frame is presented when it is done. A time the
-  //! frame before it stays on screen at least is given next to what the loop does without one: it keeps a present that
-  //! lands on the wrong side of a refresh from being shown a refresh early. Where the frames start is as without one.
+  //! nearest to the step it is due at: the loop holds no present, and a frame is presented when it is done. So it is where
+  //! the display's side places a frame after the one before it (SetDisplayHoldsUpTo: the second major tier), and with the aim
+  //! of low latency, display times and no wait for a present, the grid moves later by the refreshes the display slipped
+  //! behind it (AddDisplayReport, DisplaySlipRule). Else a time the frame before it stays on screen at least is given next to
+  //! what the loop does without one: it keeps a present that lands on the wrong side of a refresh from being shown a refresh
+  //! early. Where the frames start is as without one.
   //!
   //! Without the wait: one pause after start-up with the aim of low latency (StartupPauses), a whole period after a present
   //! that was made late, and the system's own waits (AddSystemWait): where the application says that the system holds the
@@ -61,6 +66,12 @@ namespace MB::FramePacing::Pacer
     // The time a present is given. With PresentTiming::AtTime the display's side puts a frame on its refresh, else the loop
     // does by when it presents
     PresentTiming m_presentTiming{PresentTiming::Untimed};
+    // The longest swap interval with which the display's side places a frame after the one before it (0: it does not), whether
+    // display times are reported, the slip of the display behind the grid they show, and the refreshes the grid moved for it
+    uint32_t m_displayHoldsUpTo{0};
+    bool m_usesDisplayTimes{false};
+    DisplaySlipRule m_slip;
+    uint64_t m_displaySlipRefreshes{0};
     PresentWaitRule m_wait;
     // Without a wait for a present: a wait for the GPU's work on an earlier frame, where the application can make one
     bool m_waitsForGpuWork{false};
@@ -217,6 +228,31 @@ namespace MB::FramePacing::Pacer
       m_presentTiming = timing;
     }
 
+    //! The longest swap interval with which the display's side places a frame after the one before it, from the next frame on
+    //! (DisplayPlacementUtil::HoldsUpTo; 0 where it does not): a frame of up to that many refreshes is presented when it is done,
+    //! and the display's side keeps the frame before it on screen for its swap interval.
+    void SetDisplayHoldsUpTo(const uint32_t swapInterval) noexcept
+    {
+      m_displayHoldsUpTo = swapInterval;
+    }
+
+    //! Whether the platform reports display times (AddDisplayReport). A change starts the display's slip anew.
+    void SetUsesDisplayTimes(bool usesDisplayTimes) noexcept;
+
+    //! What the platform says of a frame that was presented earlier. With the aim of low latency, where the display's side places
+    //! a frame after the one before it and no wait for a present holds the loop, a display that slipped behind the grid (a frame
+    //! shown late moved the ones after it) moves the grid later by as many refreshes (DisplaySlipRule): the frames that would
+    //! wait for the display start that much later. The animation time is not moved: it is that many refreshes further behind
+    //! the clock. Otherwise the report changes nothing.
+    void AddDisplayReport(const DisplayReport& report) noexcept;
+
+    //! The refreshes the grid was moved later by for the display's slip (AddDisplayReport), since the pacer was made: counted in
+    //! RefreshesBehindClock.
+    [[nodiscard]] uint64_t DisplaySlipRefreshes() const noexcept
+    {
+      return m_displaySlipRefreshes;
+    }
+
     //! How far the animation time is behind the clock, in refreshes, since the pacer was made: the refreshes that were lost and
     //! that it was not moved over, and the pauses after start-up.
     [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
@@ -321,6 +357,8 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] NanosecondTickCount TimeOfSlot(int64_t slot) const noexcept;
     void ArmStartupPause() noexcept;
     [[nodiscard]] uint32_t StartupPauseAt(NanosecondTickCount cpuStartTime) noexcept;
+    [[nodiscard]] bool DisplayPlaces(uint32_t swapInterval) const noexcept;
+    [[nodiscard]] bool FollowsTheDisplaysSlip() const noexcept;
   };
 }
 
