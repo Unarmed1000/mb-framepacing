@@ -130,6 +130,10 @@ leave out the rest: a field it does not know is left out, never written as 0.
 A slice's or a moment's name is its prefix and the frame's two marker ids, as the record's name has them (`FrameDetailName`):
 `mbfp present 1 388`. The record's own name begins `mbfp frame `, so a reader never takes one for the other.
 
+Part 2 may be logged for every frame, a marker drawn or not (the user's decision, 2026-10-15). A frame without a marker is named
+by the ids its marker would carry: the run id of the run it belongs to, never one given to another run, and the frame index of the
+same count the markers take, one more for every frame made. The record (part 1) stays for the frames whose marker is drawn.
+
 | Track           | Name                               | What                                                                                                | Annotations                                                                                                                                                                                                                                 |
 | --------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mbfp waits`    | `mbfp wait <run> <index>`          | A slice per wait before the frame's CPU work, from its start to its end                             | `kind` (below); `plannedNs`, the time it waited for, where it had one                                                                                                                                                                       |

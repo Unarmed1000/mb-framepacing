@@ -238,7 +238,8 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
       `mbfp display <run> <index>` moment on tracks `mbfp waits|presents|gpu|display`; on `mbfp run` the moments
       `mbfp not presented <run> <index>`, `mbfp environment`, `mbfp swap chain recreated`, `mbfp swap interval change` (with a
       `runId` annotation). Values in no API's words (present modes `queue`, `queue, late at once`, `newest at refresh`,
-      `immediate`, `unknown`), but `platformFeatures`, the plain list of the extensions and protocols found. Strings in
+      `immediate`, `unknown`), but `platformFeatures`, the plain list of the extensions and protocols found. Part 2 may be logged for
+      every frame, a marker drawn or not (the user, 2026-10-15), by the ids the marker would carry; part 1 only where it is drawn. Strings in
       `FrameRecordText` (C++ and C#, one table), names by `FrameDetail` / `FrameDetailName` (C# `TryParse`), held to
       `sdk/test-data/trace/frame-details.csv`. `sdk/test-data/trace/example-app.pftrace` is the made-up example with all of it
       (`synthetic_trace.build_example`, written and checked by `update_trace_test_data.py`). The tools only count it
