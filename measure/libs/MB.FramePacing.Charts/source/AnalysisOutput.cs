@@ -60,7 +60,7 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
-    /// EXPERIMENTAL: what a Perfetto trace says of a run's frames, when the analysis joined one (run-&lt;id&gt;-trace.csv next to the run's
+    /// What a Perfetto trace says of a run's frames, when the analysis joined one (run-&lt;id&gt;-trace.csv next to the run's
     /// frames); null without the file. A file that does not have a row per frame is of another analysis: an InvalidDataException.
     /// </summary>
     private static IReadOnlyList<TraceFrame>? ReadTrace(string directory, string prefix, int frameCount)

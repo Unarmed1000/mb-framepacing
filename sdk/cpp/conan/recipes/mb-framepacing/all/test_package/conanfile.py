@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
 """Builds and runs a small program against the mb-framepacing package: find_package with its components, link, draw one marker, read a time.
-A package built with with_pacer (the experimental pacer module) also paces one frame, and one built with with_trace (the experimental
-trace module) also makes the record of one frame's marker."""
+A package built with with_pacer (the experimental pacer module) also paces one frame, and one with the trace module (with_trace, the
+default) also makes the record of one frame's marker."""
 
 import os
 

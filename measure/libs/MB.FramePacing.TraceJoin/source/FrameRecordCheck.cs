@@ -25,7 +25,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A run's markers as decoded, against the frame record of a trace.</summary>
+  /// <summary>A run's markers as decoded, against the frame record of a trace.</summary>
   /// <param name="Slices">The record's slices of this run.</param>
   /// <param name="NamedFrames">Frames with a CPU start time whose frame index has a slice.</param>
   /// <param name="WorkedFrames">Frames with a CPU start time.</param>

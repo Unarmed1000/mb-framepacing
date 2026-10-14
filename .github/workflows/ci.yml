@@ -48,8 +48,8 @@ jobs:
           esac
           ffmpeg -version | head -1
 
-      # The pacer and the trace module are experimental and off by default; they are built and tested here all the same
-      - name: C++ library (core, marker, data and the experimental pacer and trace modules)
+      # The pacer is experimental and off by default; it is built and tested here all the same
+      - name: C++ library (core, marker, data, trace and the experimental pacer)
         shell: bash
         run: |
           cmake -S sdk/cpp -B sdk/cpp/build/ci -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON -DMB_FRAMEPACING_BUILD_TRACE=ON
@@ -73,7 +73,7 @@ jobs:
           # Windows runners have 'python', Linux and macOS 'python3'
           "$(command -v python3 || command -v python)" sdk/cpp/tests/consumer/check_consumers.py "${only[@]}"
 
-      # Experimental: a capture joined with a Perfetto trace. The tools start the user's own trace processor and never download one;
+      # A capture joined with a Perfetto trace. The tools start the user's own trace processor and never download one;
       # here Perfetto's Python package fetches the copy it is pinned to, and the tests that read a trace must find it
       - name: uv (for Perfetto's Python package)
         uses: astral-sh/setup-uv@v10.2.0

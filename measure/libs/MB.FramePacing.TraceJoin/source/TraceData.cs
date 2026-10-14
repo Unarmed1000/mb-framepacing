@@ -12,7 +12,7 @@ using System.Collections.Generic;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. What was read of one trace for a join.</summary>
+  /// <summary>What was read of one trace for a join.</summary>
   /// <param name="FirstNs">The first time of the trace.</param>
   /// <param name="Snapshots">The trace's snapshots of the frame record's clock (the monotonic clock), ascending by that clock.</param>
   /// <param name="Errors">What the trace processor counted as errors while it read the trace, by name.</param>

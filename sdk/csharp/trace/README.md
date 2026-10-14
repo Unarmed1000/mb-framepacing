@@ -1,7 +1,4 @@
-# MB Frame Pacing Trace for C# (experimental)
-
-> **Experimental.** The frame record, this module and the tools that read the record are checked against traces their own tests
-> make: no recorded trace has been through them yet. Its strings and its API may change in any release.
+# MB Frame Pacing Trace for C#
 
 `MB.FramePacing.Trace`, the trace module of the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) SDK for C#: the
 **frame record**, the slice an application logs to its own trace for every frame, so that the tools can merge a trace of a run

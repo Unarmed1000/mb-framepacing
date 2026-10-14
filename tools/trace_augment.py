@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""EXPERIMENTAL: join a capture's analysis with a Perfetto trace of the same run (measure/doc/perfetto.md).
+"""Join a capture's analysis with a Perfetto trace of the same run (measure/doc/perfetto.md).
 
 The capture's measurements into the trace, and what the trace says into the capture's frames:
 

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// EXPERIMENTAL. The frame record of a marker's payload (sdk/doc/trace-frame-record.md, which is the reference): which markers
+// The frame record of a marker's payload (sdk/doc/trace-frame-record.md, which is the reference): which markers
 // get a record, and the name, the times and the annotations of the slice an application logs for one.
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>

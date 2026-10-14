@@ -30,7 +30,7 @@ using System.Text;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Writes the tracks of one run to a stream as Perfetto trace packets.</summary>
+  /// <summary>Writes the tracks of one run to a stream as Perfetto trace packets.</summary>
   public sealed class TraceTrackWriter
   {
     /// <summary>
@@ -149,9 +149,7 @@ namespace MB.FramePacing.TraceJoin
     /// </summary>
     public void WriteAttributes(IReadOnlyList<KeyValuePair<string, string>> attributes)
     {
-      var description = new StringBuilder(
-        "Measured by mb-framepacing from a capture of the display, and placed on this trace's clock (experimental)."
-      );
+      var description = new StringBuilder("Measured by mb-framepacing from a capture of the display, and placed on this trace's clock.");
       foreach (var attribute in attributes)
         description.Append('\n').Append(attribute.Key).Append(": ").Append(attribute.Value);
 

@@ -22,7 +22,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Writes a run's tracks into a trace, and checks the result.</summary>
+  /// <summary>Writes a run's tracks into a trace, and checks the result.</summary>
   public static class TraceAugmenter
   {
     /// <summary>What a run's augmented trace's file name ends in, after the run's prefix (run-&lt;id&gt;).</summary>

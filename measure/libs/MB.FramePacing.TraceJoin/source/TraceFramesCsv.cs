@@ -21,7 +21,7 @@ using System.Text;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Writes and reads the per-frame join of a capture and a trace.</summary>
+  /// <summary>Writes and reads the per-frame join of a capture and a trace.</summary>
   public static class TraceFramesCsv
   {
     /// <summary>What a run's file name ends in, after the run's prefix (run-&lt;id&gt;).</summary>

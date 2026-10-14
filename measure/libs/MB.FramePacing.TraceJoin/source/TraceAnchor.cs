@@ -9,7 +9,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. What placed the capture's clock against the application's.</summary>
+  /// <summary>What placed the capture's clock against the application's.</summary>
   public enum TraceAnchor
   {
     /// <summary>The pacer's intended display times: the analysis's own alignment.</summary>

@@ -414,6 +414,17 @@ PNGs. `--playback` (on `import`, `analyze` and `render`, and the GUI's **Save pl
 [playback report](measure/doc/usage.md#the-playback-page) in a folder of its own (`analysis/playback/run-<id>/index.html`): one HTML
 page that plays the imported recording next to its report, with a playhead on the report where the frame on screen is.
 
+### A Perfetto trace of the run
+
+An application that records a [Perfetto](https://perfetto.dev) trace of the run, and logs the SDK's
+[frame record](sdk/doc/trace-frame-record.md) into it (a slice per frame with the values of its marker), can have the trace joined
+with the capture: `--trace run.pftrace` on `import` or `analyze`, or the Perfetto trace card in the GUI. The analysis then says what
+the trace says of each frame (the system's own account of it, its thread's scheduling, the display's vertical blanks), and
+`--charts` and **Save charts** also write the trace with the capture's measurements added as tracks. The report card links that
+file; `trace-open` and **Open in Perfetto** open it in [Perfetto's viewer](https://ui.perfetto.dev), in the browser, where nothing
+is uploaded. Reading a trace needs Perfetto's trace processor, a program of your own. [The guide](measure/doc/perfetto.md) has the
+whole of it.
+
 ### What you need
 
 | For              | You need                                                                                                                                                                    |
@@ -447,8 +458,6 @@ Some features are experimental, hidden unless you ask for them, and described in
 - [Live capture](measure/doc/live-capture.md): recording a capture card or a network stream with mb-framepacing itself.
 - [Camera capture](measure/doc/camera.md): a high speed camera filming the screen.
 - [The frame pacer](sdk/doc/pacer.md): a C++ module that paces a frame loop and fills the marker's pacing fields.
-- [A capture and a Perfetto trace](measure/doc/perfetto.md): the capture's measurements as tracks in a Perfetto trace of the same
-  run, and what the trace says of each frame.
 
 ## Configuration
 

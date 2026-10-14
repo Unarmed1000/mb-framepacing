@@ -21,7 +21,7 @@ using MB.FramePacing.Data;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The clock arithmetic that places a capture's frames on a trace's clock.</summary>
+  /// <summary>The clock arithmetic that places a capture's frames on a trace's clock.</summary>
   public static class TraceAlignmentUtil
   {
     /// <summary>How many display times need a vertical blank within a refresh before them for the vertical blanks to be used.</summary>

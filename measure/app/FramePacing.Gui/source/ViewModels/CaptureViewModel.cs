@@ -73,8 +73,9 @@ namespace MB.FramePacing.Gui.ViewModels
       MediaPath = settings.MediaPath ?? string.Empty;
       ImageFpsText = settings.ImageFps ?? "240";
       TimestampFile = settings.TimestampFile ?? string.Empty;
-      // Before the experimental features are set: switching them on shows the trace chosen earlier
+      // The trace chosen earlier is shown (and read for its processes)
       Trace = new TraceViewModel(dialogs);
+      Trace.Show(RememberedTrace());
       foreach (var item in OtherSources())
         Devices.Add(item);
       SelectedDevice = Devices.First(d => d.Kind == SourceKind.VideoFile);
@@ -82,10 +83,7 @@ namespace MB.FramePacing.Gui.ViewModels
       Camera = new CameraRigViewModel(settings, CameraLibraryDirectory, OpenCameraWizardAsync, token => OpenCameraSource(CurrentChoice(), token));
     }
 
-    /// <summary>
-    /// EXPERIMENTAL: the Perfetto trace of the run (the Perfetto trace card): stored with the capture, for the analysis to join it with.
-    /// Only with the experimental features: off, a trace chosen earlier is not used.
-    /// </summary>
+    /// <summary>The Perfetto trace of the run (the Perfetto trace card): stored with the capture, for the analysis to join it with.</summary>
     public TraceViewModel Trace { get; }
 
     private TraceJoinOptions? RememberedTrace() =>
@@ -110,14 +108,6 @@ namespace MB.FramePacing.Gui.ViewModels
     {
       m_settings.ExperimentalFeatures = value;
       ListSources();
-      // Switched on, the trace chosen earlier is back (and read for its processes); switched off it is kept in the settings and not shown
-      if (value)
-        Trace.Show(RememberedTrace());
-      else if (!string.IsNullOrWhiteSpace(Trace.TracePath))
-      {
-        StoreTrace();
-        Trace.Show(null);
-      }
     }
 
     /// <summary>Live and experimental sources: capture cards, network streams and the synthetic camera.</summary>
@@ -458,7 +448,7 @@ namespace MB.FramePacing.Gui.ViewModels
           TargetFps = FrameRateText.ParseOptional(TargetFpsText),
           ExpectedRefreshHz = FrameRateText.ParseOptional(DisplayHzText),
           Name = string.IsNullOrWhiteSpace(CaptureName) ? null : CaptureName.Trim(),
-          Trace = ExperimentalFeatures ? Trace.Options() : null,
+          Trace = Trace.Options(),
           ToolVersion = MainWindowViewModel.Version,
           Preview = OnPreview,
         };
@@ -848,8 +838,7 @@ namespace MB.FramePacing.Gui.ViewModels
       m_settings.MediaPath = MediaPath;
       m_settings.ImageFps = ImageFpsText;
       m_settings.TimestampFile = TimestampFile;
-      if (ExperimentalFeatures)
-        StoreTrace();
+      StoreTrace();
       Camera.StoreSettings();
     }
   }

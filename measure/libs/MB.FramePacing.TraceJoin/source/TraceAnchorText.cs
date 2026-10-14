@@ -11,7 +11,7 @@ using System;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The words for a <see cref="TraceAnchor"/>.</summary>
+  /// <summary>The words for a <see cref="TraceAnchor"/>.</summary>
   public static class TraceAnchorText
   {
     public static string Of(TraceAnchor anchor) =>

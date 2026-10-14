@@ -9,6 +9,6 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A frame timeline layer of a process.</summary>
+  /// <summary>A frame timeline layer of a process.</summary>
   public sealed record TraceLayerInfo(string Process, string Layer, long Frames);
 }

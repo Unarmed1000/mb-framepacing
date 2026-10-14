@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL: what a Perfetto trace says of a run's frames, on the report card and under the pointer. The golden analysis
+//* What a Perfetto trace says of a run's frames, on the report card and under the pointer. The golden analysis
 //* (sdk/test-data/data) with the per-frame CSV that was made for it (measure/test-data/trace/frames.csv) next to its frames: the card's
 //* description says a trace was joined and what it has for the frames, the hover has the trace's lines for a frame, a section has its own
 //* frames' rows, and a run without a trace has none of it.
@@ -24,7 +24,7 @@ namespace MB.FramePacing.Charts.UnitTest
   [NonParallelizable] // shares Perfetto's trace processor and the loader's cache of traces
   public class TraceChartTests
   {
-    private const string Joined = "A Perfetto trace of the run was joined (experimental): its times are tied to the capture's by the frames only.";
+    private const string Joined = "A Perfetto trace of the run was joined: its times are tied to the capture's by the frames only.";
 
     private TempFolder m_temp = null!;
     private string m_analysis = string.Empty;

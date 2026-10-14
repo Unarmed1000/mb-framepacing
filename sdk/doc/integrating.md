@@ -302,12 +302,12 @@ mb-framepacing itself is experimental ([Live capture](../../measure/doc/live-cap
 the screen with a high speed camera, draw the sync marker as well and see the very experimental
 [camera capture](../../measure/doc/camera.md).
 
-### A trace of the same run (experimental)
+### A trace of the same run
 
 An application that records a [Perfetto](https://perfetto.dev) trace of a run can have the tools merge it with the capture:
 the capture's measurements as tracks in the trace, and what the trace says of each frame in the analysis. For that the
 application logs one slice per frame to its trace, [the frame record](trace-frame-record.md), with the values of the frame's
-marker. The SDK's experimental trace module defines the record's strings and works out what to log from the payload you
+marker. The SDK's trace module defines the record's strings and works out what to log from the payload you
 already make; you log it with your own tracing. It is needed for that merge only: a measurement needs nothing but the marker.
 Say in the run's start marker that you log it (`FM::MarkerFlags::FrameRecordLogged`, off unless you set it), so that whoever
 analyses the capture knows a trace of the run exists.

@@ -10,7 +10,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A track of a capture's measurements in a trace; the order is the order they are shown in.</summary>
+  /// <summary>A track of a capture's measurements in a trace; the order is the order they are shown in.</summary>
   public enum TraceTrack
   {
     /// <summary>A slice per capture of a capture card, a refresh long, two names in turn.</summary>

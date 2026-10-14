@@ -8,13 +8,13 @@ subdirectory   add_subdirectory(<source tree>)
 package        cmake --install to a temporary prefix, then find_package(mb_framepacing <version> CONFIG REQUIRED COMPONENTS ...)
 archive        FetchContent of a release archive (a local path as URL, with its SHA256) (only with --archive)
 
-The pacer and the trace module are experimental and off by default: the runs above must not get them. Two more runs ask for the pacer
-and pace a frame (MB_CONSUMER_PACER): subdirectory-pacer, and package-pacer against an install built with
--DMB_FRAMEPACING_BUILD_PACER=ON. Two more ask for the trace module and make a frame's record (MB_CONSUMER_TRACE): subdirectory-trace,
-and package-trace against an install built with -DMB_FRAMEPACING_BUILD_TRACE=ON.
+The pacer is experimental and off by default: the runs above must not get it. Two more runs ask for the pacer and pace a frame
+(MB_CONSUMER_PACER): subdirectory-pacer, and package-pacer against an install built with -DMB_FRAMEPACING_BUILD_PACER=ON. The trace
+module is on by default: two more runs ask for it and make a frame's record (MB_CONSUMER_TRACE), subdirectory-trace and package-trace
+against the default install.
 
 --package-only runs the package way alone, with the default modules: the library built and installed once, the check that the
-install holds nothing of an experimental module, and a consumer that finds it. It is what a system runs when another one runs all
+install holds the trace module and nothing of the pacer, and a consumer that finds it. It is what a system runs when another one runs all
 of them (CI: everything on Ubuntu, this on Windows and macOS, where a build of the library takes longest).
 
 python sdk/cpp/tests/consumer/check_consumers.py [--source <mb_framepacing source tree>] [--archive <mb-framepacing-cpp-x.y.z.tar.gz>]
@@ -32,7 +32,7 @@ from pathlib import Path
 CONSUMER_DIR = Path(__file__).resolve().parent
 DEFAULT_SOURCE = CONSUMER_DIR.parent.parent
 # The modules that are off unless an application asks for them
-EXPERIMENTAL_MODULES = ("pacer", "trace")
+EXPERIMENTAL_MODULES = ("pacer",)
 
 
 class Arguments(argparse.Namespace):
@@ -115,7 +115,7 @@ def module_files(prefix: Path, module: str) -> list[str]:
 
 
 def check_has_no_experimental_module(prefix: Path) -> None:
-    """The pacer and the trace module are experimental: an install with the default options has nothing of either."""
+    """The pacer is experimental: an install with the default options has nothing of it."""
     for module in EXPERIMENTAL_MODULES:
         found = module_files(prefix, module)
         if module == "pacer":
@@ -126,8 +126,7 @@ def check_has_no_experimental_module(prefix: Path) -> None:
 
 
 def check_has_module(prefix: Path, module: str) -> None:
-    """An install that was asked for an experimental module holds it: what shows that the check of the default install looks for
-    the right files."""
+    """An install that should hold a module does: what shows that the check of the default install looks for the right files."""
     if not module_files(prefix, module):
         sys.exit(f"The install built with the {module} module holds none of its files")
 
@@ -144,6 +143,7 @@ def main() -> int:
                 sys.exit("--package-only does not take --archive")
             prefix = install_library(work, source, "library", [])
             check_has_no_experimental_module(prefix)
+            check_has_module(prefix, "trace")
             definitions = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
             build_and_run(work, "package", definitions)
             print("\nConsumer check: OK (package)")
@@ -158,9 +158,11 @@ def main() -> int:
         build_and_run(work, "subdirectory", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix()})
         check_installs_nothing(work, "subdirectory")
 
-        prefix = install_library(work, source, "library", [])
-        check_has_no_experimental_module(prefix)
-        build_and_run(work, "package", {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor})
+        default_prefix = install_library(work, source, "library", [])
+        check_has_no_experimental_module(default_prefix)
+        check_has_module(default_prefix, "trace")
+        default_package = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": default_prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
+        build_and_run(work, "package", default_package)
 
         # The experimental pacer, for an application that asks for it
         pacer = {"MB_CONSUMER_PACER": "ON"}
@@ -170,13 +172,10 @@ def main() -> int:
         package = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
         build_and_run(work, "package-pacer", {**package, **pacer})
 
-        # The experimental trace module, the same way
+        # The trace module, which the default install holds
         trace = {"MB_CONSUMER_TRACE": "ON"}
         build_and_run(work, "subdirectory-trace", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix(), **trace})
-        prefix = install_library(work, source, "library-trace", ["-DMB_FRAMEPACING_BUILD_TRACE=ON"])
-        check_has_module(prefix, "trace")
-        package = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
-        build_and_run(work, "package-trace", {**package, **trace})
+        build_and_run(work, "package-trace", {**default_package, **trace})
 
         if args.archive:
             archive = Path(args.archive).resolve()

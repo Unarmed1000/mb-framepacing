@@ -12,7 +12,7 @@ using System.Collections.Generic;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. What a trace has to go by.</summary>
+  /// <summary>What a trace has to go by.</summary>
   /// <param name="FirstNs">The first time of the trace, on its own clock.</param>
   /// <param name="Errors">What the trace processor counted as errors while it read the trace, by name.</param>
   public sealed record TraceInfo(

@@ -112,7 +112,7 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   - The animation clock pauses one frame early: the frame that reaches the rest pose gets the paused time, and the step into it (which
     is judged) shows an error. Pause the clock after the last frame that animates.
 
-### Flags: frame record logged (experimental)
+### Flags: frame record logged
 
 - **Means:** the application logs [the frame record](trace-frame-record.md) of this run to a trace of its own: a slice per frame
   with the values of the frame's marker, which is what lets the tools merge a trace of the run with its capture. The flag says

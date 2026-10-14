@@ -15,7 +15,7 @@
 
 namespace MB::FramePacing::Trace
 {
-  //! EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). What an application logs to its trace for one frame: a slice
+  //! What an application logs to its trace for one frame: a slice
   //! with this name, in the category FrameRecordText::Category, on the track named FrameRecordText::TrackName, from StartTime for
   //! Duration on the clock FrameRecordText::ClockId, with every entry of Annotations(). FrameRecordUtil::TryCreate makes it from
   //! the payload the frame's marker is drawn from, so the record and the marker can not disagree. The application writes the

@@ -27,14 +27,14 @@ namespace MB.FramePacing.App.Commands
 
     /// <summary>
     /// Global (recursive) option: show and allow the experimental parts, live capture (capture, locate, devices, a stream URL for import),
-    /// camera capture (camera-rig, --camera, --recorded-fps, selftest --camera) and a capture joined with a Perfetto trace (trace-info,
-    /// trace-open, --trace). Without it they are left out of --help and refused, as the GUI hides them unless its experimental features are on.
+    /// camera capture (camera-rig, --camera, --recorded-fps, selftest --camera) and the frame pacer's frame logs (frame-stages). Without it
+    /// they are left out of --help and refused, as the GUI hides them unless its experimental features are on.
     /// </summary>
     public static readonly Option<bool> Experimental = new Option<bool>("--experimental")
     {
       Description =
         "Show and allow the experimental parts: live capture (capture, locate, devices, a stream URL for import), camera capture "
-        + "(camera-rig, --camera, --recorded-fps, selftest --camera) and a capture joined with a Perfetto trace (trace-info, trace-open, --trace).",
+        + "(camera-rig, --camera, --recorded-fps, selftest --camera) and the frame pacer's frame logs (frame-stages).",
       Recursive = true,
     };
 

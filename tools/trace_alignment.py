@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""EXPERIMENTAL (measure/doc/perfetto.md). Where a capture's frames are on the clocks of a Perfetto trace of the same run: the
+"""Where a capture's frames are on the clocks of a Perfetto trace of the same run: the
 clock arithmetic of trace_augment.py, with nothing of Perfetto in it.
 
 Three clocks meet. The capture's (the capture card's, or the host's): a frame's display time, firstSeenNs. The application's

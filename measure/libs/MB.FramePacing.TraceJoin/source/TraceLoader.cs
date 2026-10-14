@@ -21,7 +21,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Reads what a join needs of a trace.</summary>
+  /// <summary>Reads what a join needs of a trace.</summary>
   public static class TraceLoader
   {
     private static readonly object g_lock = new object();

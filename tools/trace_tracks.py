@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
-"""EXPERIMENTAL (measure/doc/perfetto.md). Writes a capture's tracks (trace_events) as the packets of a Perfetto trace, with
+"""Writes a capture's tracks (trace_events) as the packets of a Perfetto trace, with
 Perfetto's own Python package: a trace of their own, or added to the bytes of a trace that was recorded.
 
 A Perfetto protobuf trace is its packets one after the other, and packets put next to a trace's bytes are part of it (the way
@@ -126,7 +126,7 @@ class TrackWriter:
         descriptor.uuid = self._root_id
         descriptor.name = self._root_name
         descriptor.child_ordering = TrackDescriptor.EXPLICIT
-        lines = ["Measured by mb-framepacing from a capture of the display, and placed on this trace's clock (experimental)."]
+        lines = ["Measured by mb-framepacing from a capture of the display, and placed on this trace's clock."]
         lines += [f"{key}: {value}" for key, value in attributes.items()]
         descriptor.description = "\n".join(lines)
         self._builder.write_packet(packet)

@@ -12,7 +12,7 @@ using System;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A capture and a Perfetto trace that can not be joined; the message says why and what to do.</summary>
+  /// <summary>A capture and a Perfetto trace that can not be joined; the message says why and what to do.</summary>
   public sealed class TraceException : Exception
   {
     public TraceException(string message)

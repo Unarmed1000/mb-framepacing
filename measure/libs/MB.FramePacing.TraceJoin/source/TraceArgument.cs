@@ -9,7 +9,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A named value of a slice or a moment: a whole number, a number or a text.</summary>
+  /// <summary>A named value of a slice or a moment: a whole number, a number or a text.</summary>
   public readonly record struct TraceArgument(string Name, TraceArgumentKind Kind, long Whole, double Number, string Text)
   {
     public static TraceArgument Of(string name, long value) => new TraceArgument(name, TraceArgumentKind.Whole, value, 0, string.Empty);

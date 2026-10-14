@@ -84,7 +84,7 @@ namespace MB::FramePacing::Marker
     }
 
     //! MarkerFlags::StaticAfter when nothing animates while this frame is on screen, MarkerFlags::StaticBefore when nothing animated while
-    //! the frame before it was; on a start marker MarkerFlags::FrameRecordLogged (experimental) when the application logs the run's frame
+    //! the frame before it was; on a start marker MarkerFlags::FrameRecordLogged when the application logs the run's frame
     //! record to its trace; the other bits are reserved (write 0, a decoded payload keeps them).
     [[nodiscard]] constexpr MarkerFlags Flags() const noexcept
     {

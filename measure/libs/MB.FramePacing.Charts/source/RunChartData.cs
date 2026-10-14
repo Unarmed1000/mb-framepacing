@@ -287,7 +287,7 @@ namespace MB.FramePacing.Charts
     public IReadOnlyList<PresentedFrame> Frames { get; }
 
     /// <summary>
-    /// EXPERIMENTAL: what a Perfetto trace of the run says of each of <see cref="Frames"/>, in their order; null when the run was not
+    /// What a Perfetto trace of the run says of each of <see cref="Frames"/>, in their order; null when the run was not
     /// joined with one.
     /// </summary>
     public IReadOnlyList<TraceFrame>? TraceFrames { get; }

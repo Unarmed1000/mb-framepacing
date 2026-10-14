@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
-"""EXPERIMENTAL (measure/doc/perfetto.md). Regenerate measure/test-data/trace: what keeps this repository's two ways of joining
+"""Regenerate measure/test-data/trace: what keeps this repository's two ways of joining
 a capture with a Perfetto trace equal, the script (tools/trace_augment.py) and the tools (measure/libs/MB.FramePacing.TraceJoin).
 
 Everything in the folder is made here, from the SDK's golden capture (sdk/test-data/data/60-busy-full-rate) and a trace the

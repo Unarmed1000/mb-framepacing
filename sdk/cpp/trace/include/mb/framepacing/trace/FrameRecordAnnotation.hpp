@@ -8,7 +8,7 @@
 
 namespace MB::FramePacing::Trace
 {
-  //! EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). One annotation of a frame record's slice: one of the marker's
+  //! One annotation of a frame record's slice: one of the marker's
   //! times, under its name.
   struct FrameRecordAnnotation
   {

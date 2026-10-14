@@ -10,7 +10,7 @@
 namespace MB.FramePacing.TraceJoin
 {
   /// <summary>
-  /// Experimental. <paramref name="ShiftNs"/> was taken off every display time (it is within half a refresh either way); afterwards the
+  /// <paramref name="ShiftNs"/> was taken off every display time (it is within half a refresh either way); afterwards the
   /// display times of <paramref name="UsedFrames"/> frames have a vertical blank within half a refresh, and the furthest of them is
   /// <paramref name="SpreadNs"/> from its vertical blank.
   /// </summary>

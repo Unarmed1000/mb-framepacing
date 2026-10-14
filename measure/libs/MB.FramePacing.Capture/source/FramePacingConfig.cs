@@ -41,7 +41,7 @@ namespace MB.FramePacing.Capture
     public PlaybackTranscodeChoice? PlaybackTranscode { get; init; }
 
     /// <summary>
-    /// EXPERIMENTAL (a capture and a Perfetto trace): full path of Perfetto's trace_processor_shell. Null = use MB_TRACE_PROCESSOR, PATH or
+    /// Full path of Perfetto's trace_processor_shell. Null = use MB_TRACE_PROCESSOR, PATH or
     /// the copy Perfetto's Python package downloaded.
     /// </summary>
     public string? TraceProcessorPath { get; init; }

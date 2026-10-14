@@ -81,7 +81,6 @@ namespace MB.FramePacing.Gui.ViewModels
       m_dialogs = dialogs;
       m_settings = settings;
       Trace = new TraceViewModel(dialogs);
-      ExperimentalFeatures = settings.ExperimentalFeatures;
       CaptureDirectory = settings.LastCaptureDirectory ?? string.Empty;
       if (Enum.TryParse(settings.TimeSource, out TimeSource timeSource))
         SelectedTimeSource = timeSource;
@@ -91,26 +90,11 @@ namespace MB.FramePacing.Gui.ViewModels
       AssumeStatic = settings.AssumeStatic;
     }
 
-    /// <summary>
-    /// EXPERIMENTAL: the Perfetto trace the next Analyze joins the capture with: the capture's own when a capture is opened, or another.
-    /// Only with the experimental features: off, no trace is joined.
-    /// </summary>
+    /// <summary>The Perfetto trace the next Analyze joins the capture with: the capture's own when a capture is opened, or another.</summary>
     public TraceViewModel Trace { get; }
 
-    /// <summary>Show the experimental features (the Settings page's switch): here, the Perfetto trace of the run.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanOpenInPerfetto))]
-    [NotifyCanExecuteChangedFor(nameof(OpenInPerfettoCommand))]
-    public partial bool ExperimentalFeatures { get; set; }
-
-    partial void OnExperimentalFeaturesChanged(bool value) => Trace.Show(value ? RememberedTrace(CaptureDirectory) : null);
-
     /// <summary>A capture was chosen: its own trace is the one shown.</summary>
-    partial void OnCaptureDirectoryChanged(string value)
-    {
-      if (ExperimentalFeatures)
-        Trace.Show(RememberedTrace(value));
-    }
+    partial void OnCaptureDirectoryChanged(string value) => Trace.Show(RememberedTrace(value));
 
     /// <summary>The trace the capture in <paramref name="directory"/> names (capture.json); null when it names none or can not be read.</summary>
     private static TraceJoinOptions? RememberedTrace(string? directory)
@@ -129,13 +113,13 @@ namespace MB.FramePacing.Gui.ViewModels
 
     /// <summary>
     /// <paramref name="options"/> with the trace the page has for the capture in <paramref name="directory"/>. The capture's own trace is
-    /// left to the analysis (which warns when it is gone); another one is given to it (and stops it when it can not be read); none, or the
-    /// experimental features off, joins none. Without a trace processor the analysis warns.
+    /// left to the analysis (which warns when it is gone); another one is given to it (and stops it when it can not be read); none joins
+    /// none. Without a trace processor the analysis warns.
     /// </summary>
     private AnalysisOptions WithTrace(AnalysisOptions options, string directory)
     {
       var remembered = RememberedTrace(directory);
-      var chosen = ExperimentalFeatures ? Trace.Options(remembered) : null;
+      var chosen = Trace.Options(remembered);
       if (chosen == null)
         return options with { NoTrace = true };
       return options with { Trace = chosen == remembered ? null : chosen, TraceProcessorPath = TraceViewModel.FindProcessor(out _) };
@@ -751,7 +735,7 @@ namespace MB.FramePacing.Gui.ViewModels
       {
         var options = ReportOptions.Default with { ClampStatic = ClampStatic };
         ErrorText = string.Empty;
-        // Experimental: an analysis that joined a Perfetto trace writes the augmented trace with its charts, first: the report card names it
+        // An analysis that joined a Perfetto trace writes the augmented trace with its charts, first: the report card names it
         IReadOnlyList<AugmentedTraceFile> traces = Array.Empty<AugmentedTraceFile>();
         if (report.TraceJoins.Any(join => join != null))
         {
@@ -776,14 +760,14 @@ namespace MB.FramePacing.Gui.ViewModels
       }
     }
 
-    /// <summary>Experimental: the selected run's augmented trace is being handed to Perfetto's viewer.</summary>
+    /// <summary>The selected run's augmented trace is being handed to Perfetto's viewer.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanOpenInPerfetto))]
     [NotifyCanExecuteChangedFor(nameof(OpenInPerfettoCommand))]
     public partial bool IsOpeningPerfetto { get; set; }
 
-    /// <summary>Experimental: the selected run was joined with a Perfetto trace, so it has an augmented trace to open.</summary>
-    public bool CanOpenInPerfetto => ExperimentalFeatures && !IsOpeningPerfetto && SelectedJoinIndex() != null;
+    /// <summary>The selected run was joined with a Perfetto trace, so it has an augmented trace to open.</summary>
+    public bool CanOpenInPerfetto => !IsOpeningPerfetto && SelectedJoinIndex() != null;
 
     /// <summary>The selected run's place in the report when it was joined with a trace.</summary>
     private int? SelectedJoinIndex()
@@ -795,7 +779,7 @@ namespace MB.FramePacing.Gui.ViewModels
     }
 
     /// <summary>
-    /// Experimental: open the selected run's augmented trace in Perfetto's viewer at ui.perfetto.dev (written first when Save charts has not
+    /// Open the selected run's augmented trace in Perfetto's viewer at ui.perfetto.dev (written first when Save charts has not
     /// written it), served once from 127.0.0.1:9001, at the run's stretch of time with the capture's tracks pinned.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanOpenInPerfetto))]

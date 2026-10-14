@@ -19,7 +19,7 @@ namespace MB::FramePacing::Marker
     //! Nothing animated while the frame before this one was on screen: StaticAfter of the previous frame, for an application that only
     //! knows it once it renders this frame.
     StaticBefore = 1u << 1u,
-    //! EXPERIMENTAL. On a start marker: the application logs the frame record of this run to its own trace (the trace module,
+    //! On a start marker: the application logs the frame record of this run to its own trace (the trace module,
     //! doc/trace-frame-record.md), so there is a trace the capture of the run can be merged with. Only the application knows: it sets
     //! the flag itself and nothing in the SDK does, so it is off unless set. It says nothing on a frame, end or sync marker.
     FrameRecordLogged = 1u << 2u,

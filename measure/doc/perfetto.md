@@ -1,8 +1,4 @@
-# A capture and a Perfetto trace of the same run (experimental)
-
-> **Experimental.** Built against traces its own tests make, by our reading of Perfetto's formats. **No recorded trace has been
-> through it yet**: how it matches the system's frames to the capture's, and where it finds a display's vertical blanks, is
-> unproven until one has. Its options and its output may change.
+# A capture and a Perfetto trace of the same run
 
 A capture card records what the display was sent, and the tools measure when each frame was really on screen. A
 [Perfetto](https://perfetto.dev) trace recorded on the device at the same time has what the system did meanwhile: its threads,
@@ -33,17 +29,15 @@ make their own. Nothing of a trace that names a program or a device is put on a 
   it as a separate process that listens on this machine only, and never bundle or download it. Each
   [Perfetto release](https://github.com/google/perfetto/releases) has a zip per system that holds it. The tools look for it in
   this order: `--trace-processor`, the environment variable `MB_TRACE_PROCESSOR`, `traceProcessorPath` in the configuration file
-  (`config --experimental --set-trace-processor <path>`, or the GUI's Settings page), the `PATH`, and the folder Perfetto's own
+  (`config --set-trace-processor <path>`, or the GUI's Settings page), the `PATH`, and the folder Perfetto's own
   Python package keeps the copy it downloaded in.
 
 ## On the command line
 
-Everything here needs `--experimental`, and is left out of `--help` without it.
-
 ```
-mb-framepacing --experimental trace-info run.pftrace
-mb-framepacing --experimental import recording.mkv --trace run.pftrace --analyze --charts
-mb-framepacing --experimental analyze <capture folder> --trace run.pftrace --charts
+mb-framepacing trace-info run.pftrace
+mb-framepacing import recording.mkv --trace run.pftrace --analyze --charts
+mb-framepacing analyze <capture folder> --trace run.pftrace --charts
 ```
 
 1. `trace-info` lists what a trace has to go by: how many slices of the frame record it has, its clocks, its vertical blank
@@ -65,7 +59,7 @@ mb-framepacing --experimental analyze <capture folder> --trace run.pftrace --cha
 | `--trace-processor <path>`       | The `trace_processor_shell` to read the trace with                                                                                |
 
 **Whether a trace exists.** An application that logs the frame record can say so in the run's start marker
-([its flags](../../sdk/doc/marker-fields.md#flags-frame-record-logged-experimental)). The analysis then notes with the run that
+([its flags](../../sdk/doc/marker-fields.md#flags-frame-record-logged)). The analysis then notes with the run that
 the application logged its frames to a trace, and, when no trace was joined, that one can be merged with the capture. It is the
 application's word: nothing is judged by it, and a trace is joined with or without it. A trace that is given and not joined with
 such a run gets a line more in its warning, asking whether it is the trace of that run.
@@ -88,8 +82,6 @@ file of its own has the record there, and nothing of the system in it. Both work
 
 ## In the GUI
 
-With **Settings → Experimental features** on:
-
 - The **Capture** page has a **Perfetto trace** card: the trace's file, and the application, picked from the trace's processes
   once the trace is read. The trace is stored with the capture.
 - The **Analyze** page shows the capture's trace in a row of its own, and the next **Analyze** joins what the row says: the
@@ -109,7 +101,7 @@ there keeps them when the GUI analyses it.
 
 ## What the analysis writes
 
-Next to the run's frames, in the capture's `analysis` folder. Both files are the tools' own and experimental: they are not part
+Next to the run's frames, in the capture's `analysis` folder. Both files are the tools' own: they are not part
 of [the analysis output format](../../sdk/doc/analysis-output-format.md).
 
 | File                         | What                                                                                 | Written                                                                        |
@@ -135,8 +127,8 @@ uploaded anywhere unless you click its Share link. It can not read a file on you
   Nothing else is served, and nothing after the trace was sent once (or after two minutes).
 
 ```
-mb-framepacing trace-open --experimental <capture folder>            # the run's augmented trace (--run <id> where there are several)
-mb-framepacing trace-open --experimental <capture folder> --no-browser   # print the link instead
+mb-framepacing trace-open <capture folder>                # the run's augmented trace (--run <id> where there are several)
+mb-framepacing trace-open <capture folder> --no-browser   # print the link instead
 ```
 
 Port 9001 is also where the viewer looks for a trace processor started with `--httpd` (Perfetto's native acceleration): close one
@@ -278,13 +270,10 @@ version, checked against its SHA-256, kept under your home folder); that downloa
 
 ## Limits
 
-- No recorded trace has been through it.
 - The vertical blank sources it finds are the kernel's vertical blank events and counters with `VSYNC` in their name. Which
   counter is the display's own is not something it knows: `trace-info` lists them and `--trace-vblanks` picks one.
 - That every track is read back whole is checked with the trace processor, on traces the tests make (one of them with the marks
-  of a recording written in pieces). The viewer uses the same reader, but nothing here has looked at a trace in the viewer.
-- The frame record has been read from traces the tests make only, as the rest has: one with sections on the application's
-  thread, one with slices on the record's own track.
+  of a recording written in pieces). The viewer uses the same reader.
 - The system's frames are matched to the capture's by time ([above](#the-frames-csv)): the frame record places the
   application's work, and the system's frame timeline has no id of ours.
 - The GUI has no field for a second trace of the application's own: it is the command line's.

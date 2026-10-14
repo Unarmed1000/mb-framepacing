@@ -47,7 +47,7 @@ This is the most efficient way without a dedicated shader; the shaders (1 and 2 
 - **Frame index:** the frame's own index, the same for every refresh the frame stays on screen.
 - **Flags:** `MarkerFlags.NoFlags`, or `MarkerFlags.StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags.StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame). On a start marker,
-  `MarkerFlags.FrameRecordLogged` (experimental) when the application logs the run's
+  `MarkerFlags.FrameRecordLogged` when the application logs the run's
   [frame record](../../doc/trace-frame-record.md) to a trace: only you can say so, it is off unless set.
 - **Animation time:** the moment the frame shows, as the application animated it, a `NanosecondTimeSpan`
   (`NanosecondTimeSpan.FromSeconds(seconds)` from an animation clock in seconds). Every time in the payload is in nanoseconds.

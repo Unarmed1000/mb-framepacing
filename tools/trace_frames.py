@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""EXPERIMENTAL (measure/doc/perfetto.md). What a Perfetto trace says of each presented frame of a capture: the join behind
+"""What a Perfetto trace says of each presented frame of a capture: the join behind
 trace_augment.py --frames, with nothing of Perfetto in it (trace_source.py reads the trace).
 
 A line per presented frame, in display order. Every time is whole nanoseconds on the trace's clock, and a cell is empty where

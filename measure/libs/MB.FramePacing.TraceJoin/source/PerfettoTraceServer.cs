@@ -20,7 +20,7 @@ using System.Threading.Tasks;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. One trace file served once to ui.perfetto.dev from 127.0.0.1.</summary>
+  /// <summary>One trace file served once to ui.perfetto.dev from 127.0.0.1.</summary>
   public sealed class PerfettoTraceServer : IDisposable
   {
     // The most a request's line and headers may be: a browser's are a few hundred bytes

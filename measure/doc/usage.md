@@ -374,6 +374,14 @@ output. Reports then show the name in the title and the sequence id below it.
 
 or use **Browse...**, **Target fps** and **Analyze** on the Analyze page.
 
+## 5. A Perfetto trace of the run
+
+When the application records a Perfetto trace of the run and logs the SDK's frame record into it, give the trace with the
+recording: `import recording.mkv --trace run.pftrace --analyze --charts`, or pick it in the Capture page's **Perfetto trace**
+card. The analysis says what the trace says of each frame, and the charts come with the trace that has the capture's measurements
+as tracks; the report card links it, and **Open in Perfetto** (`trace-open`) opens it in Perfetto's viewer.
+[A capture and a Perfetto trace](perfetto.md) has what it needs and what it writes.
+
 ## Troubleshooting
 
 | Symptom                                          | What to do                                                                                                                                                                                                                                                  |

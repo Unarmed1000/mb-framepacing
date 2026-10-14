@@ -16,7 +16,7 @@ using System.Text;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The rows a query to the trace processor gave: whole numbers, numbers, texts and empty cells.</summary>
+  /// <summary>The rows a query to the trace processor gave: whole numbers, numbers, texts and empty cells.</summary>
   public sealed class TraceQueryResult
   {
     // Perfetto's field numbers (protos/perfetto/trace_processor/trace_processor.proto: QueryResult, QueryResult.CellsBatch)

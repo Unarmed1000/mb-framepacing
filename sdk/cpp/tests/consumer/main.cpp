@@ -4,7 +4,7 @@
 // The smallest program using mb_framepacing's modules: encode the frame marker of one frame at 60 fps and draw it as a triangle
 // list (marker), read a summary's capture period (data), and print what came out with the library version (core). With
 // MB_CONSUMER_PACER it also paces a frame with the experimental pacer module and fills the frame's marker from it, and with
-// MB_CONSUMER_TRACE it makes the record of a frame's marker with the experimental trace module and prints the record's name.
+// MB_CONSUMER_TRACE it makes the record of a frame's marker with the trace module and prints the record's name.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
@@ -87,7 +87,7 @@ namespace
 #ifdef MB_CONSUMER_TRACE
 namespace
 {
-  // The experimental trace module: the record of a frame, made from the payload its marker is drawn from. An application writes it
+  // The trace module: the record of a frame, made from the payload its marker is drawn from. An application writes it
   // to its own trace as a slice, with whatever it traces with; here it is printed
   bool RecordOneFrame(const uint64_t frameIndex)
   {
@@ -106,7 +106,7 @@ namespace
                               FP::NanosecondTimeDuration::FromNanoseconds(4'000'000)};
     TR::FrameRecord record;
     const bool created = TR::FrameRecordUtil::TryCreate(payload, record);
-    std::printf("the trace module (experimental): a slice '%s' in the category %s, %lld ns long, with %zu annotations\n", record.Name.CStr(),
+    std::printf("the trace module: a slice '%s' in the category %s, %lld ns long, with %zu annotations\n", record.Name.CStr(),
                 TR::FrameRecordText::Category.data(), static_cast<long long>(record.Duration.Nanoseconds()), record.Annotations().size());
     return created && record.Name.View() == "mbfp frame 1 60" && record.StartTime == payload.CpuStartTime() &&
            record.Duration.Nanoseconds() == 4'000'000 && record.Annotations().size() == 3u;

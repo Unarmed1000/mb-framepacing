@@ -13,7 +13,7 @@ using System.Collections.Generic;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The names and descriptions of the <see cref="TraceTrack"/>s.</summary>
+  /// <summary>The names and descriptions of the <see cref="TraceTrack"/>s.</summary>
   public static class TraceTrackText
   {
     /// <summary>Every track, in the order they are shown.</summary>

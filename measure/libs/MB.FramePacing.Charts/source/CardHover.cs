@@ -110,7 +110,7 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>
-    /// EXPERIMENTAL: what a Perfetto trace of the run says of the frame, a line for each thing it says. Values and the system's own words
+    /// What a Perfetto trace of the run says of the frame, a line for each thing it says. Values and the system's own words
     /// only: nothing that names a program or a device.
     /// </summary>
     private static void DescribeTrace(List<string> lines, TraceFrame trace)

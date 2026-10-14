@@ -17,7 +17,7 @@ using MB.FramePacing.Data;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Joins a run's frames with what a trace has: vertical blanks, the system's frame timeline, a thread's scheduling.</summary>
+  /// <summary>Joins a run's frames with what a trace has: vertical blanks, the system's frame timeline, a thread's scheduling.</summary>
   public static class TraceJoin
   {
     /// <summary>How many of the application's frames that began before a moment are looked at for the one the moment lies in.</summary>

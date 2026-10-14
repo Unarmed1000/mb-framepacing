@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL: an analysis that joins the capture with a Perfetto trace of the run. The SDK's golden capture analysed with the stored
+//* An analysis that joins the capture with a Perfetto trace of the run. The SDK's golden capture analysed with the stored
 //* trace that was made to fit it (measure/test-data/trace) writes, byte for byte, the per-frame CSV tools/trace_augment.py wrote; without
 //* a trace the analysis output is what it is without the feature; and what does not fit is a warning, but for a trace the analysis itself
 //* was given.

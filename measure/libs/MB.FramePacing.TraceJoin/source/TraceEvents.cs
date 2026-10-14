@@ -19,7 +19,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A run's frames and its capture's rows as the events of each <see cref="TraceTrack"/>.</summary>
+  /// <summary>A run's frames and its capture's rows as the events of each <see cref="TraceTrack"/>.</summary>
   public static class TraceEvents
   {
     private const double NanosecondsPerMillisecond = 1_000_000.0;

@@ -6,7 +6,7 @@
 //*   captures.csv                - one row per capture index
 //*   run-<id>[-<n>]-frames.csv   - one row per presented application frame
 //*   summary.json                - everything else (layout, counts, statistics, histograms, warnings)
-//* EXPERIMENTAL: with a Perfetto trace of the run (measure/doc/perfetto.md), also what the trace says of each presented frame:
+//* With a Perfetto trace of the run (measure/doc/perfetto.md), also what the trace says of each presented frame:
 //*   run-<id>[-<n>]-trace.csv    - one row per presented application frame (the tools' own file, not part of the analysis output format)
 //*   run-<id>[-<n>]-trace-check.txt - how well the markers and the trace line up, as numbers
 //*
@@ -101,7 +101,7 @@ namespace MB.FramePacing.Analysis
     }
 
     /// <summary>
-    /// EXPERIMENTAL: the Perfetto trace an analysis of <paramref name="captureDirectory"/> with <paramref name="options"/> joins the capture
+    /// The Perfetto trace an analysis of <paramref name="captureDirectory"/> with <paramref name="options"/> joins the capture
     /// with: the options', else the one capture.json names; null when there is none or the options say to join none.
     /// </summary>
     public static TraceJoinOptions? TraceOf(string captureDirectory, AnalysisOptions options) =>
@@ -111,7 +111,7 @@ namespace MB.FramePacing.Analysis
       options.NoTrace ? null : options.Trace ?? session?.Trace;
 
     /// <summary>
-    /// EXPERIMENTAL (measure/doc/perfetto.md): each run joined with the capture's Perfetto trace, by the frame record the application
+    /// Each run joined with the capture's Perfetto trace, by the frame record the application
     /// logged (sdk/doc/trace-frame-record.md), and its markers held against that record. With only a trace of the application's own
     /// nothing is joined, and the markers are held against its record. Each trace is read once. What does not fit is a warning and
     /// the run has no join, but for a trace the options themselves name: that one not being readable stops the analysis.
@@ -135,9 +135,7 @@ namespace MB.FramePacing.Analysis
       string traceName = Path.GetFileName(hasTrace ? trace.Path : trace.AppTracePath!);
       if (options.TraceProcessorPath is not { } processor)
       {
-        warnings.Add(
-          $"The Perfetto trace '{traceName}' was not read: Perfetto's trace processor was not found (experimental; see measure/doc/perfetto.md)."
-        );
+        warnings.Add($"The Perfetto trace '{traceName}' was not read: Perfetto's trace processor was not found (see measure/doc/perfetto.md).");
         return none;
       }
 
@@ -197,7 +195,7 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>What an analysis that joined a Perfetto trace says of it: the feature is experimental, and what its times rest on.</summary>
     public const string TraceNotice =
-      "A Perfetto trace was joined (experimental): its times and the capture's are tied by the frames only, so a delay the whole run shares "
+      "A Perfetto trace was joined: its times and the capture's are tied by the frames only, so a delay the whole run shares "
       + "is not in what the trace says of a frame.";
 
     /// <summary>

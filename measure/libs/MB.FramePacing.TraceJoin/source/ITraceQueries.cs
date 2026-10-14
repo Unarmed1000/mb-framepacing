@@ -9,7 +9,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Answers SQL about one trace.</summary>
+  /// <summary>Answers SQL about one trace.</summary>
   public interface ITraceQueries
   {
     /// <summary>The rows of <paramref name="sql"/>. A query that is refused is a <see cref="TraceException"/>.</summary>

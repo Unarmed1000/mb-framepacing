@@ -83,7 +83,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
-    /// EXPERIMENTAL. A start marker's frame record flag is the application's word that it logged the run's frames to a trace: the run
+    /// A start marker's frame record flag is the application's word that it logged the run's frames to a trace: the run
     /// carries it and the analysis notes it. On a frame marker the bit says nothing.
     /// </summary>
     [Test]

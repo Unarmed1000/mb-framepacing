@@ -23,7 +23,7 @@ using System.Linq;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Checks how a run's markers and a trace line up.</summary>
+  /// <summary>Checks how a run's markers and a trace line up.</summary>
   public static class TraceLineUpCheck
   {
     /// <summary>

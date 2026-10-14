@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). What an application logs to its trace for one frame: a slice named for
+//* What an application logs to its trace for one frame: a slice named for
 //* the frame's marker, from the marker's CPU start time for its CPU busy time, with the marker's other times as annotations. TryCreate
 //* works it out from the payload the frame's marker is drawn from, so the record and the marker can not disagree; the application gives
 //* the values to whatever it traces with. Nothing here writes a trace, reads a clock or allocates (but Name, which makes a string).
@@ -19,7 +19,7 @@ using MB.FramePacing.Marker;
 
 namespace MB.FramePacing.Trace
 {
-  /// <summary>Experimental. What to log to a trace for one frame.</summary>
+  /// <summary>What to log to a trace for one frame.</summary>
   public readonly struct FrameRecord : IEquatable<FrameRecord>
   {
     /// <summary>The most annotations a record has.</summary>

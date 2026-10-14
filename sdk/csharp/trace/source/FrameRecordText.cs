@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). The strings of the frame record: the slice an application logs to a
+//* The strings of the frame record: the slice an application logs to a
 //* trace for each frame, so that a trace and a capture of the same run can be merged. The document is the reference; the C++ module has
 //* the same strings under the same names.
 //*
@@ -11,7 +11,7 @@
 
 namespace MB.FramePacing.Trace
 {
-  /// <summary>Experimental. The strings of the frame record.</summary>
+  /// <summary>The strings of the frame record.</summary>
   public static class FrameRecordText
   {
     /// <summary>The category the slices are logged in.</summary>

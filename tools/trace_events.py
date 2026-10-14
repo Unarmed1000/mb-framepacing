@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
-"""EXPERIMENTAL (measure/doc/perfetto.md). A capture's measurements as the tracks of a trace: what trace_augment.py adds to a
+"""A capture's measurements as the tracks of a trace: what trace_augment.py adds to a
 Perfetto trace, as plain values with nothing of Perfetto in it (trace_tracks.py writes them).
 
 A track is a line of the trace viewer. Each holds one kind of thing, in time order, and none of its slices overlap:

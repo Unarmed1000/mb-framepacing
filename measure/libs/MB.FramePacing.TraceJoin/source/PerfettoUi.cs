@@ -17,7 +17,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The link that opens a trace served from this machine in ui.perfetto.dev.</summary>
+  /// <summary>The link that opens a trace served from this machine in ui.perfetto.dev.</summary>
   public static class PerfettoUi
   {
     /// <summary>The viewer's origin: what a server of the trace allows to read it.</summary>

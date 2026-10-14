@@ -16,7 +16,7 @@ using System.Globalization;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. How a run's markers and a trace line up, as numbers.</summary>
+  /// <summary>How a run's markers and a trace line up, as numbers.</summary>
   /// <param name="ScheduledFrames">Frames the trace has the thread's scheduling for, over their markers' CPU busy time.</param>
   /// <param name="BusyNs">Those frames' CPU busy time by their markers, in all.</param>
   /// <param name="AwakeNs">Of it, how long the thread was running or waiting for a CPU.</param>
@@ -48,10 +48,7 @@ namespace MB.FramePacing.TraceJoin
     /// <summary>The numbers in words, a line for each part the trace had what it needs for; a first line says what they are.</summary>
     public IReadOnlyList<string> Lines()
     {
-      var lines = new List<string>
-      {
-        "Do the markers and the trace line up (experimental; numbers only, and none of them shows a delay the whole run shares):",
-      };
+      var lines = new List<string> { "Do the markers and the trace line up (numbers only, and none of them shows a delay the whole run shares):" };
       if (ScheduledFrames > 0)
         lines.Add(
           $"  CPU busy against the thread's scheduling, {Count(ScheduledFrames)} frames: the thread was running or waiting for a CPU for "

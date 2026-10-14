@@ -140,7 +140,7 @@ namespace MB.FramePacing.Charts
                 : "."
             )
         );
-      // Experimental: a Perfetto trace of the run was joined. What it has for these frames, and what its times rest on
+      // A Perfetto trace of the run was joined. What it has for these frames, and what its times rest on
       string? augmentedLine = null;
       if (section.Data.TraceFrames is { } trace)
       {
@@ -1397,7 +1397,7 @@ namespace MB.FramePacing.Charts
       (section.Data.TimeAt(section.FromSeconds), section.Data.TimeAt(section.ToSeconds) + section.Data.Run.CapturePeriod);
 
     /// <summary>
-    /// EXPERIMENTAL: the description's lines for a run that was joined with a Perfetto trace: that it was, what the trace's times rest on,
+    /// The description's lines for a run that was joined with a Perfetto trace: that it was, what the trace's times rest on,
     /// and for how many of the frames from <paramref name="start"/> up to <paramref name="end"/> the trace has each thing. Counts only:
     /// nothing of the trace that names a program or a device.
     /// </summary>
@@ -1413,7 +1413,7 @@ namespace MB.FramePacing.Charts
         vblank += trace[i].VBlankTraceNs != null ? 1 : 0;
       }
       string Count(int count) => count.ToString("N0", CultureInfo.InvariantCulture);
-      yield return "A Perfetto trace of the run was joined (experimental): its times are tied to the capture's by the frames only.";
+      yield return "A Perfetto trace of the run was joined: its times are tied to the capture's by the frames only.";
       yield return $"Of these {Count(end - start)} frames the trace has the system's own account of {Count(account)}, its thread's scheduling "
         + $"for {Count(scheduling)} and a vertical blank for {Count(vblank)}.";
     }

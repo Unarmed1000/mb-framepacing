@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (measure/doc/perfetto.md). The Perfetto trace a capture is joined with, and how: the trace's file, and what of it to
+//* The Perfetto trace a capture is joined with, and how: the trace's file, and what of it to
 //* read. A capture keeps it in capture.json ("trace"), so a later analysis joins the same trace again. MB.FramePacing.TraceJoin does
 //* the join, by the frame record the application logged into the trace (sdk/doc/trace-frame-record.md).
 //*
@@ -11,7 +11,7 @@
 
 namespace MB.FramePacing.Capture
 {
-  /// <summary>Experimental. A Perfetto trace of a capture's run, and the options of the join.</summary>
+  /// <summary>A Perfetto trace of a capture's run, and the options of the join.</summary>
   public sealed record TraceJoinOptions
   {
     /// <summary>

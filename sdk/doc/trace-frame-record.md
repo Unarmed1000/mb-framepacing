@@ -1,7 +1,4 @@
-# The frame record: what an application logs to a trace (experimental)
-
-> **Experimental.** The record, the trace module that defines it and the tools that read it are checked against traces their own
-> tests make. **No recorded trace has been through them yet.** The strings and the module's API may change in any release.
+# The frame record: what an application logs to a trace
 
 A capture card recording says when each frame was on screen. A [Perfetto](https://perfetto.dev) trace of the same run says what
 the application and the system did meanwhile. The tools merge the two ([the tools' guide](../../measure/doc/perfetto.md)), and
@@ -51,8 +48,8 @@ report how close.
 ## The trace module
 
 `mb_framepacing::trace` (C++, `MB::FramePacing::Trace`) and `MB.FramePacing.Trace` (C#). It links the marker module, has no
-other dependency, reads no clock, calls no tracing API and allocates nothing. Off by default in C++
-(`-DMB_FRAMEPACING_BUILD_TRACE=ON`, Conan's `with_trace`), as every experimental module is.
+other dependency, reads no clock, calls no tracing API and allocates nothing. On by default in C++
+(`-DMB_FRAMEPACING_BUILD_TRACE=OFF` leaves it out, as Conan's `with_trace=False` does).
 
 | C++                             | C#                         | What                                                                                              |
 | ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |

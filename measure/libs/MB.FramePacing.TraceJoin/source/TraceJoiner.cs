@@ -18,7 +18,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Joins a run with a trace.</summary>
+  /// <summary>Joins a run with a trace.</summary>
   public static class TraceJoiner
   {
     /// <summary>

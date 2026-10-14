@@ -45,8 +45,8 @@ option(MB_FRAMEPACING_BUILD_MARKER "Build the marker module (mb_framepacing::mar
 option(MB_FRAMEPACING_BUILD_DATA "Build the data module (mb_framepacing::data; needs the marker module, fetches nlohmann/json unless one is installed)" ON)
 # The pacer is experimental (sdk/doc/pacer.md: no capture of it has been analysed with the tools), so nobody gets it without asking for it
 option(MB_FRAMEPACING_BUILD_PACER "Build the pacer module (mb_framepacing::pacer); EXPERIMENTAL, its API may change in any release" OFF)
-# The trace module is experimental too (sdk/doc/trace-frame-record.md: no recorded trace has been through the tools that read its record)
-option(MB_FRAMEPACING_BUILD_TRACE "Build the trace module (mb_framepacing::trace; needs the marker module); EXPERIMENTAL, its API may change in any release" OFF)
+# The trace module: the frame record an application logs to its own trace (sdk/doc/trace-frame-record.md)
+option(MB_FRAMEPACING_BUILD_TRACE "Build the trace module (mb_framepacing::trace; needs the marker module)" ON)
 option(MB_FRAMEPACING_BUILD_TESTS "Build the unit tests (fetches GoogleTest unless one is installed)" ${PROJECT_IS_TOP_LEVEL})
 option(MB_FRAMEPACING_BUILD_TOOLS "Build the tools (marker-render)" ${PROJECT_IS_TOP_LEVEL})
 # An application that builds the library inside its own project installs its own files, not the library's

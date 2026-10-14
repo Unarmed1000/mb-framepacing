@@ -24,7 +24,7 @@ using NLog;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A running trace processor with one trace loaded. Dispose it: it holds a process.</summary>
+  /// <summary>A running trace processor with one trace loaded. Dispose it: it holds a process.</summary>
   public sealed class TraceProcessor : ITraceQueries, IDisposable
   {
     /// <summary>How long a trace may take to load before the start counts as failed.</summary>

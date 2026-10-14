@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). One annotation of a frame's slice: its name and its value.
+//* One annotation of a frame's slice: its name and its value.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: BSD-3-Clause
@@ -11,7 +11,7 @@ using System;
 
 namespace MB.FramePacing.Trace
 {
-  /// <summary>Experimental. One annotation of a frame's slice.</summary>
+  /// <summary>One annotation of a frame's slice.</summary>
   public readonly struct FrameRecordAnnotation : IEquatable<FrameRecordAnnotation>
   {
     public FrameRecordAnnotation(string name, long value)

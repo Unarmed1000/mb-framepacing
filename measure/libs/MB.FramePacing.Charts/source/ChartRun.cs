@@ -27,7 +27,7 @@ namespace MB.FramePacing.Charts
     public IReadOnlyList<CaptureCsvRow>? Captures { get; init; }
 
     /// <summary>
-    /// EXPERIMENTAL: what a Perfetto trace of the run says of each frame (run-&lt;id&gt;-trace.csv), a row per frame of <see cref="Run"/> in
+    /// What a Perfetto trace of the run says of each frame (run-&lt;id&gt;-trace.csv), a row per frame of <see cref="Run"/> in
     /// its order. Null when the analysis joined no trace with the run.
     /// </summary>
     public IReadOnlyList<TraceFrame>? Trace { get; init; }

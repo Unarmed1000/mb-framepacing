@@ -1,10 +1,10 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (measure/doc/perfetto.md): the Perfetto trace of a run, on the Capture page (stored with the capture) and on the Analyze
-//* page (the capture's own, or another for the next Analyze): the trace's file and which of its processes is the application. Once a
-//* trace is picked its processes are listed, those the system's frame timeline has frames of first. Shown only with the experimental
-//* features; the join's other options are the command line's.
+//* The Perfetto trace of a run (measure/doc/perfetto.md), on the Capture page (stored with the capture) and on the Analyze page (the
+//* capture's own, or another for the next Analyze): the trace's file and which of its processes is the application. Once a trace is
+//* picked its processes are listed, those the system's frame timeline has frames of first. The join's other options are the command
+//* line's.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -26,9 +26,8 @@ namespace MB.FramePacing.Gui.ViewModels
 {
   public sealed partial class TraceViewModel : ObservableObject
   {
-    public const string ExperimentalText =
-      "EXPERIMENTAL: checked against traces its own tests make only; no recorded trace has been through it yet. A trace names the device "
-      + "and its programs: what is written with it is as private as the recording.";
+    /// <summary>What a trace is: shown where one is picked.</summary>
+    public const string PrivacyText = "A trace names the device and its programs: what is written with it is as private as the recording.";
 
     private static readonly Logger g_logger = LogManager.GetCurrentClassLogger();
 

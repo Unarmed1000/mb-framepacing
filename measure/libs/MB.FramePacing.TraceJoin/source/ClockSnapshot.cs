@@ -9,6 +9,6 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. One moment on the trace's clock and on a system clock, in whole nanoseconds.</summary>
+  /// <summary>One moment on the trace's clock and on a system clock, in whole nanoseconds.</summary>
   public readonly record struct ClockSnapshot(long TraceNs, long ClockNs);
 }

@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL 'trace-info' (measure/doc/perfetto.md): what a Perfetto trace has to go by, for picking the options --trace takes: its
+//* 'trace-info' (measure/doc/perfetto.md): what a Perfetto trace has to go by, for picking the options --trace takes: its
 //* clocks, its vertical blank sources, its processes, their layers in the frame timeline and their threads.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -34,7 +34,7 @@ namespace MB.FramePacing.App.Commands
       var processorOption = TraceInput.ProcessorOption();
       var command = new Command(
         "trace-info",
-        "(experimental) List what a Perfetto trace has to go by: its clocks, vertical blank sources, processes, frame timeline layers and "
+        "List what a Perfetto trace has to go by: its clocks, vertical blank sources, processes, frame timeline layers and "
           + "threads, and whether it has the frame record the application logs (without which a trace is not joined)."
       )
       {

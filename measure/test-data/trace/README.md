@@ -1,4 +1,4 @@
-# Test data: a capture and a Perfetto trace (experimental)
+# Test data: a capture and a Perfetto trace
 
 **Nothing here was recorded.** The traces are made up in every value by `tools/tests/synthetic_trace.py` to fit the SDK's
 golden capture (`sdk/test-data/data/60-busy-full-rate`): a process named `com.example.game`, no device. A recorded trace names

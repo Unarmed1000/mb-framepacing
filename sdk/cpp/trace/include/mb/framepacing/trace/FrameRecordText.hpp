@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <string_view>
 
-//! EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). The strings of the frame record, the slice an application logs
+//! The strings of the frame record, the slice an application logs
 //! to its trace for every frame: the category, the name of the track, the start of a slice's name and the names of the
 //! annotations. The tools find the record by these strings, so an application logs them as they are. Every text is a string
 //! literal: it is there for the life of the program, nothing is allocated, and its data() ends with a zero, so it can be given to

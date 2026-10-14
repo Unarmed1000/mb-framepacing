@@ -83,7 +83,7 @@ namespace MB.FramePacing.Marker
 
     /// <summary>
     /// <see cref="MarkerFlags.StaticAfter"/> when nothing animates while this frame is on screen, <see cref="MarkerFlags.StaticBefore"/> when
-    /// nothing animated while the frame before it was; on a start marker <see cref="MarkerFlags.FrameRecordLogged"/> (experimental) when the
+    /// nothing animated while the frame before it was; on a start marker <see cref="MarkerFlags.FrameRecordLogged"/> when the
     /// application logs the run's frame record to its trace; the other bits are reserved (write 0, a decoded payload keeps them).
     /// </summary>
     public readonly MarkerFlags Flags;

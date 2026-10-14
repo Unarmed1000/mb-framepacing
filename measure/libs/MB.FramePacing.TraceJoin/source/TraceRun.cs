@@ -15,7 +15,7 @@ using MB.FramePacing.Data;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A run of a capture, as a join reads it.</summary>
+  /// <summary>A run of a capture, as a join reads it.</summary>
   /// <param name="PeriodNs">The display's refresh period, in whole nanoseconds.</param>
   public sealed record TraceRun(string Name, string Key, IReadOnlyList<FrameRow> Frames, IReadOnlyList<CaptureCsvRow> Captures, long PeriodNs)
   {

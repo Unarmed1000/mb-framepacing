@@ -73,14 +73,14 @@
           </StackPanel>
         </Border>
 
-        <!-- EXPERIMENTAL: a Perfetto trace of the run, joined with the capture (only with the experimental features on) -->
-        <Border Classes="card" IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
+        <!-- A Perfetto trace of the run, joined with the capture -->
+        <Border Classes="card" IsEnabled="{Binding IsIdle}">
           <Expander HorizontalAlignment="Stretch">
             <Expander.Header>
-              <TextBlock Classes="cardTitle" Text="Perfetto trace (experimental)" />
+              <TextBlock Classes="cardTitle" Text="Perfetto trace" />
             </Expander.Header>
             <StackPanel Spacing="8" DataContext="{Binding Trace}">
-              <TextBlock Classes="warning" Text="{x:Static vm:TraceViewModel.ExperimentalText}" TextWrapping="Wrap" />
+              <TextBlock Classes="warning" Text="{x:Static vm:TraceViewModel.PrivacyText}" TextWrapping="Wrap" />
               <TextBlock
                 Classes="caption"
                 TextWrapping="Wrap"

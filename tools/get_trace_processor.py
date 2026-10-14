@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
-"""EXPERIMENTAL (measure/doc/perfetto.md). Print the path of Perfetto's trace processor (trace_processor_shell), fetching it
+"""Print the path of Perfetto's trace processor (trace_processor_shell), fetching it
 first when it is not on this machine yet: the copy Perfetto's own Python package is pinned to, downloaded by that package,
 checked against its SHA-256 and kept under the user's home folder.
 

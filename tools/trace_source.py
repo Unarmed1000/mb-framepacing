@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
-"""EXPERIMENTAL (measure/doc/perfetto.md). Reads what trace_augment.py needs of a Perfetto trace, with Perfetto's own Python
+"""Reads what trace_augment.py needs of a Perfetto trace, with Perfetto's own Python
 package: the trace's clocks, the frame record the application logged, its processes, the display's vertical blanks, the
 system's frame timeline and a thread's scheduling states.
 

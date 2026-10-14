@@ -64,15 +64,15 @@
             ToolTip.Tip="Scale the Timeline's display time step and frametime panels to the frames that animate: static holds, frametimes, CPU busy and aims beyond it (an idle wait) stop at the edge with their value. Save view and Save charts follow it."
           />
         </Grid>
-        <!-- EXPERIMENTAL: a Perfetto trace of the run, joined at the next Analyze (only with the experimental features on) -->
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}" IsVisible="{Binding ExperimentalFeatures}">
+        <!-- A Perfetto trace of the run, joined at the next Analyze -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsEnabled="{Binding IsIdle}">
           <Grid
             ColumnDefinitions="Auto,*,Auto,Auto,300"
             ColumnSpacing="8"
             DataContext="{Binding Trace}"
-            ToolTip.Tip="{x:Static vm:TraceViewModel.ExperimentalText}"
+            ToolTip.Tip="{x:Static vm:TraceViewModel.PrivacyText}"
           >
-            <TextBlock Classes="subtle" Text="Perfetto trace (experimental)" VerticalAlignment="Center" />
+            <TextBlock Classes="subtle" Text="Perfetto trace" VerticalAlignment="Center" />
             <TextBox
               Grid.Column="1"
               Text="{Binding TracePath}"
@@ -95,7 +95,7 @@
           <Border
             Grid.Column="1"
             Background="Transparent"
-            ToolTip.Tip="Open the selected run's augmented trace in Perfetto's viewer at ui.perfetto.dev (experimental), at the run with the capture's tracks pinned. The trace is served once from 127.0.0.1:9001; the viewer runs in the browser and does not upload it. For a run that was joined with a trace."
+            ToolTip.Tip="Open the selected run's augmented trace in Perfetto's viewer at ui.perfetto.dev, at the run with the capture's tracks pinned. The trace is served once from 127.0.0.1:9001; the viewer runs in the browser and does not upload it. For a run that was joined with a trace."
           >
             <Button Content="Open in Perfetto" Command="{Binding OpenInPerfettoCommand}" />
           </Border>

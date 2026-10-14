@@ -11,7 +11,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Where a capture's times are on the system clock an application's clock is, in whole nanoseconds.</summary>
+  /// <summary>Where a capture's times are on the system clock an application's clock is, in whole nanoseconds.</summary>
   public sealed record TraceAlignment(TraceAnchor Anchor, long CaptureMinusAppNs, long AppClockOffsetNs = 0, long VBlankShiftNs = 0)
   {
     /// <summary>A time the markers carry (CPU start, intended display), on the system clock.</summary>

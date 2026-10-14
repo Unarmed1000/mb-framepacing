@@ -6,7 +6,7 @@
 #   MB_CONSUMER_MODE=subdirectory  add_subdirectory(MB_FRAMEPACING_SOURCE_DIR)
 #   MB_CONSUMER_MODE=package       find_package with the components it uses, after cmake --install (CMAKE_PREFIX_PATH)
 #   MB_CONSUMER_PACER=ON           also uses the experimental pacer module, which is off unless the application asks for it
-#   MB_CONSUMER_TRACE=ON           also uses the experimental trace module, which is off unless the application asks for it
+#   MB_CONSUMER_TRACE=ON           also uses the trace module
 cmake_minimum_required(VERSION 4.0)
 project(mb_framepacing_consumer LANGUAGES CXX)
 
@@ -16,7 +16,7 @@ set(MB_FRAMEPACING_URL "https://github.com/Unarmed1000/mb-framepacing/releases/d
 set(MB_FRAMEPACING_SHA256 "0000000000000000000000000000000000000000000000000000000000000000" CACHE STRING "")
 set(MB_FRAMEPACING_SOURCE_DIR "" CACHE PATH "Source tree for the subdirectory mode")
 option(MB_CONSUMER_PACER "Also use the experimental pacer module (mb_framepacing::pacer)" OFF)
-option(MB_CONSUMER_TRACE "Also use the experimental trace module (mb_framepacing::trace)" OFF)
+option(MB_CONSUMER_TRACE "Also use the trace module (mb_framepacing::trace)" OFF)
 
 set(MB_CONSUMER_COMPONENTS marker data)
 if(MB_CONSUMER_PACER)
@@ -26,7 +26,7 @@ if(MB_CONSUMER_PACER)
 endif()
 if(MB_CONSUMER_TRACE)
   list(APPEND MB_CONSUMER_COMPONENTS trace)
-  # The trace module is switched on the same way
+  # The trace module is on by default; said all the same, as an application that needs it would
   set(MB_FRAMEPACING_BUILD_TRACE ON)
 endif()
 

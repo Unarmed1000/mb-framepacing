@@ -10,7 +10,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A frame of the application in a trace's frame timeline, with what the system says of it.</summary>
+  /// <summary>A frame of the application in a trace's frame timeline, with what the system says of it.</summary>
   public sealed record SurfaceFrame(
     long StartNs,
     long EndNs,

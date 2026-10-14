@@ -9,7 +9,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The kind of value a <see cref="TraceArgument"/> holds.</summary>
+  /// <summary>The kind of value a <see cref="TraceArgument"/> holds.</summary>
   public enum TraceArgumentKind
   {
     Whole,

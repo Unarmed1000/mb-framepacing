@@ -24,7 +24,7 @@ namespace MB.FramePacing.Analysis
   )
   {
     /// <summary>
-    /// EXPERIMENTAL: each run joined with the capture's Perfetto trace, in the order of the timeline's runs; null for a run that was not
+    /// Each run joined with the capture's Perfetto trace, in the order of the timeline's runs; null for a run that was not
     /// joined. Empty when no trace was joined at all.
     /// </summary>
     public IReadOnlyList<TraceRunJoin?> TraceJoins { get; init; } = Array.Empty<TraceRunJoin?>();
@@ -33,14 +33,14 @@ namespace MB.FramePacing.Analysis
     public TraceRunJoin? TraceJoinOf(int runIndex) => runIndex < TraceJoins.Count ? TraceJoins[runIndex] : null;
 
     /// <summary>
-    /// EXPERIMENTAL: each run's markers held against the frame record the application logged into a trace (slices named
+    /// Each run's markers held against the frame record the application logged into a trace (slices named
     /// "mbfp frame &lt;run id&gt; &lt;frame index&gt;"), in the order of the timeline's runs; null for a run without one. Empty when no
     /// trace was read.
     /// </summary>
     public IReadOnlyList<FrameRecordCheck?> TraceRecordChecks { get; init; } = Array.Empty<FrameRecordCheck?>();
 
     /// <summary>
-    /// EXPERIMENTAL: what the traces say of the run at <paramref name="runIndex"/>, as lines of numbers: how well its markers and the
+    /// What the traces say of the run at <paramref name="runIndex"/>, as lines of numbers: how well its markers and the
     /// joined trace line up, or, without a join, its markers against the application's frame record. Null when there is neither.
     /// </summary>
     public IReadOnlyList<string>? TraceCheckLines(int runIndex)
@@ -48,7 +48,7 @@ namespace MB.FramePacing.Analysis
       if (TraceJoinOf(runIndex)?.LineUp is { } lineUp)
         return lineUp.Lines();
       if (runIndex < TraceRecordChecks.Count && TraceRecordChecks[runIndex] is { } record)
-        return new[] { "The frame record of the application's own trace (experimental; numbers only, and nothing is joined):", record.Line() };
+        return new[] { "The frame record of the application's own trace (numbers only, and nothing is joined):", record.Line() };
       return null;
     }
 

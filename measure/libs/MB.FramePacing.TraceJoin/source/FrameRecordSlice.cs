@@ -19,7 +19,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A frame record read from a trace, with its marker's run id and frame index.</summary>
+  /// <summary>A frame record read from a trace, with its marker's run id and frame index.</summary>
   /// <param name="StartNs">The slice's start: the marker's CPU start time, on the record's clock.</param>
   /// <param name="EndNs">Its end: the start plus the marker's CPU busy time.</param>
   public readonly record struct FrameRecordSlice(uint RunId, ulong FrameIndex, long StartNs, long EndNs)

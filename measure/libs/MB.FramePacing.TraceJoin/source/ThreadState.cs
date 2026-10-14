@@ -10,6 +10,6 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A stretch of a thread's time in one scheduling state.</summary>
+  /// <summary>A stretch of a thread's time in one scheduling state.</summary>
   public readonly record struct ThreadState(long StartNs, long EndNs, string State);
 }

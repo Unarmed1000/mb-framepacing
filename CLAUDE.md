@@ -15,7 +15,7 @@ The repository has two parts, and the license follows them (see Conventions):
     frame its waits, its start time, its swap interval, its animation time, how to present it and the marker's pacing values, holds
     a target frame rate, and adapts the swap interval (the full-window rule of mb-framepacing-explained's simulation, and its fix
     as the default); it counts what the display did from the display times the platform reports (statistics only);
-  - **trace** (C++ `MB::FramePacing::Trace` and C# `MB.FramePacing.Trace`; **experimental**, off by default in C++): the **frame
+  - **trace** (C++ `MB::FramePacing::Trace` and C# `MB.FramePacing.Trace`; on by default in C++): the **frame
     record**, the slice an application logs to its own Perfetto trace for every frame so that the tools can merge a trace of a
     run with a capture of it (`sdk/doc/trace-frame-record.md` is the reference). It defines every string of the record and works
     out what to log from a marker's payload; it writes no trace and calls no tracing API;
@@ -46,7 +46,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker` with its own QR encoder, `reference/` (qrcodegen), `marker-render`, tests     |
 | `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests           |
 | `sdk/cpp/pacer/`                                  | Pacer module `mb_framepacing::pacer`, GoogleTest tests with the simulations and `pacer-sim` (`tests/`, test code)    |
-| `sdk/cpp/trace/`, `sdk/csharp/trace/`             | Trace module `mb_framepacing::trace` / `MB.FramePacing.Trace` (experimental): the frame record + tests               |
+| `sdk/cpp/trace/`, `sdk/csharp/trace/`             | Trace module `mb_framepacing::trace` / `MB.FramePacing.Trace`: the frame record + tests                              |
 | `sdk/cpp/conan/`                                  | Conan 2 recipe `mb-framepacing`, a component per module (conan-center-index layout, a local-recipes-index remote)    |
 | `sdk/csharp/core/`                                | C# core module `MB.FramePacing` (`Point`, `Rectangle`, the time types; .NET Standard 2.1, C# 9) + NUnit tests        |
 | `sdk/csharp/marker/`                              | C# marker module `MB.FramePacing.Marker` (.NET Standard 2.1, C# 9, no dependencies) + NUnit tests                    |
@@ -63,7 +63,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/TraceJoin/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks |
 | `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)         |
 | `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                      |
-| `measure/test-data/trace/`, `frame-logs/`         | Made-up traces and frame logs with what the scripts gave for them: what the experimental C# ports are held to        |
+| `measure/test-data/trace/`, `frame-logs/`         | Made-up traces and frame logs with what the scripts gave for them: what the C# ports are held to                     |
 | `doc/`                                            | Project docs: releasing, roadmap                                                                                     |
 | `pacer-captures/`                                 | Capture sessions of the pacer: results documents, charts, `runs.csv`; the zips are assets of a GitHub release        |
 | `tools/`                                          | Repository scripts (checks, golden data, shaders, camera rate table)                                                 |
@@ -116,7 +116,7 @@ uv run tools/check_conan.py                      # the Conan recipe built from t
     full at every use: no `using namespace`), namespaces
     `MB::FramePacing` (core) and `MB::FramePacing::<Module>`. One export set and package (`find_package(mb_framepacing CONFIG
 COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` / `_TRACE` leave modules out (no data module: nlohmann/json is never fetched;
-    the pacer and the trace module are experimental and off unless asked for).
+    the pacer is experimental and off unless asked for).
     `MB_FRAMEPACING_INSTALL` (on only when top-level) is around every install rule and the CMake package: an application that builds the
     library inside its own project installs its own files only (`tests/consumer/check_consumers.py` checks it).
     Each module's tests are their own executable. What they share is in `sdk/cpp/testing` (`mb_framepacing_test_support`, an OBJECT
@@ -162,12 +162,14 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` / `_TRACE`
   Perfetto scripts (below). They must pass `ruff check .`, `ruff format --check .` and `basedpyright` (config: `ruff.toml`,
   `pyrightconfig.json`, recommended mode). CI runs all three. Their tests are in `tools/tests` (`python -m unittest discover -s
 tools/tests -t tools`; CI's `lint`).
-- **A capture and a Perfetto trace: EXPERIMENTAL** (`measure/doc/perfetto.md`; the user, 2026-10-09: load a trace with a capture
-  for extra information, add the capture's measurements to the trace, select the trace in the GUI and the console app "so we can
-  use it for what we present", and save the augmented trace "as part of the report").
-  - **Checked against traces its own tests make only. No recorded trace has been through it:** every place that describes it says
-    so, until one has. A trace names a device and its programs: **never store a recorded trace in the repository** or quote from
-    one without the user's word. **Nothing of a trace that names a program or a device goes onto a card** (the hover and the
+- **A capture and a Perfetto trace** (`measure/doc/perfetto.md`; the user, 2026-10-09: load a trace with a capture for extra
+  information, add the capture's measurements to the trace, select the trace in the GUI and the console app "so we can use it for
+  what we present", and save the augmented trace "as part of the report").
+  - **Graduated from experimental on 2026-10-14** (the user's word, with the SDK's trace module: the frame record is what the join
+    stands on), after a recorded trace had been through it: no `--experimental`, no GUI switch, in the README's workflow and in
+    `usage.md`, the trace module on by default in C++ and Conan. Never bring the "no recorded trace has been through it" notices
+    back. A trace names a device and its programs: **never store a recorded trace in the repository** or quote from one without
+    the user's word. **Nothing of a trace that names a program or a device goes onto a card** (the hover and the
     description have values and the system's own verdict words; the layer name is in the CSV only).
   - **Two implementations, held to the same bytes:** the script (`tools/trace_augment.py`, Perfetto's Python package) and the
     tools (`measure/libs/MB.FramePacing.TraceJoin`, a port part for part). `measure/test-data/trace` is what the script makes from the
@@ -184,7 +186,7 @@ tools/tests -t tools`; CI's `lint`).
     What stays by time: which of the system's frame timeline frames is which, and the capture's clock against the application's.
   - **The tools:** `--trace` on `import` (stored in capture.json's `trace`, `TraceJoinOptions`) and `analyze` (for that analysis;
     `--no-trace`), the trace's own options (`--trace-process`, …), `trace-info`, `config --set-trace-processor`; the GUI's
-    Perfetto trace card (Capture), row (Analyze) and trace processor (Settings), all behind the experimental switch. `capture`
+    Perfetto trace card (Capture), row (Analyze) and trace processor (Settings), always shown. `capture`
     takes no trace: while a live capture runs its trace is still being recorded.
     - **`--trace-app <file>`** (`TraceJoinOptions.AppTracePath`; the console only, the GUI keeps what a capture names): a trace
       the application wrote itself, for a frame record that is in a file of its own. With `--trace` the run is placed in the
@@ -228,10 +230,9 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
       tracing API in the SDK; an optional header that makes one library's calls is a roadmap option, not built.
     - C++ `FrameRecordText` (the strings), `FrameRecordName` (inline, no allocation), `FrameRecord`, `FrameRecordAnnotation`,
       `FrameRecordUtil::TryCreate(payload, record)`; C# the same names with `FrameRecord.TryCreate` and, for readers,
-      `FrameRecordName.TryParse`. Both are held to `sdk/test-data/trace/frame-records.csv`. Wired as the pacer is:
-      `MB_FRAMEPACING_BUILD_TRACE` (needs the marker module), Conan's `with_trace`, the `windows` and `linux-sanitize` presets,
-      CI and the release workflow, the consumer check (`subdirectory-trace`, `package-trace`; a default install holds none of
-      it). Not in Python (the script has the two strings it reads, held to the golden data by a test) and not in the Unity package.
+      `FrameRecordName.TryParse`. Both are held to `sdk/test-data/trace/frame-records.csv`. On by default:
+      `MB_FRAMEPACING_BUILD_TRACE` (needs the marker module; OFF leaves it out), Conan's `with_trace` (True), the consumer
+      check (`subdirectory-trace`, `package-trace` against the default install, which must hold it). Not in Python (the script has the two strings it reads, held to the golden data by a test) and not in the Unity package.
     - The tools read it with the SDK's strings (`MB.FramePacing.TraceJoin` references `MB.FramePacing.Trace`; the tools' library
       was renamed to give the SDK the name): `FrameRecordSlice` is a record read from a trace, `TraceReader.FrameRecords` reads
       it from any track with the process of the track.
@@ -266,8 +267,9 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
     period (a camera). Instants keep `#<frame index>` in their names.
   - The clocks are tied by the frames only (`measure/doc/perfetto.md` "The clocks"): a delay the whole run shares can not be told
     from the clocks' difference. Never describe a track's position, or what the trace says of a frame, as measured beyond that.
-  - It is out of `usage.md`, as every experimental feature is out of the workflow documents. DocImages has two pictures of it
-    (`gui-trace-capture.png`, `gui-trace-analysis.png`) and checks the whole way through the GUI when a trace processor is found.
+  - `usage.md` has a short section on it (5.) and the README one ("A Perfetto trace of the run"); `perfetto.md` has the whole of
+    it. DocImages has two pictures of it (`gui-trace-capture.png`, `gui-trace-analysis.png`) and checks the whole way through the
+    GUI when a trace processor is found.
 - **The frame stages charts: EXPERIMENTAL** (`frame-stages`, `measure/libs/MB.FramePacing.Charts/source/Stages`; the user,
   2026-10-09: the script that drew them converted to C#). From a frame log of the pacer's first integration (its sample's own
   CSV, alone or in a capture session's zip; `pacer-sim --loop` writes the same columns): a row per frame or a lane per resource,
@@ -498,7 +500,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   little or no compression. Its OBS settings are proposed, not yet verified with a recording: say so until they are. The README
   opens with the sister repository's page (the slides), then how it works and this workflow.
 - **The root README never mentions an experimental feature** (the user's rule) except in its one "Experimental features" section,
-  which names each (live capture, camera capture, the pacer, a capture and a Perfetto trace) with a link to its guide: no experimental commands, options, GUI
+  which names each (live capture, camera capture, the pacer) with a link to its guide: no experimental commands, options, GUI
   switches or diagram paths anywhere else in it. The other documents say "experimental" wherever the feature appears.
 - **Live capture is EXPERIMENTAL** (`measure/doc/live-capture.md`, agreed with the user): recording a capture card or a network stream
   with the tools themselves. It is out of the workflow documents (README, usage.md, the install guides); live-capture.md has it,
@@ -507,8 +509,8 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     (`CaptureViewModel.ListSources`, `IsExperimental`). The default source is a video file, and the start button says
     **Analyze recording** for a video file or an image folder, **Start capture** for a live source (`StartText`).
   - **CLI:** `--experimental` (`CommonOptions.Experimental`, recursive) shows and allows the experimental parts: `capture`, `locate`,
-    `devices`, `camera-rig`, `trace-info` and `frame-stages` (`CommonOptions.ExperimentalCommand`), `--camera`, `--recorded-fps`,
-    `--trace` with its options, and `selftest`'s `--camera`, `--refresh`, `--tear-every` (`ExperimentalOption`), and a stream URL
+    `devices`, `camera-rig` and `frame-stages` (`CommonOptions.ExperimentalCommand`), `--camera`, `--recorded-fps`,
+    and `selftest`'s `--camera`, `--refresh`, `--tear-every` (`ExperimentalOption`), and a stream URL
     for `import`. Without it they are left out of `--help`
     (read from the arguments before the commands are made: `ExperimentalRequested`) and refused with a one-line hint. Live capture
     prints `CommonOptions.LiveCaptureNotice` first. Every documented command for them carries `--experimental`.
@@ -770,7 +772,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and
     `StaticBefore` on the next: that static step gets no animation or prediction error (the drift sums only judged errors), the step
     into the static frame is judged. Independent flags, not an enum; bits 3 to 7 are reserved (write 0, decoders keep them).
-    - **Bit 2, `FrameRecordLogged`** (experimental; the user, 2026-10-13: "just so we know it exists"): on a **start marker**, the
+    - **Bit 2, `FrameRecordLogged`** (the user, 2026-10-13: "just so we know it exists"): on a **start marker**, the
       application's word that it logs the run's frame record to a trace. **The application sets it; the SDK never does** (the trace
       module writes no trace, so it can not know) and it is off unless set. Read from the start marker only
       (`MarkerPayload.IsFrameRecordLogged`, `RunAnalysis.FrameRecordLogged`); on another marker it says nothing. The tools **note**

@@ -11,7 +11,7 @@
 
 namespace MB::FramePacing::Trace
 {
-  //! EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). The name of a frame record's slice: "mbfp frame <run id>
+  //! The name of a frame record's slice: "mbfp frame <run id>
   //! <frame index>", the two ids of the frame's marker as decimal numbers without leading zeros. The text is held inline and ends
   //! with a zero, so making a name allocates nothing and CStr() can be given to a function that takes a C string. A name made
   //! without ids is empty: the name of no record.

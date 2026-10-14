@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (measure/doc/perfetto.md): a Perfetto trace of the run on the command line (import and analyze --trace), and a trace
+//* A Perfetto trace of the run on the command line (measure/doc/perfetto.md; import and analyze --trace), and a trace
 //* the application wrote itself where the frame record is in a file of its own (--trace-app): the options, the traces they name, and
 //* the trace processor that reads them. The join itself is the analysis's, shared with the GUI.
 //*
@@ -23,111 +23,87 @@ namespace MB.FramePacing.App.Commands
 {
   internal sealed class TraceInput
   {
-    public const string What = "A capture joined with a Perfetto trace (--trace)";
-
-    /// <summary>What a command that joins a trace prints first.</summary>
-    public const string Notice =
-      "A capture joined with a Perfetto trace is EXPERIMENTAL: it is checked against traces its own tests make, and no recorded trace has "
-      + "been through it yet (measure/doc/perfetto.md). A trace names the device and its programs: keep what is written as private as the "
-      + "recording.";
+    /// <summary>What a command that reads a trace prints first.</summary>
+    public const string Notice = "A trace names the device and its programs: keep what is written with it as private as the recording.";
 
     public Option<string?> Trace { get; } =
-      Experimental(
-        new Option<string?>("--trace")
-        {
-          Description =
-            "(experimental) A Perfetto trace of the run (.pftrace, .perfetto-trace): the analysis says what the trace says of each "
-            + "presented frame (run-<id>-trace.csv), and --charts also writes the trace with the capture's measurements added as tracks "
-            + "(run-<id>-augmented.pftrace). The trace needs the frame record the application logs (a slice per frame named "
-            + $"'{FrameRecordText.NamePrefix}<run id> <frame index>', sdk/doc/trace-frame-record.md): without it nothing is joined.",
-          HelpName = "file",
-        }
-      );
+      new Option<string?>("--trace")
+      {
+        Description =
+          "A Perfetto trace of the run (.pftrace, .perfetto-trace): the analysis says what the trace says of each "
+          + "presented frame (run-<id>-trace.csv), and --charts also writes the trace with the capture's measurements added as tracks "
+          + "(run-<id>-augmented.pftrace). The trace needs the frame record the application logs (a slice per frame named "
+          + $"'{FrameRecordText.NamePrefix}<run id> <frame index>', sdk/doc/trace-frame-record.md): without it nothing is joined.",
+        HelpName = "file",
+      };
 
     public Option<string?> AppTrace { get; } =
-      Experimental(
-        new Option<string?>("--trace-app")
-        {
-          Description =
-            "(experimental) A Perfetto trace the application wrote itself, for when its frame record is in a file of its own. With "
-            + "--trace the join is placed by it; alone nothing is joined, and what the tools decoded from the markers is held against "
-            + "it (run-<id>-trace-check.txt).",
-          HelpName = "file",
-        }
-      );
+      new Option<string?>("--trace-app")
+      {
+        Description =
+          "A Perfetto trace the application wrote itself, for when its frame record is in a file of its own. With "
+          + "--trace the join is placed by it; alone nothing is joined, and what the tools decoded from the markers is held against "
+          + "it (run-<id>-trace-check.txt).",
+        HelpName = "file",
+      };
 
     public Option<string?> Process { get; } =
-      Experimental(
-        new Option<string?>("--trace-process")
-        {
-          Description =
-            "With --trace: the application's process name in the trace (* and ? as in a file name), for a frame record that is on no "
-            + "process's track (default: the process the frame record is on; 'trace-info' lists the processes).",
-          HelpName = "pattern",
-        }
-      );
+      new Option<string?>("--trace-process")
+      {
+        Description =
+          "With --trace: the application's process name in the trace (* and ? as in a file name), for a frame record that is on no "
+          + "process's track (default: the process the frame record is on; 'trace-info' lists the processes).",
+        HelpName = "pattern",
+      };
 
     public Option<string?> Layer { get; } =
-      Experimental(
-        new Option<string?>("--trace-layer")
-        {
-          Description = "With --trace: the application's layer in the trace's frame timeline, when it has several (default: every layer).",
-          HelpName = "pattern",
-        }
-      );
+      new Option<string?>("--trace-layer")
+      {
+        Description = "With --trace: the application's layer in the trace's frame timeline, when it has several (default: every layer).",
+        HelpName = "pattern",
+      };
 
     public Option<string?> Thread { get; } =
-      Experimental(
-        new Option<string?>("--trace-thread")
-        {
-          Description = "With --trace: the thread whose CPU time is counted (default: the process's main thread).",
-          HelpName = "name",
-        }
-      );
+      new Option<string?>("--trace-thread")
+      {
+        Description = "With --trace: the thread whose CPU time is counted (default: the process's main thread).",
+        HelpName = "name",
+      };
 
     public Option<string?> VBlanks { get; } =
-      Experimental(
-        new Option<string?>("--trace-vblanks")
-        {
-          Description =
-            "With --trace: which of the trace's vertical blank sources to use, or 'none' (default: the kernel's vertical blank events, when "
-            + "the trace has them; 'trace-info' lists the sources).",
-          HelpName = "name|none",
-        }
-      );
+      new Option<string?>("--trace-vblanks")
+      {
+        Description =
+          "With --trace: which of the trace's vertical blank sources to use, or 'none' (default: the kernel's vertical blank events, when "
+          + "the trace has them; 'trace-info' lists the sources).",
+        HelpName = "name|none",
+      };
 
     public Option<long?> CaptureOffset { get; } =
-      Experimental(
-        new Option<long?>("--trace-capture-offset-ns")
-        {
-          Description =
-            "With --trace: the capture's clock minus the application's, in nanoseconds, when you know it: nothing is worked out from the "
-            + "frames then.",
-          HelpName = "ns",
-        }
-      );
+      new Option<long?>("--trace-capture-offset-ns")
+      {
+        Description =
+          "With --trace: the capture's clock minus the application's, in nanoseconds, when you know it: nothing is worked out from the "
+          + "frames then.",
+        HelpName = "ns",
+      };
 
     public Option<string?> Processor { get; } = ProcessorOption();
 
     /// <summary>analyze only: join no trace, also when the capture names one.</summary>
     public Option<bool> NoTrace { get; } =
-      Experimental(new Option<bool>("--no-trace") { Description = "(experimental) Read no Perfetto trace, also when capture.json names one." });
+      new Option<bool>("--no-trace") { Description = "Read no Perfetto trace, also when capture.json names one." };
 
     /// <summary>--trace-processor: the user's trace_processor_shell.</summary>
     public static Option<string?> ProcessorOption() =>
-      Experimental(
-        new Option<string?>("--trace-processor")
-        {
-          Description =
-            $"(experimental) Path to Perfetto's trace_processor_shell, which reads a trace (default: ${TraceProcessorLocator.EnvironmentVariable}, "
-            + "then traceProcessorPath in the configuration file, then PATH, then the copy Perfetto's Python package downloaded). Download: "
-            + TraceProcessorLocator.DownloadPage,
-          HelpName = "path",
-        }
-      );
-
-    private static T Experimental<T>(T option)
-      where T : Option => CommonOptions.ExperimentalOption(option, What);
+      new Option<string?>("--trace-processor")
+      {
+        Description =
+          $"Path to Perfetto's trace_processor_shell, which reads a trace (default: ${TraceProcessorLocator.EnvironmentVariable}, "
+          + "then traceProcessorPath in the configuration file, then PATH, then the copy Perfetto's Python package downloaded). Download: "
+          + TraceProcessorLocator.DownloadPage,
+        HelpName = "path",
+      };
 
     /// <summary>Add the options to <paramref name="command"/>: the trace's own only with --trace.</summary>
     /// <param name="remembered">The command analyses a capture that may name a trace itself (analyze): --no-trace is offered.</param>
@@ -159,7 +135,7 @@ namespace MB.FramePacing.App.Commands
 
     /// <summary>
     /// The traces the options name; null without --trace and --trace-app. A file that is not there is a
-    /// <see cref="FileNotFoundException"/>. Prints the experimental notice.
+    /// <see cref="FileNotFoundException"/>. Prints the notice.
     /// </summary>
     /// <param name="remembered">
     /// The trace the capture itself names: --trace-app alone adds the application's trace to it; --trace replaces it whole.
@@ -223,7 +199,7 @@ namespace MB.FramePacing.App.Commands
       }
     }
 
-    public static void PrintNotice() => AnsiConsole.MarkupLineInterpolated($"[yellow]WARNING:[/] {Notice}");
+    public static void PrintNotice() => AnsiConsole.MarkupLineInterpolated($"[yellow]Note:[/] {Notice}");
 
     /// <summary>The trace processor: --trace-processor, else as the configuration finds it.</summary>
     public static string FindProcessor(ParseResult parseResult, Option<string?> processorOption) =>

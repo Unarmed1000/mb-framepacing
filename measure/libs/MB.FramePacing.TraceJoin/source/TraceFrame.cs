@@ -14,7 +14,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A presented frame with what a trace of the same run says of it.</summary>
+  /// <summary>A presented frame with what a trace of the same run says of it.</summary>
   /// <param name="DisplayTraceNs">The frame's display time as measured.</param>
   /// <param name="CpuStartTraceNs">Its marker's CPU start time.</param>
   /// <param name="CpuEndTraceNs">The end of its marker's CPU busy time.</param>

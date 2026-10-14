@@ -16,7 +16,7 @@ using MB.FramePacing.Trace;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The questions a join asks a trace.</summary>
+  /// <summary>The questions a join asks a trace.</summary>
   public static class TraceReader
   {
     /// <summary>The kernel's vertical blank events, as the trace processor shows them: slices named so on tracks named vblank-&lt;crtc&gt;.</summary>

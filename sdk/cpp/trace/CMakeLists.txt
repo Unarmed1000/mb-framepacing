@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: BSD-3-Clause
-# The trace module (EXPERIMENTAL): the frame record, what an application logs to its own trace for every frame so that the tools
+# The trace module: the frame record, what an application logs to its own trace for every frame so that the tools
 # can tell a frame of the trace from a frame of a capture (sdk/doc/trace-frame-record.md). It defines the record's strings and
 # works out, from a marker's payload, what to log; it writes no trace.
 # No dependencies besides the marker module (and so the core), no allocations.

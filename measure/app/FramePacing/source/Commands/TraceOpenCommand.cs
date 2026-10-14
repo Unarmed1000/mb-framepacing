@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL 'trace-open' (measure/doc/perfetto.md): a run's augmented trace opened in Perfetto's viewer at ui.perfetto.dev. The trace
+//* 'trace-open' (measure/doc/perfetto.md): a run's augmented trace opened in Perfetto's viewer at ui.perfetto.dev. The trace
 //* is served once from 127.0.0.1:9001, the one place on this machine the viewer loads a trace from; the viewer runs in the browser and
 //* does not upload it.
 //*
@@ -42,7 +42,7 @@ namespace MB.FramePacing.App.Commands
       var processorOption = TraceInput.ProcessorOption();
       var command = new Command(
         "trace-open",
-        "(experimental) Open a run's augmented trace in Perfetto's viewer at ui.perfetto.dev, at the run's stretch of time with the capture's "
+        "Open a run's augmented trace in Perfetto's viewer at ui.perfetto.dev, at the run's stretch of time with the capture's "
           + "tracks pinned. The trace is served once from 127.0.0.1:9001; the viewer runs in the browser and does not upload it."
       )
       {
@@ -102,7 +102,7 @@ namespace MB.FramePacing.App.Commands
       {
         1 => traces[0],
         0 => throw new TraceException(
-          $"The analysis in {analysis} has no augmented trace: 'analyze --experimental --trace <trace> --charts' writes it with the charts."
+          $"The analysis in {analysis} has no augmented trace: 'analyze --trace <trace> --charts' writes it with the charts."
         ),
         _ => throw new TraceException(
           $"The analysis has {traces.Count} augmented traces ({string.Join(", ", traces.Select(Path.GetFileName))}): say which run with --run."

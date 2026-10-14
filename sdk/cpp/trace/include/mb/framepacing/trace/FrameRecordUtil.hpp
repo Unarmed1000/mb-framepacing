@@ -6,7 +6,7 @@
 #include <mb/framepacing/marker/payload/Payload.hpp>
 #include <mb/framepacing/trace/FrameRecord.hpp>
 
-//! EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). The frame record of a marker's payload: what the application
+//! The frame record of a marker's payload: what the application
 //! logs to its trace for the frame the marker is drawn in. It reads no clock, calls no tracing API and allocates nothing.
 namespace MB::FramePacing::Trace::FrameRecordUtil
 {

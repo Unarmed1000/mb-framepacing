@@ -10,7 +10,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. The names of a trace's built-in clocks.</summary>
+  /// <summary>The names of a trace's built-in clocks.</summary>
   public static class TraceClockText
   {
     /// <summary>The name of the built-in clock with the id <paramref name="clockId"/>; null for another clock.</summary>

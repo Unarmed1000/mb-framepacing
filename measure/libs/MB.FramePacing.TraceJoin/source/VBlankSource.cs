@@ -10,7 +10,7 @@
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A source of vertical blank times in a trace.</summary>
+  /// <summary>A source of vertical blank times in a trace.</summary>
   /// <param name="IsCounter">True for a counter, false for the kernel's vertical blank events.</param>
   /// <param name="Count">How many vertical blanks it has.</param>
   public sealed record VBlankSource(bool IsCounter, string Name, long Count)

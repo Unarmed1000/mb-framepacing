@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (the trace module, sdk/doc/trace-frame-record.md). The name of a frame's slice: "mbfp frame <run id> <frame index>", the
+//* The name of a frame's slice: "mbfp frame <run id> <frame index>", the
 //* two ids of the frame's marker as decimal numbers without leading zeros. An application formats it (into its own buffer: nothing is
 //* allocated), a reader of a trace parses it.
 //*
@@ -14,7 +14,7 @@ using System.Globalization;
 
 namespace MB.FramePacing.Trace
 {
-  /// <summary>Experimental. The name of a frame's slice.</summary>
+  /// <summary>The name of a frame's slice.</summary>
   public static class FrameRecordName
   {
     /// <summary>The length of the longest name: "mbfp frame 4294967295 18446744073709551615".</summary>

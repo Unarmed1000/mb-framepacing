@@ -47,8 +47,6 @@ namespace MB.FramePacing.Gui.ViewModels
       };
       Capture.PropertyChanged += (_, e) =>
       {
-        if (e.PropertyName == nameof(CaptureViewModel.ExperimentalFeatures))
-          Analysis.ExperimentalFeatures = Capture.ExperimentalFeatures;
         if (
           e.PropertyName is nameof(CaptureViewModel.FfmpegReady) or nameof(CaptureViewModel.FfmpegSummary) or nameof(CaptureViewModel.FfmpegToolTip)
         )

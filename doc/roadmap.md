@@ -193,15 +193,14 @@ without it: the output files, the analysis and the report cards of an hour take 
 ## A capture and a Perfetto trace
 
 The tools join a capture with a [Perfetto](https://perfetto.dev) trace recorded on the device during the same run
-([experimental](../measure/doc/perfetto.md)): the analysis says what the trace says of each presented frame (a CSV, the report
+([the guide](../measure/doc/perfetto.md)): the analysis says what the trace says of each presented frame (a CSV, the report
 card's description, the GUI's text under the pointer), and the charts come with the trace that has the capture's measurements
 added as tracks. `tools/trace_augment.py` does the same from a checkout. The join is by
 [the frame record](../sdk/doc/trace-frame-record.md), a slice the application logs for every frame, which the SDK's trace
-module defines (C++ and C#). It is checked against traces its own tests make; **no recorded trace has been through it**.
+module defines (C++ and C#).
 
-**Out of experimental:** a recorded trace and a capture of the same run, on each kind of system a trace comes from, to prove
-the two parts that rest on our reading of the trace: which of the system's frames is which frame of the capture, and where a
-display's vertical blanks are.
+**Still to prove on each kind of system a trace comes from:** the two parts that rest on our reading of the trace, which of the
+system's frames is which frame of the capture, and where a display's vertical blanks are.
 
 **Possible upgrades:**
 

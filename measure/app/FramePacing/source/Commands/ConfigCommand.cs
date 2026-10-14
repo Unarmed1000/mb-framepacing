@@ -29,13 +29,10 @@ namespace MB.FramePacing.App.Commands
         Description = "Store what a playback report does with a recording browsers cannot play: ask, yes (make a playable copy) or no (no video).",
         HelpName = "ask|yes|no",
       };
-      var traceProcessorOption = CommonOptions.ExperimentalOption(
-        new Option<string?>("--set-trace-processor")
-        {
-          Description = "(experimental) Store the path of Perfetto's trace_processor_shell, which reads a Perfetto trace (--trace).",
-        },
-        TraceInput.What
-      );
+      var traceProcessorOption = new Option<string?>("--set-trace-processor")
+      {
+        Description = "Store the path of Perfetto's trace_processor_shell, which reads a Perfetto trace (--trace).",
+      };
       var command = new Command(
         "config",
         "Show or change the configuration file (ffmpeg installation, capture folder, the playback page's answers). Without options it shows the active settings."
@@ -106,21 +103,18 @@ namespace MB.FramePacing.App.Commands
       table.AddRow("ffmpegPath", Markup.Escape(config.FfmpegPath ?? "(not set)"));
       table.AddRow("captureDirectory", Markup.Escape(config.CaptureDirectory ?? "(not set: Documents/mb-framepacing)"));
       table.AddRow("playbackTranscode", (config.PlaybackTranscode ?? PlaybackTranscodeChoice.Ask).ToString().ToLowerInvariant());
-      // Experimental: the trace processor a Perfetto trace is read with, shown with the experimental parts only
-      if (CommonOptions.ExperimentalRequested)
+      // The trace processor a Perfetto trace is read with
+      table.AddRow("traceProcessorPath", Markup.Escape(config.TraceProcessorPath ?? "(not set)"));
+      string traceProcessor;
+      try
       {
-        table.AddRow("traceProcessorPath (experimental)", Markup.Escape(config.TraceProcessorPath ?? "(not set)"));
-        string traceProcessor;
-        try
-        {
-          traceProcessor = Markup.Escape(TraceProcessorLocator.Find(null, config));
-        }
-        catch (FileNotFoundException)
-        {
-          traceProcessor = "[red]not found[/] - download: " + Markup.Escape(TraceProcessorLocator.DownloadPage);
-        }
-        table.AddRow("trace processor in use (experimental)", traceProcessor);
+        traceProcessor = Markup.Escape(TraceProcessorLocator.Find(null, config));
       }
+      catch (FileNotFoundException)
+      {
+        traceProcessor = "[red]not found[/] - download: " + Markup.Escape(TraceProcessorLocator.DownloadPage);
+      }
+      table.AddRow("trace processor in use", traceProcessor);
       string ffmpeg;
       try
       {

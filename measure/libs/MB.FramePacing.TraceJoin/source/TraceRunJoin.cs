@@ -12,7 +12,7 @@ using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. A run joined with a trace.</summary>
+  /// <summary>A run joined with a trace.</summary>
   /// <param name="Alignment">Where the run's times are on the application's system clock, the vertical blanks' shift included.</param>
   /// <param name="Fit">How the display times sit on the trace's vertical blanks; null when none were used.</param>
   /// <param name="VBlankNote">What was done with vertical blanks, in words: for the written trace's description.</param>

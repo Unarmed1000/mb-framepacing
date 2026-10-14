@@ -46,7 +46,7 @@ namespace MB.FramePacing.Gui.ViewModels
 
     public string ExperimentalText => CameraRigViewModel.ExperimentalText;
 
-    /// <summary>EXPERIMENTAL: Perfetto's trace processor, which reads a Perfetto trace: the one in use, or that none was found.</summary>
+    /// <summary>Perfetto's trace processor, which reads a Perfetto trace: the one in use, or that none was found.</summary>
     [ObservableProperty]
     public partial string TraceProcessorText { get; set; } = string.Empty;
 

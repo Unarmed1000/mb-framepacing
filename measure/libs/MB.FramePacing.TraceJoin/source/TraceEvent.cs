@@ -13,7 +13,7 @@ using System.Collections.Generic;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. One event of a track of a capture's measurements.</summary>
+  /// <summary>One event of a track of a capture's measurements.</summary>
   /// <param name="EndNs">A slice's end; a moment's and a value's own time.</param>
   /// <param name="Flow">Joins a slice to the slice of another track that has the same number (0: none).</param>
   /// <param name="Value">A counter's value.</param>

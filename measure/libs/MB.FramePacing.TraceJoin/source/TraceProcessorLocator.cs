@@ -18,7 +18,7 @@ using MB.FramePacing.Capture;
 
 namespace MB.FramePacing.TraceJoin
 {
-  /// <summary>Experimental. Finds the user's trace_processor_shell.</summary>
+  /// <summary>Finds the user's trace_processor_shell.</summary>
   public static class TraceProcessorLocator
   {
     public const string EnvironmentVariable = "MB_TRACE_PROCESSOR";

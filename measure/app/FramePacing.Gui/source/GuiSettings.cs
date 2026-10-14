@@ -56,7 +56,7 @@ namespace MB.FramePacing.Gui
     public string? ImageFps { get; set; }
     public string? TimestampFile { get; set; }
 
-    /// <summary>EXPERIMENTAL: the Perfetto trace of the run on the Capture page, and the application's process in it. Not used while the experimental features are off.</summary>
+    /// <summary>The Perfetto trace of the run on the Capture page, and the application's process in it.</summary>
     public string? TracePath { get; set; }
     public string? TraceProcess { get; set; }
 

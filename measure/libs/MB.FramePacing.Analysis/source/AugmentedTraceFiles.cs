@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* EXPERIMENTAL (measure/doc/perfetto.md). The augmented traces of an analysis that joined a Perfetto trace: for each run that was joined,
+//* The augmented traces of an analysis that joined a Perfetto trace: for each run that was joined,
 //* the recorded trace with the capture's measurements added as tracks, next to the run's reports (run-<id>-augmented.pftrace), to open in
 //* Perfetto's trace viewer. Written when the charts are (--charts, the GUI's Save charts): a trace is copied whole, so not by every
 //* analysis.
@@ -20,7 +20,7 @@ using MB.FramePacing.TraceJoin;
 
 namespace MB.FramePacing.Analysis
 {
-  /// <summary>Experimental. Writes the augmented traces of an analysis.</summary>
+  /// <summary>Writes the augmented traces of an analysis.</summary>
   public static class AugmentedTraceFiles
   {
     /// <summary>

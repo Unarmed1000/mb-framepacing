@@ -169,14 +169,10 @@ namespace MB.FramePacing.DocImages
       return true;
     }
 
-    /// <summary>
-    /// EXPERIMENTAL, the Capture page's Perfetto trace card (gui-trace-capture.png): shown only with the experimental features, which are
-    /// switched on for the picture and off again, so that the pictures after it show the default. Example values, nothing of this machine.
-    /// </summary>
+    /// <summary>The Capture page's Perfetto trace card (gui-trace-capture.png), opened. Example values, nothing of this machine.</summary>
     private static async Task RenderTraceCardAsync(MainWindow window, MainWindowViewModel viewModel, string output)
     {
       var capture = viewModel.Capture;
-      viewModel.Settings.ExperimentalFeatures = true;
       capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.VideoFile);
       capture.Trace.TracePath = ExampleTrace;
       await capture.Trace.Listed;
@@ -188,8 +184,6 @@ namespace MB.FramePacing.DocImages
       Save(window, Path.Combine(output, "gui-trace-capture.png"));
       expander.IsExpanded = false;
       capture.Trace.Show(null);
-      viewModel.Settings.ExperimentalFeatures = false;
-      capture.SelectedDevice = capture.Devices.First(d => d.Kind == SourceKind.VideoFile);
       await Task.Delay(100);
     }
 
@@ -200,8 +194,8 @@ namespace MB.FramePacing.DocImages
         .First(e => e.Header is TextBlock { Text: { } header } && header.StartsWith("Perfetto trace", StringComparison.Ordinal));
 
     /// <summary>
-    /// EXPERIMENTAL, a capture joined with a Perfetto trace (gui-trace-analysis.png): with the experimental features on, a test clip is imported with
-    /// the trace the tests made to fit it (measure/test-data/trace), picked on the Capture page with its application from the trace's
+    /// A capture joined with a Perfetto trace (gui-trace-analysis.png): a test clip is imported with the trace the tests made to fit it
+    /// (measure/test-data/trace), picked on the Capture page with its application from the trace's
     /// processes. The capture remembers the trace, the Analyze page shows it and joins it (with the offset of the made-up device's clock,
     /// which is an option of the command line's, written into capture.json as an import there writes it), and Save charts writes the
     /// augmented trace. Skipped without a trace processor; throws when a step does not happen.
@@ -217,8 +211,6 @@ namespace MB.FramePacing.DocImages
       var analysis = viewModel.Analysis;
       string trace = Path.Combine(FindRepositoryRoot(), "measure", "test-data", "trace", "synthetic.pftrace");
       const string Application = "com.example.game";
-      if (!analysis.ExperimentalFeatures)
-        throw new InvalidOperationException("The Analyze page did not hear that the experimental features are on");
 
       viewModel.SelectedTab = MainWindowViewModel.CaptureTab;
       capture.Camera.UseCamera = false;
@@ -273,13 +265,13 @@ namespace MB.FramePacing.DocImages
       )
         throw new InvalidOperationException($"Save charts wrote no augmented trace that reads back: '{analysis.SummaryText}' '{analysis.ErrorText}'");
 
-      // Switched off, the trace is not shown and not joined; the capture still remembers it
-      viewModel.Settings.ExperimentalFeatures = false;
-      if (analysis.Trace.TracePath.Length > 0 || capture.Trace.TracePath.Length > 0)
-        throw new InvalidOperationException("The trace is still shown with the experimental features off");
+      // The row emptied, the next Analyze joins no trace; the capture still remembers it
+      analysis.Trace.TracePath = string.Empty;
       await analysis.AnalyzeCommand.ExecuteAsync(null);
       if (analysis.SelectedRun?.Chart.Trace != null || analysis.Warnings.Any(w => w.Contains("Perfetto", StringComparison.Ordinal)))
-        throw new InvalidOperationException("A trace was joined with the experimental features off");
+        throw new InvalidOperationException("A trace was joined with the trace row empty");
+      if (CaptureSessionInfo.TryLoad(directory)?.Trace?.Path != trace)
+        throw new InvalidOperationException("The capture forgot its trace when the Analyze page joined none");
       Console.WriteLine($"  Perfetto trace: picked, remembered, joined ({rows.Count} frames), {Path.GetFileName(augmented)} written and read back");
     }
 
