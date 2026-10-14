@@ -23,6 +23,7 @@ the two share: a trace and a capture have none in common. No recorded trace has 
 
 import bisect
 import csv
+import dataclasses
 import io
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -243,6 +244,43 @@ def to_csv(rows: Sequence[TraceFrame]) -> str:
     for row in rows:
         writer.writerow([_cell(value) for value in cells(row)])
     return text.getvalue()
+
+
+def from_csv(text: str) -> list[TraceFrame]:
+    """The rows of a CSV that to_csv wrote (or the tools' run-<id>-trace.csv, the same columns): a missing column or a cell
+    that is not of its column's kind is a ValueError."""
+    reader = csv.reader(io.StringIO(text))
+    header = next(reader, None)
+    if header is None or tuple(header) != COLUMNS:
+        raise ValueError(f"not a per-frame join: its columns are {header}, not {', '.join(COLUMNS)}")
+    kinds = [field.type for field in dataclasses.fields(TraceFrame)]
+    rows: list[TraceFrame] = []
+    for line, cells_of_row in enumerate(reader, start=2):
+        if not cells_of_row:
+            continue
+        if len(cells_of_row) != len(COLUMNS):
+            raise ValueError(f"line {line}: {len(cells_of_row)} cells, not {len(COLUMNS)}")
+        values: list[int | str | bool | None] = []
+        for cell, kind in zip(cells_of_row, kinds, strict=True):
+            values.append(_value(cell, str(kind), line))
+        rows.append(TraceFrame(*values))  # pyright: ignore[reportArgumentType] (each value is of its field's kind)
+    return rows
+
+
+def _value(cell: str, kind: str, line: int) -> int | str | bool | None:
+    if cell == "":
+        if "None" not in kind:
+            raise ValueError(f"line {line}: a required cell is empty")
+        return None
+    if "bool" in kind:
+        if cell not in ("true", "false"):
+            raise ValueError(f"line {line}: '{cell}' is not true or false")
+        return cell == "true"
+    if "int" in kind:
+        if not (cell.isdigit() or (cell.startswith("-") and cell[1:].isdigit())):
+            raise ValueError(f"line {line}: '{cell}' is not a whole number")
+        return int(cell)
+    return cell
 
 
 def summary_lines(rows: Sequence[TraceFrame]) -> list[str]:

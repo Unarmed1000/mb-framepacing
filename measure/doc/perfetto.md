@@ -273,6 +273,57 @@ the markers against the record. Its options are the tools' without the `trace-` 
 `--vblanks`, `--capture-offset-ns`, `--trace-processor`). The package downloads the trace processor on first use (a pinned
 version, checked against its SHA-256, kept under your home folder); that download needs `curl`.
 
+## What went wrong: `tools/trace_diagnose.py`
+
+A script, from a checkout of this repository, that goes through every frame of a run that went wrong (late, off by more than the
+error threshold, off by delta time jitter, shown after frame indices that never were, or followed by an older frame) and says
+what the capture and the trace give of it. It is a first step, a script whose rules will change once recorded traces have
+been through it: the tools do not run it.
+
+```
+uv run --group trace tools/trace_diagnose.py <capture folder> [--run <id>] [-o <folder>] [--thread <name>] [--no-programs]
+```
+
+It reads the analysis of a capture that was analysed with a trace: the run's frames, `run-<id>-trace.csv`, and, where the
+charts were written, `run-<id>-augmented.pftrace` for what the application logged around each frame
+([part 2 of the frame record](../../sdk/doc/trace-frame-record.md#part-2-what-happened-around-each-frame-optional)) and for what ran
+on the CPU while the application's thread waited for one. With less it gives less, and says so. It writes `run-<id>-diagnosis.txt`
+(the run in words, then every frame that went wrong with its facts) and `run-<id>-diagnosis.csv` (a line per frame that went wrong:
+its facts as `kind=nanoseconds`) next to the analysis, or into `-o`.
+
+The facts, in the order a frame is made in; a frame that went wrong is grouped by its first:
+
+| Fact                                | From                                                                                                  |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| wait past its time                  | Part 2: a wait before the frame ended after the time it waited for                                    |
+| waited for a CPU                    | The join: the thread was runnable during the frame's CPU work                                         |
+| CPU work longer than intended       | The marker: its CPU busy time against its intended period                                             |
+| CPU work ended after its refresh    | The join: the end of its CPU work against the refresh it was due at (its display time plus its error) |
+| GPU work ended after its refresh    | Part 2: the end of its GPU work, the same way                                                         |
+| present ended after its refresh     | Part 2: its present's return, the same way                                                            |
+| present blocked                     | Part 2: its present call took over half a refresh                                                     |
+| present not accepted                | Part 2: its present's result                                                                          |
+| system calls it janky               | The join: the system's frame timeline                                                                 |
+| done in time, shown later           | Everything the trace has of the application's side ended before the refresh, and it was shown later   |
+| shown sooner than intended          | The capture: its display time step was shorter than its intended period                               |
+| animation time step off             | The capture: its display time step was as intended and its animation time step was not                |
+| frame indices never shown before it | The capture                                                                                           |
+
+A time beyond the error threshold counts. Each fact is also worked out for the frames on time, and the summary holds the two
+against each other: a fact as common in frames on time explains nothing. It also names repeats (frames that went wrong at one
+distance apart), bursts, frames shortly after a moment of the run the application logged (a swap chain made anew, a swap interval
+change, a change of its environment) and, in the text file only, the programs that ran on the application's CPU while its thread
+waited (`--no-programs` leaves them out).
+
+What it can not claim:
+
+- Every fact is a measurement or what the application or the system logged. It does not guess a cause; "nothing in the trace
+  explains it" is said when no fact applies.
+- Part 2 is the application's own word, not checked against the capture.
+- A time against the refresh a frame was due at is on the clocks as the frames tie them ([The clocks](#the-clocks)): a delay every
+  frame shares is not in it.
+- The files name programs of a recorded trace: they are for whoever measured, never for a report card or a repository.
+
 ## Limits
 
 - The vertical blank sources it finds are the kernel's vertical blank events and counters with `VSYNC` in their name. Which

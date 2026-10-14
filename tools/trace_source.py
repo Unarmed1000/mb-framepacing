@@ -22,6 +22,20 @@ from trace_alignment import (  # pyright: ignore[reportImplicitRelativeImport] (
     FrameRecord,
     parse_record_name,
 )
+from trace_diagnosis import (  # pyright: ignore[reportImplicitRelativeImport]
+    DISPLAY_NAME_PREFIX,
+    ENVIRONMENT_NAME,
+    GPU_NAME_PREFIX,
+    NOT_PRESENTED_NAME_PREFIX,
+    PRESENT_NAME_PREFIX,
+    SWAP_CHAIN_RECREATED_NAME,
+    SWAP_INTERVAL_CHANGE_NAME,
+    WAIT_NAME_PREFIX,
+    FrameDetails,
+    Present,
+    RunMoment,
+    Wait,
+)
 from trace_events import TOOLS_ROOT_PREFIX, TraceReadError  # pyright: ignore[reportImplicitRelativeImport]
 from trace_frames import SurfaceFrame, ThreadState  # pyright: ignore[reportImplicitRelativeImport]
 
@@ -212,6 +226,97 @@ class TraceSource:
         """One thread's scheduling states, ascending. A state that had not ended when the trace did is left out."""
         rows = self._rows(f"SELECT ts, dur, state FROM thread_state WHERE utid = {utid} AND dur > 0 ORDER BY ts")
         return [ThreadState(int(row.ts), int(row.ts) + int(row.dur), str(row.state)) for row in rows]
+
+    def frame_details(self, run_id: int) -> dict[int, FrameDetails]:
+        """Part 2 of the frame record of one run (sdk/doc/trace-frame-record.md), by frame index: the waits before each frame,
+        its present, the end of its GPU work, the display time the platform reported and whether it was never presented, as the
+        application logged them. A slice that had not ended when the trace did is left out."""
+        prefixes = (WAIT_NAME_PREFIX, PRESENT_NAME_PREFIX, GPU_NAME_PREFIX, DISPLAY_NAME_PREFIX, NOT_PRESENTED_NAME_PREFIX)
+        wanted = " OR ".join(f"name GLOB {quoted(prefix + str(run_id) + ' *')}" for prefix in prefixes)
+        rows = self._rows(
+            "SELECT ts, dur, name, EXTRACT_ARG(arg_set_id, 'debug.kind') AS kind, EXTRACT_ARG(arg_set_id, 'debug.plannedNs') AS planned, "
+            + "EXTRACT_ARG(arg_set_id, 'debug.result') AS result, EXTRACT_ARG(arg_set_id, 'debug.swapInterval') AS swap_interval "
+            + f"FROM slice WHERE ({wanted}) AND dur >= 0 ORDER BY ts"
+        )
+        waits: dict[int, list[Wait]] = {}
+        found: dict[int, dict[str, object]] = {}
+        for row in rows:
+            name = str(row.name)
+            prefix = next(p for p in prefixes if name.startswith(p))
+            parts = name[len(prefix) :].split(" ")
+            if len(parts) != 2 or not parts[1].isdigit():
+                continue
+            index = int(parts[1])
+            begin, end = int(row.ts), int(row.ts) + int(row.dur)
+            values = found.setdefault(index, {})
+            if prefix == WAIT_NAME_PREFIX:
+                planned = int(row.planned) if row.planned is not None else None
+                waits.setdefault(index, []).append(Wait(begin, end, str(row.kind) if row.kind is not None else None, planned))
+            elif prefix == PRESENT_NAME_PREFIX:
+                swap_interval = int(row.swap_interval) if row.swap_interval is not None else None
+                values["present"] = Present(begin, end, str(row.result) if row.result is not None else None, swap_interval)
+            elif prefix == GPU_NAME_PREFIX:
+                values["gpu_end_ns"] = end
+            elif prefix == DISPLAY_NAME_PREFIX:
+                values["display_ns"] = begin
+            else:
+                values["not_presented"] = True
+        details: dict[int, FrameDetails] = {}
+        for index in sorted(set(found) | set(waits)):
+            values = found.get(index, {})
+            details[index] = FrameDetails(
+                waits=tuple(waits.get(index, ())),
+                present=values.get("present"),  # pyright: ignore[reportArgumentType]
+                gpu_end_ns=values.get("gpu_end_ns"),  # pyright: ignore[reportArgumentType]
+                display_ns=values.get("display_ns"),  # pyright: ignore[reportArgumentType]
+                not_presented=bool(values.get("not_presented", False)),
+            )
+        return details
+
+    def run_moments(self, run_id: int) -> list[RunMoment]:
+        """The run's moments the application logged (its environment, a swap chain made anew, a swap interval change), by time:
+        those with the run's id, and those without one."""
+        names = (ENVIRONMENT_NAME, SWAP_CHAIN_RECREATED_NAME, SWAP_INTERVAL_CHANGE_NAME)
+        rows = self._rows(
+            "SELECT ts, name, EXTRACT_ARG(arg_set_id, 'debug.runId') AS run, EXTRACT_ARG(arg_set_id, 'debug.reason') AS reason, "
+            + "EXTRACT_ARG(arg_set_id, 'debug.from') AS from_value, EXTRACT_ARG(arg_set_id, 'debug.to') AS to_value, EXTRACT_ARG(arg_set_id, 'debug.by') AS by "
+            + f"FROM slice WHERE name IN ({', '.join(quoted(n) for n in names)}) ORDER BY ts"
+        )
+        moments: list[RunMoment] = []
+        for row in rows:
+            if row.run is not None and int(row.run) != run_id:
+                continue
+            text = ""
+            if row.name == SWAP_CHAIN_RECREATED_NAME and row.reason is not None:
+                text = str(row.reason)
+            elif row.name == SWAP_INTERVAL_CHANGE_NAME and row.from_value is not None and row.to_value is not None:
+                text = f"from {row.from_value} to {row.to_value}" + (f", by the {row.by}" if row.by is not None else "")
+            moments.append(RunMoment(str(row.name), int(row.ts), text))
+        return moments
+
+    def waited_for_cpu(self, utid: int, from_ns: int, to_ns: int) -> list[tuple[str, int]]:
+        """What ran while a thread waited for a CPU from from_ns to to_ns: of each stretch it waited, the CPU it then ran on and
+        what that CPU ran meanwhile, by process (else thread) name, the longest first."""
+        states = self._rows(
+            f"SELECT ts, dur, state, cpu FROM thread_state WHERE utid = {utid} AND ts < {to_ns + 1_000_000_000} AND ts + dur > {from_ns} AND dur > 0 ORDER BY ts"
+        )
+        totals: dict[str, int] = {}
+        for position, state in enumerate(states):
+            if str(state.state) == "Running" or not str(state.state).startswith("R"):
+                continue
+            begin, end = max(int(state.ts), from_ns), min(int(state.ts) + int(state.dur), to_ns)
+            following = next((s for s in states[position + 1 :] if str(s.state) == "Running" and s.cpu is not None), None)
+            if begin >= end or following is None:
+                continue
+            ran = self._rows(
+                "SELECT s.ts AS ts, s.dur AS dur, COALESCE(p.name, t.name, 'unknown') AS name FROM sched_slice s JOIN thread t USING (utid) "
+                + f"LEFT JOIN process p USING (upid) WHERE s.cpu = {int(following.cpu)} AND s.utid != {utid} AND s.ts < {end} AND s.ts + s.dur > {begin}"
+            )
+            for slice_row in ran:
+                overlap = min(int(slice_row.ts) + int(slice_row.dur), end) - max(int(slice_row.ts), begin)
+                if overlap > 0:
+                    totals[str(slice_row.name)] = totals.get(str(slice_row.name), 0) + overlap
+        return sorted(totals.items(), key=lambda item: (-item[1], item[0]))
 
     def added(self, root: str) -> tuple[dict[str, int], dict[str, int]]:
         """What a trace has under the root track of that name, per track name: its slices (a moment is a slice without length

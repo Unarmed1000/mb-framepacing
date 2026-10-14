@@ -62,6 +62,7 @@ class MadeFrame:
     cpu_start_ns: int | None = None
     cpu_busy_ns: int | None = None
     older_frames: tuple[tuple[int, int], ...] = ()
+    frame_time_ns: int | None = None
 
 
 @dataclass(frozen=True)

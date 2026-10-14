@@ -114,8 +114,9 @@ marker. The tools note it with the run; a trace is merged with or without it.
 ## Part 2: what happened around each frame (optional)
 
 > **Not checked against the capture.** Part 2 is optional, and nothing the tools measure is held against it: it is what the
-> application says it did, for whoever reads the trace (the viewer, a person, a script). The tools count it (`trace-info`)
-> and read nothing else of it yet. Part 1, the record above, is unchanged and is all the merge needs.
+> application says it did, for whoever reads the trace (the viewer, a person, a script). The tools count it (`trace-info`),
+> and the script `tools/trace_diagnose.py` reads it beside the capture to say what went wrong in a run. Part 1, the record
+> above, is unchanged and is all the merge needs.
 
 Where the record says which frame a slice of the trace is, part 2 says what happened around it: the waits before it, its
 present, the GPU's work on it, when the platform says it was shown, and what the run runs on. The rules of the record hold for

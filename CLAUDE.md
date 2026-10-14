@@ -242,13 +242,23 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
       `FrameRecordText` (C++ and C#, one table), names by `FrameDetail` / `FrameDetailName` (C# `TryParse`), held to
       `sdk/test-data/trace/frame-details.csv`. `sdk/test-data/trace/example-app.pftrace` is the made-up example with all of it
       (`synthetic_trace.build_example`, written and checked by `update_trace_test_data.py`). The tools only count it
-      (`TraceInfo.FrameRecordDetails`, `trace-info`); using it is phase B.
+      (`TraceInfo.FrameRecordDetails`, `trace-info`); `tools/trace_diagnose.py` uses it (phase B, below).
     - The tools read it with the SDK's strings (`MB.FramePacing.TraceJoin` references `MB.FramePacing.Trace`; the tools' library
       was renamed to give the SDK the name): `FrameRecordSlice` is a record read from a trace, `TraceReader.FrameRecords` reads
       it from any track with the process of the track.
     - The made-up traces have both forms: `synthetic.pftrace` logs it as sections on the application's thread (every ninth
       1500 ns late, one frame in fifty none), `synthetic-app.pftrace` (`synthetic_trace.build_app`) as the SDK defines it, with
       annotations. The made-up application's clock is 100 s from the record's clock on purpose: nothing tells the join so.
+  - **What went wrong: phase B** (the user, 2026-10-14: "a script that can analyze the augmented report and try to figure out
+    what went wrong", "using the CPU + capture side to correlate things"; his choices of 2026-10-15: a script first, a port
+    into the tools only once recorded traces show it is useful; it reads the analysis folder; program names in the local text
+    file only; no diagnosis track in the augmented trace yet). `tools/trace_diagnose.py` (reads: the run's frames,
+    `run-<id>-trace.csv`, the augmented trace through `trace_source.py`'s `frame_details`, `run_moments`, `waited_for_cpu`)
+    and `tools/trace_diagnosis.py` (the facts, standard library: `FACT_ORDER`, a frame grouped by its first, every fact held
+    against the frames on time, repeats, bursts, the run's moments) write `run-<id>-diagnosis.txt` and `.csv`. **Facts only,
+    never a guessed cause** ("nothing in the trace explains it"); part 2 is the application's word; a time against a frame's
+    due refresh carries the clocks' tie by the frames. Tests: `test_trace_diagnosis` (made-up joins and part 2 on known frames
+    of the golden capture), `test_trace_diagnose` (end to end with the SDK's example trace). The tools do not run it.
   - **Perfetto's trace processor is the user's own**, found as ffmpeg is (`TraceProcessorLocator`: `--trace-processor`,
     `MB_TRACE_PROCESSOR`, `traceProcessorPath`, PATH, the folder Perfetto's Python package downloads into) and never bundled or
     downloaded by the tools. `TraceProcessor` starts it on the loopback address with the trace on its command line and asks SQL
