@@ -702,8 +702,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       frame appeared) is that position: a value in the CSV and the hover that no flag or colour follows from. A static or an
       uncertain step has no late frame. On the 22 clips: 231 late frames, `60-naive-5ms` none (it had 64 by the rule of
       2026-10-13, which only compared the two steps).
-    - The pacer's `DisplayErrorCounter` still counts by the steps alone (the rule of 2026-10-13): `sdk/doc/pacer.md` and decision
-      18 of `pacer-design.md` say so. Not changed without the user's word.
+    - The pacer's `DisplayErrorCounter` counts by the same rule (the user's go, 2026-10-14): `TierPacer` gives it each frame's
+      intended period in refreshes (the swap interval while pacing, the preferred swap interval while not; 0 = on demand). While
+      pacing that changes no count (the golden runs are byte for byte the same); only a frame not paced counts differently.
     - **Jitter** (`PresentedFrameFlags.Jitter`, the user, 2026-10-14: "jitter animation timer off by less than a intended refresh
       period"): an error frame that the cause split (`PacingAnalyzer.Split`) counts as delta time jitter, off by less than its
       intended period, and not late. Yellow (`#e3b341`) on the error bars (`bar-jitter`; a pixel column of many frames when every

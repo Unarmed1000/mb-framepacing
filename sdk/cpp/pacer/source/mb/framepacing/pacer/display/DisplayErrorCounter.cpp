@@ -17,7 +17,8 @@ namespace MB::FramePacing::Pacer
     constexpr int64_t OffTargetDivisor = 2;
   }
 
-  void DisplayErrorCounter::AddFrame(const uint64_t frameId, const NanosecondTimeSpan animationStep, const NanosecondTickCount startTime) noexcept
+  void DisplayErrorCounter::AddFrame(const uint64_t frameId, const NanosecondTimeSpan animationStep, const uint32_t intendedRefreshes,
+                                     const NanosecondTickCount startTime) noexcept
   {
     if (frameId != m_newestId + 1u)
     {
@@ -33,6 +34,7 @@ namespace MB::FramePacing::Pacer
     }
     m_steps[static_cast<std::size_t>(frameId % Capacity)] = animationStep;
     m_starts[static_cast<std::size_t>(frameId % Capacity)] = startTime;
+    m_intendedRefreshes[static_cast<std::size_t>(frameId % Capacity)] = intendedRefreshes;
   }
 
   void DisplayErrorCounter::AddDisplayReport(const DisplayReport& report, const RefreshPeriod period) noexcept
@@ -84,8 +86,10 @@ namespace MB::FramePacing::Pacer
       const int64_t offTarget = period.ToNanosecondTimeSpan().Nanoseconds() / OffTargetDivisor;
       const bool isError = error > ErrorThreshold.Nanoseconds() || error < -ErrorThreshold.Nanoseconds();
       const bool isOffTarget = error >= offTarget || error <= -offTarget;
-      // Shown later than its animation time step put it: the display time step is the longer of the two
-      const bool isLate = error <= -offTarget;
+      // Shown later than its animation time step put it and later than intended: the display time step is half a refresh or more
+      // longer than both. A frame without an intended period (on demand) is never late
+      const uint32_t intendedRefreshes = m_intendedRefreshes[static_cast<std::size_t>(frameId % Capacity)];
+      const bool isLate = error <= -offTarget && intendedRefreshes > 0 && displayStep >= period.TimeFor(intendedRefreshes).Nanoseconds() + offTarget;
 
       ++bucket.Judged;
       bucket.Errors += isError ? 1u : 0u;

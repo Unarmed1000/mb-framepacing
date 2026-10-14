@@ -245,8 +245,10 @@ namespace MB::FramePacing::Pacer
     {
       schedule = m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
     }
-    // Kept for the display report that comes for it later
-    m_display.AddFrame(schedule.FrameId, schedule.AnimationStep, cpuStartTime);
+    // Kept for the display report that comes for it later, with the period the frame's marker says was intended, as the tools
+    // read it: the target frame time (its swap interval) while pacing, else the preferred frame time
+    const uint32_t intendedRefreshes = m_isPacing ? schedule.SwapInterval : Rule().PreferredSwapInterval();
+    m_display.AddFrame(schedule.FrameId, schedule.AnimationStep, intendedRefreshes, cpuStartTime);
     return schedule;
   }
 

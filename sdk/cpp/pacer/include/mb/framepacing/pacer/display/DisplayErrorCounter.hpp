@@ -21,8 +21,10 @@ namespace MB::FramePacing::Pacer
   //! The rules are the measuring tools': the animation error of a frame is its animation time step less its display time step
   //! (the time between its display time and that of the frame before it); an error of more than ErrorThreshold is an error
   //! frame; a display time step half a refresh or more off the animation time step is a frame at another refresh than it was made
-  //! for; and a step next to a frame without a display time (never shown, no report) is not judged. What differs: the times are
-  //! the platform's word, where the tools read them off the display.
+  //! for; such a frame is late when its display time step is the longer and is also half a refresh or more longer than the frame's
+  //! intended period (the period its marker carries: a frame on demand has none and is never late); and a step next to a frame
+  //! without a display time (never shown, no report) is not judged. What differs: the times are the platform's word, where the
+  //! tools read them off the display.
   //!
   //! Next to that it adds up how long a frame took from its start to its display, of every frame reported as shown.
   //!
@@ -56,6 +58,8 @@ namespace MB::FramePacing::Pacer
     // The animation time step and the start of every frame kept, by its id
     std::array<NanosecondTimeSpan, Capacity> m_steps{};
     std::array<NanosecondTickCount, Capacity> m_starts{};
+    // The intended period of every frame kept, in refreshes, by its id (0: none)
+    std::array<uint32_t, Capacity> m_intendedRefreshes{};
     // The newest frame begun (0: none), the oldest one kept, and the newest one a report came for
     uint64_t m_newestId{0};
     uint64_t m_oldestId{1};
@@ -71,9 +75,10 @@ namespace MB::FramePacing::Pacer
     DisplayErrorState m_state;
 
   public:
-    //! A frame begins: its id (FrameSchedule::FrameId, one more than the frame before), its animation time step and the time
-    //! it starts at. An id that is not the next one starts again from it.
-    void AddFrame(uint64_t frameId, NanosecondTimeSpan animationStep, NanosecondTickCount startTime) noexcept;
+    //! A frame begins: its id (FrameSchedule::FrameId, one more than the frame before), its animation time step, its intended
+    //! period in refreshes (the marker's target frame time, else its preferred frame time; 0: none, on demand) and the time it
+    //! starts at. An id that is not the next one starts again from it.
+    void AddFrame(uint64_t frameId, NanosecondTimeSpan animationStep, uint32_t intendedRefreshes, NanosecondTickCount startTime) noexcept;
 
     //! A display report for a frame that was begun: oldest first, at most once a frame. period is the display's refresh period.
     void AddDisplayReport(const DisplayReport& report, RefreshPeriod period) noexcept;

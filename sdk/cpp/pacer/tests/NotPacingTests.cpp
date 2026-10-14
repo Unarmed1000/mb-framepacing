@@ -33,6 +33,8 @@
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string_view>
@@ -607,5 +609,41 @@ TEST(NotPacing, ASimulatedLoopThatStopsPacingAndStartsAgainIsOnItsRefreshesAgain
         ASSERT_LE(frames[index].PendingAtStart, waitingBefore) << message(index);
       }
     }
+  }
+}
+
+TEST(NotPacing, AFrameIsLateOnlyWhenItIsAlsoHalfARefreshPastThePreferredFrameTime)
+{
+  // Not paced, a frame's marker carries no target frame time: its intended period is the preferred frame time, as the tools read
+  // it. Every frame is animated for the FreeStep since the one before, far short of a refresh
+  for (const uint32_t preferred : {1u, 2u})
+  {
+    PC::PacerSettings settings = Settings();
+    settings.SetPreferredSwapInterval(preferred);
+    Loop loop(settings, PacerCapabilities(PacerCapability::DisplayTimes));
+    loop.Pacer.SetPacing(false);
+    std::array<PC::FrameSchedule, 3> frames{};
+    for (PC::FrameSchedule& rFrame : frames)
+    {
+      rFrame = loop.Frame();
+    }
+    EXPECT_EQ(frames[1].AnimationStep.Nanoseconds(), FreeStep) << preferred;
+    EXPECT_EQ(frames[2].AnimationStep.Nanoseconds(), FreeStep) << preferred;
+    // Shown just under half a refresh past the preferred frame time, then half a refresh past it: each later than it was
+    // animated for by more than half a refresh, and only the second is late
+    const int64_t intended = static_cast<int64_t>(preferred) * Period;
+    int64_t shown = loop.Now + (10 * Period);
+    for (std::size_t frame = 0; frame < frames.size(); ++frame)
+    {
+      shown += frame == 0 ? 0 : (frame == 1 ? intended + 4'999'999 : intended + 5'000'000);
+      PC::DisplayReport report;
+      report.FrameId = frames[frame].FrameId;
+      report.DisplayTime = At(shown);
+      loop.Pacer.AddDisplayReport(report);
+    }
+    const PC::DisplayErrorState state = loop.Pacer.DisplayErrors();
+    EXPECT_EQ(state.JudgedFrames, 2u) << preferred;
+    EXPECT_EQ(state.OffTargetFrames, 2u) << preferred;
+    EXPECT_EQ(state.LateFrames, 1u) << preferred;
   }
 }

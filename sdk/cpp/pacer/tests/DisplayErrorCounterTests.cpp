@@ -46,7 +46,7 @@ namespace
   {
     for (uint64_t frameId = first; frameId <= last; ++frameId)
     {
-      rCounter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(0));
+      rCounter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(0));
     }
   }
 }
@@ -119,10 +119,10 @@ TEST(DisplayErrorCounter, AnErrorOfMoreThanAMillisecondIsAnErrorFrameAndHalfARef
 TEST(DisplayErrorCounter, TheAnimationTimeStepIsTheFramesOwn)
 {
   PC::DisplayErrorCounter counter;
-  counter.AddFrame(1, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(0));
-  counter.AddFrame(2, FP::NanosecondTimeSpan(2 * Period), FP::NanosecondTickCount(0));
-  counter.AddFrame(3, FP::NanosecondTimeSpan(3 * Period), FP::NanosecondTickCount(0));
-  counter.AddFrame(4, FP::NanosecondTimeSpan(2 * Period), FP::NanosecondTickCount(0));
+  counter.AddFrame(1, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(0));
+  counter.AddFrame(2, FP::NanosecondTimeSpan(2 * Period), 2, FP::NanosecondTickCount(0));
+  counter.AddFrame(3, FP::NanosecondTimeSpan(3 * Period), 3, FP::NanosecondTickCount(0));
+  counter.AddFrame(4, FP::NanosecondTimeSpan(2 * Period), 2, FP::NanosecondTickCount(0));
   counter.AddDisplayReport(Shown(1, Start), g_hz100);
   counter.AddDisplayReport(Shown(2, Start + (2 * Period)), g_hz100);
   counter.AddDisplayReport(Shown(3, Start + (5 * Period)), g_hz100);
@@ -216,7 +216,7 @@ TEST(DisplayErrorCounter, TheLastSecondIsCountedByItself)
   uint64_t expectedErrors = 0;
   for (uint64_t frameId = 1; frameId <= 300; ++frameId)
   {
-    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(0));
+    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(0));
     const bool late = frameId <= 100 && (frameId % 10) == 0;
     const bool afterLate = frameId <= 101 && frameId > 1 && ((frameId - 1) % 10) == 0;
     shown += late ? 2 * Period : (afterLate ? 0 : Period);
@@ -253,7 +253,7 @@ TEST(DisplayErrorCounter, TheTimeFromAFramesStartToItsDisplayIsAddedUpForEveryFr
   for (uint64_t frameId = 1; frameId <= 5; ++frameId)
   {
     const int64_t start = Start + (static_cast<int64_t>(frameId) * Period);
-    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(start));
+    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(start));
   }
   for (uint64_t frameId = 1; frameId <= 5; ++frameId)
   {
@@ -276,7 +276,7 @@ TEST(DisplayErrorCounter, TheTimeFromAFramesStartToItsDisplayIsAddedUpForEveryFr
   // time a frame took, though the report is taken
   for (uint64_t frameId = 6; frameId <= 8; ++frameId)
   {
-    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(Start + (static_cast<int64_t>(frameId) * Period)));
+    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(Start + (static_cast<int64_t>(frameId) * Period)));
   }
   counter.AddDisplayReport(NotShown(6), g_hz100);
   counter.AddDisplayReport(Shown(7, Start + (7 * Period) - 1), g_hz100);
@@ -299,7 +299,7 @@ TEST(DisplayErrorCounter, TheLastSecondsTimeFromStartToDisplayIsItsOwn)
   for (uint64_t frameId = 1; frameId <= 300; ++frameId)
   {
     const int64_t start = Start + (static_cast<int64_t>(frameId) * Period);
-    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(start));
+    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(start));
     counter.AddDisplayReport(Shown(frameId, start + (frameId <= 100 ? 3 * Period : Period)), g_hz100);
   }
   const PC::DisplayErrorState state = counter.State();
@@ -319,7 +319,7 @@ TEST(DisplayErrorCounter, AFrameIdOfZeroStartsAgainAsAnyIdThatIsNotTheNextOne)
   Begin(counter, 1, 3);
   counter.AddDisplayReport(Shown(1, Start), g_hz100);
   // No frame has the id 0: given all the same, it starts again and keeps nothing from before
-  counter.AddFrame(0, FP::NanosecondTimeSpan(Period), FP::NanosecondTickCount(0));
+  counter.AddFrame(0, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(0));
   counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
   EXPECT_EQ(counter.State().Refused, 1u);
   Begin(counter, 1, 2);
@@ -327,4 +327,55 @@ TEST(DisplayErrorCounter, AFrameIdOfZeroStartsAgainAsAnyIdThatIsNotTheNextOne)
   counter.AddDisplayReport(Shown(2, Start + (11 * Period)), g_hz100);
   EXPECT_EQ(counter.State().JudgedFrames, 1u);
   EXPECT_EQ(counter.State().ErrorFrames, 0u);
+}
+
+TEST(DisplayErrorCounter, AFrameOnScreenForItsIntendedPeriodIsNotLateHoweverShortItsAnimationTimeStep)
+{
+  PC::DisplayErrorCounter counter;
+  // A timer that stepped 4 ms for a frame intended for one refresh, shown one refresh after the frame before: 6 ms off, at
+  // another refresh than it was made for, and not late
+  counter.AddFrame(1, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(0));
+  counter.AddFrame(2, FP::NanosecondTimeSpan(4'000'000), 1, FP::NanosecondTickCount(0));
+  counter.AddFrame(3, FP::NanosecondTimeSpan(4'000'000), 1, FP::NanosecondTickCount(0));
+  counter.AddFrame(4, FP::NanosecondTimeSpan(4'000'000), 1, FP::NanosecondTickCount(0));
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
+  EXPECT_EQ(counter.State().OffTargetFrames, 1u);
+  EXPECT_EQ(counter.State().LateFrames, 0u);
+  // Just under half a refresh past its intended period is still not late; half a refresh past it is
+  counter.AddDisplayReport(Shown(3, Start + (2 * Period) + 4'999'999), g_hz100);
+  EXPECT_EQ(counter.State().LateFrames, 0u);
+  counter.AddDisplayReport(Shown(4, Start + (3 * Period) + 4'999'999 + 5'000'000), g_hz100);
+  EXPECT_EQ(counter.State().OffTargetFrames, 3u);
+  EXPECT_EQ(counter.State().LateFrames, 1u);
+}
+
+TEST(DisplayErrorCounter, AFrameIntendedForTwoRefreshesIsLateOnlyPastThem)
+{
+  PC::DisplayErrorCounter counter;
+  // 30 fps on a display of 60, here 50 on 100: every frame made and intended for two refreshes
+  for (uint64_t frameId = 1; frameId <= 4; ++frameId)
+  {
+    counter.AddFrame(frameId, FP::NanosecondTimeSpan(2 * Period), 2, FP::NanosecondTickCount(0));
+  }
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + (2 * Period)), g_hz100);
+  counter.AddDisplayReport(Shown(3, Start + (4 * Period)), g_hz100);
+  EXPECT_EQ(counter.State().JudgedFrames, 2u);
+  EXPECT_EQ(counter.State().ErrorFrames, 0u);
+  // Shown after three: a refresh late
+  counter.AddDisplayReport(Shown(4, Start + (7 * Period)), g_hz100);
+  EXPECT_EQ(counter.State().LateFrames, 1u);
+}
+
+TEST(DisplayErrorCounter, AFrameWithoutAnIntendedPeriodIsNeverLate)
+{
+  PC::DisplayErrorCounter counter;
+  // On demand: made for one refresh, shown after three. At another refresh, and not late
+  counter.AddFrame(1, FP::NanosecondTimeSpan(Period), 0, FP::NanosecondTickCount(0));
+  counter.AddFrame(2, FP::NanosecondTimeSpan(Period), 0, FP::NanosecondTickCount(0));
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + (3 * Period)), g_hz100);
+  EXPECT_EQ(counter.State().OffTargetFrames, 1u);
+  EXPECT_EQ(counter.State().LateFrames, 0u);
 }

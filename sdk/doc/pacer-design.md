@@ -2263,11 +2263,13 @@ refresh.
     not run there since.
 
 18. **What the frame window counts as a late frame**: open. The count from display reports
-    (`DisplayErrorState::LateFrames`) has the rule the measuring tools had on 2026-10-13: a frame is late when its display
-    time step is half a refresh or more longer than its animation time step. Since 2026-10-14 the tools also ask that the
-    step is half a refresh or more longer than the frame's intended period (its target frame time, else the plan's step,
-    else the preferred frame time; one more per dropped frame; never on demand), so that a timer that steps short on an
-    even display is not late; the count from display reports does not ask that yet. The swap interval rule's count (`FrameWindowState::LateFrames`)
+    (`DisplayErrorState::LateFrames`) has the measuring tools' rule (since 2026-10-14): a frame is late when its display time
+    step is half a refresh or more longer than both its animation time step and its intended period, the period its marker
+    carries (the target frame time, the swap interval, while pacing; the preferred frame time while not). While pacing the
+    animation step is never shorter than the swap interval, so the second condition changes no count: the golden runs came
+    out byte for byte the same, among them the eight that report display times, with their 10 late frames. It counts
+    differently only while not pacing, where the animation step is the time since the frame before started. The swap
+    interval rule's count (`FrameWindowState::LateFrames`)
     is not that rule. It has no display times, and it counts a frame that did not make its time, which is what the rule
     slows down on. Where the two differ, with the display as the pacer reckons it:
 
