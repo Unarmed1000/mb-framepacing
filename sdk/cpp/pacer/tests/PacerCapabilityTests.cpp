@@ -49,22 +49,32 @@ namespace
     return static_cast<uint32_t>(tier);
   }
 
-  constexpr std::array<PacerTier, 12> EveryTier = {PacerTier::TimedSkipVBlankWaitForPresent, PacerTier::TimedSkipTimerWaitForPresent,
-                                                   PacerTier::TimedSkipVBlankPeriodOnly,     PacerTier::TimedSkipTimerPeriodOnly,
-                                                   PacerTier::TimedVBlankWaitForPresent,     PacerTier::TimedTimerWaitForPresent,
-                                                   PacerTier::TimedVBlankPeriodOnly,         PacerTier::TimedTimerPeriodOnly,
-                                                   PacerTier::VBlankWaitForPresent,          PacerTier::VBlankPeriodOnly,
-                                                   PacerTier::TimerWaitForPresent,           PacerTier::TimerPeriodOnly};
+  constexpr std::array<PacerTier, 12> EveryTier = {PacerTier::AtTimeVBlankWaitForPresent,
+                                                   PacerTier::AtTimeTimerWaitForPresent,
+                                                   PacerTier::AtTimeVBlankPeriodOnly,
+                                                   PacerTier::AtTimeTimerPeriodOnly,
+                                                   PacerTier::AfterDurationVBlankWaitForPresent,
+                                                   PacerTier::AfterDurationTimerWaitForPresent,
+                                                   PacerTier::AfterDurationVBlankDisplayTimes,
+                                                   PacerTier::AfterDurationTimerDisplayTimes,
+                                                   PacerTier::VBlankWaitForPresent,
+                                                   PacerTier::VBlankPeriodOnly,
+                                                   PacerTier::TimerWaitForPresent,
+                                                   PacerTier::TimerPeriodOnly};
 
-  // The one present that places a frame, and what makes its display's side the better one
+  // The present that places a frame against a clock, the one that places it after the one before, and the display's side that
+  // skips a frame that is overdue (a mark beside the tier)
   constexpr PacerCapability TimedPresent = PacerCapability::PresentAtTime;
+  constexpr PacerCapability Duration = PacerCapability::PresentAfterDuration;
   constexpr PacerCapability Skips = PacerCapability::PresentSkipsOverdue;
   constexpr PacerCapability EveryRaise = TimedPresent | PacerCapability::WaitForPresent | PacerCapability::VBlankTimes;
+  // What raises a set that sees where frames were shown and has no present that places a frame
+  constexpr PacerCapability PlacingPresents = TimedPresent | Duration | PacerCapability::PresentSwapInterval;
 
   // The rating is usable where a constant is needed
   static_assert(PC::PacerTierUtil::Rate(PacerCapabilities()).Tier == PacerTier::TimerPeriodOnly);
   static_assert(PC::PacerTierUtil::Rate(PacerCapabilities(PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)) ==
-                PacerRating{PacerTier::VBlankWaitForPresent, TimedPresent, false, false});
+                PacerRating{PacerTier::VBlankWaitForPresent, PlacingPresents, false, false});
 }
 
 TEST(PacerCapability, EveryCapabilityIsABitOfItsOwnAndAllOfThemAreAllCapabilities)
@@ -202,6 +212,7 @@ TEST(PacerTier, ATierIsItsCapabilitySet)
   using PC::PacerTierUtil::Reaches;
   const PacerCapability wait = PacerCapability::WaitForPresent;
   const PacerCapability vblank = PacerCapability::VBlankTimes;
+  const PacerCapability shown = PacerCapability::DisplayTimes;
   // Every set reaches the baseline: a timer and the refresh period only
   EXPECT_TRUE(Reaches(PacerCapabilities(), PacerTier::TimerPeriodOnly));
   // (every capability a set can have at once: of the two pairs that exclude themselves, neither)
@@ -213,70 +224,81 @@ TEST(PacerTier, ATierIsItsCapabilitySet)
   // Vertical blank times, and nothing else, reach the tier of the loop that knows where the refreshes are
   EXPECT_TRUE(Reaches(PacerCapabilities(vblank), PacerTier::VBlankPeriodOnly));
   EXPECT_FALSE(Reaches(PacerCapabilities(), PacerTier::VBlankPeriodOnly));
-  EXPECT_FALSE(Reaches(PacerCapabilities(PacerCapability::DisplayTimes | wait), PacerTier::VBlankPeriodOnly));
-  // Both: the best tier without a timed present
+  EXPECT_FALSE(Reaches(PacerCapabilities(shown | wait), PacerTier::VBlankPeriodOnly));
+  // Both: the best tier of the frame loop
   EXPECT_TRUE(Reaches(PacerCapabilities(vblank | wait), PacerTier::VBlankWaitForPresent));
   EXPECT_FALSE(Reaches(PacerCapabilities(vblank), PacerTier::VBlankWaitForPresent));
   EXPECT_FALSE(Reaches(PacerCapabilities(wait), PacerTier::VBlankWaitForPresent));
 
-  // A present that takes a time before which the frame is not shown, and nothing else, reaches the lowest of the four tiers
-  // above those: with a time the frame before it stays as well, or without
-  for (const PacerCapability timed : {PacerCapability::PresentAtTime, PacerCapability::PresentAtTime | PacerCapability::PresentAfterDuration})
+  // A present that takes a time before which the frame is not shown, and nothing else, reaches the lowest of the first major
+  // tier: with a duration as well, or without, and with a display's side that skips or without
+  for (const PacerCapability timed : {TimedPresent, TimedPresent | Duration, TimedPresent | Skips})
   {
-    EXPECT_TRUE(PC::PacerTierUtil::HasTimedPresent(PacerCapabilities(timed)));
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed), PacerTier::TimedTimerPeriodOnly));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed), PacerTier::TimedVBlankPeriodOnly));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed), PacerTier::TimedTimerWaitForPresent));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed), PacerTier::TimedVBlankWaitForPresent));
+    EXPECT_TRUE(PC::PacerTierUtil::HasPresentAtTime(PacerCapabilities(timed)));
+    EXPECT_TRUE(Reaches(PacerCapabilities(timed), PacerTier::AtTimeTimerPeriodOnly));
+    EXPECT_FALSE(Reaches(PacerCapabilities(timed), PacerTier::AtTimeVBlankPeriodOnly));
+    EXPECT_FALSE(Reaches(PacerCapabilities(timed), PacerTier::AtTimeTimerWaitForPresent));
+    EXPECT_FALSE(Reaches(PacerCapabilities(timed), PacerTier::AtTimeVBlankWaitForPresent));
     // With vertical blank times, with a wait for a present, and with both
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | vblank), PacerTier::TimedVBlankPeriodOnly));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | vblank), PacerTier::TimedTimerWaitForPresent));
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | wait), PacerTier::TimedTimerWaitForPresent));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | wait), PacerTier::TimedVBlankPeriodOnly));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | wait), PacerTier::TimedVBlankWaitForPresent));
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | vblank | wait), PacerTier::TimedVBlankWaitForPresent));
-    // And none of the four of a display that skips
-    EXPECT_FALSE(PC::PacerTierUtil::SkipsOverduePresents(PacerCapabilities(timed | vblank | wait)));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | vblank | wait), PacerTier::TimedSkipTimerPeriodOnly));
+    EXPECT_TRUE(Reaches(PacerCapabilities(timed | vblank), PacerTier::AtTimeVBlankPeriodOnly));
+    EXPECT_FALSE(Reaches(PacerCapabilities(timed | vblank), PacerTier::AtTimeTimerWaitForPresent));
+    EXPECT_TRUE(Reaches(PacerCapabilities(timed | wait), PacerTier::AtTimeTimerWaitForPresent));
+    EXPECT_FALSE(Reaches(PacerCapabilities(timed | wait), PacerTier::AtTimeVBlankPeriodOnly));
+    EXPECT_FALSE(Reaches(PacerCapabilities(timed | wait), PacerTier::AtTimeVBlankWaitForPresent));
+    EXPECT_TRUE(Reaches(PacerCapabilities(timed | vblank | wait), PacerTier::AtTimeVBlankWaitForPresent));
+  }
 
-    // A display's side that leaves out a frame that is overdue: the four above those, by the same two capabilities
-    EXPECT_TRUE(PC::PacerTierUtil::SkipsOverduePresents(PacerCapabilities(timed | Skips)));
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | Skips), PacerTier::TimedSkipTimerPeriodOnly));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | Skips), PacerTier::TimedSkipVBlankPeriodOnly));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | Skips), PacerTier::TimedSkipTimerWaitForPresent));
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | Skips | vblank), PacerTier::TimedSkipVBlankPeriodOnly));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | Skips | vblank), PacerTier::TimedSkipTimerWaitForPresent));
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | Skips | wait), PacerTier::TimedSkipTimerWaitForPresent));
-    EXPECT_FALSE(Reaches(PacerCapabilities(timed | Skips | wait), PacerTier::TimedSkipVBlankWaitForPresent));
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | Skips | vblank | wait), PacerTier::TimedSkipVBlankWaitForPresent));
-    // It reaches the tiers of a display that shows every frame as well: its rating is the best of them
-    EXPECT_TRUE(Reaches(PacerCapabilities(timed | Skips), PacerTier::TimedTimerPeriodOnly));
-  }
-  // A time the frame before it stays places no frame: alone it reaches nothing above the tiers of the loop, and neither does
-  // a display's side that skips without a time on the present, as nothing is due there
-  for (const PacerCapability alone : {PacerCapability::PresentAfterDuration, Skips, PacerCapability::PresentAfterDuration | Skips})
+  // A duration on the present (or a swap interval of two or more) reaches the second major tier where the set sees where frames
+  // were shown: with a wait for a present, or with display times where it has none
+  for (const PacerCapabilities duration : {PacerCapabilities(Duration), PacerCapabilities(PacerCapability::PresentSwapInterval, 2)})
   {
-    const PacerCapabilities set(alone | vblank | wait);
-    EXPECT_FALSE(PC::PacerTierUtil::HasTimedPresent(set));
-    EXPECT_FALSE(PC::PacerTierUtil::SkipsOverduePresents(set));
-    EXPECT_FALSE(Reaches(set, PacerTier::TimedTimerPeriodOnly));
-    EXPECT_FALSE(Reaches(set, PacerTier::TimedSkipTimerPeriodOnly));
-    EXPECT_TRUE(Reaches(set, PacerTier::VBlankWaitForPresent));
+    const PacerCapability present = duration.Capabilities();
+    EXPECT_TRUE(PC::PacerTierUtil::HasPresentAfterDuration(duration));
+    EXPECT_FALSE(PC::PacerTierUtil::HasPresentAtTime(duration));
+    // Alone, or with vertical blank times only, it sees nothing: the frame loop's tiers
+    for (const PacerCapability tier : {PacerCapability::NoCapabilities, vblank})
+    {
+      const PacerCapabilities blind(present | tier, 2);
+      EXPECT_FALSE(PC::PacerTierUtil::SeesWhereFramesWereShown(blind));
+      for (const PacerTier afterDuration : {PacerTier::AfterDurationVBlankWaitForPresent, PacerTier::AfterDurationTimerWaitForPresent,
+                                            PacerTier::AfterDurationVBlankDisplayTimes, PacerTier::AfterDurationTimerDisplayTimes})
+      {
+        EXPECT_FALSE(Reaches(blind, afterDuration));
+      }
+    }
+    EXPECT_TRUE(Reaches(PacerCapabilities(present | vblank | wait, 2), PacerTier::AfterDurationVBlankWaitForPresent));
+    EXPECT_TRUE(Reaches(PacerCapabilities(present | wait, 2), PacerTier::AfterDurationTimerWaitForPresent));
+    EXPECT_FALSE(Reaches(PacerCapabilities(present | wait, 2), PacerTier::AfterDurationVBlankWaitForPresent));
+    EXPECT_TRUE(Reaches(PacerCapabilities(present | vblank | shown, 2), PacerTier::AfterDurationVBlankDisplayTimes));
+    EXPECT_FALSE(Reaches(PacerCapabilities(present | vblank | shown, 2), PacerTier::AfterDurationTimerWaitForPresent));
+    EXPECT_TRUE(Reaches(PacerCapabilities(present | shown, 2), PacerTier::AfterDurationTimerDisplayTimes));
+    EXPECT_FALSE(Reaches(PacerCapabilities(present | shown, 2), PacerTier::AfterDurationVBlankDisplayTimes));
+    // And none of the first major tier
+    EXPECT_FALSE(Reaches(PacerCapabilities(present | vblank | wait | shown, 2), PacerTier::AtTimeTimerPeriodOnly));
   }
-  // Without a timed present no set reaches them, whatever else it has
-  const PacerCapabilities untimed(PC::Without(PacerCapability::AllCapabilities, TimedPresent | PresentPair | AcquirePair), 8);
-  EXPECT_FALSE(PC::PacerTierUtil::HasTimedPresent(untimed));
-  EXPECT_FALSE(Reaches(untimed, PacerTier::TimedTimerPeriodOnly));
-  EXPECT_FALSE(Reaches(untimed, PacerTier::TimedSkipTimerPeriodOnly));
+  // A swap interval of one places nothing beyond the frame loop's
+  const PacerCapabilities one(PacerCapability::PresentSwapInterval | wait | shown, 1);
+  EXPECT_FALSE(PC::PacerTierUtil::HasPresentAfterDuration(one));
+  EXPECT_FALSE(Reaches(one, PacerTier::AfterDurationTimerDisplayTimes));
+  EXPECT_TRUE(Reaches(one, PacerTier::TimerWaitForPresent));
+
+  // A display's side that skips a frame that is overdue reaches no tier by itself: it is a mark beside the tier
+  const PacerCapabilities skips(Skips | vblank | wait);
+  EXPECT_FALSE(Reaches(skips, PacerTier::AtTimeTimerPeriodOnly));
+  EXPECT_FALSE(Reaches(skips, PacerTier::AfterDurationTimerWaitForPresent));
+  EXPECT_TRUE(Reaches(skips, PacerTier::VBlankWaitForPresent));
+  // Without a present that places a frame no set reaches the first two major tiers, whatever else it has
+  const PacerCapabilities untimed(PC::Without(PacerCapability::AllCapabilities, PlacingPresents | PresentPair | AcquirePair), 8);
+  EXPECT_FALSE(Reaches(untimed, PacerTier::AtTimeTimerPeriodOnly));
+  EXPECT_FALSE(Reaches(untimed, PacerTier::AfterDurationTimerDisplayTimes));
   EXPECT_TRUE(Reaches(untimed, PacerTier::VBlankWaitForPresent));
 
-  // What a present's swap interval or minimum duration holds, what slows a loop when its queue is full, what only measures, a
-  // wait for the GPU's work and display times reach no tier above the baseline
-  const PacerCapabilities noTier(PacerCapability::PresentSwapInterval | PacerCapability::PresentAfterDuration | PacerCapability::WaitForImage |
-                                   PacerCapability::FrameCallback | PacerCapability::PresentWaits | PacerCapability::AcquireWaits |
-                                   PacerCapability::WaitForGpuWork | PacerCapability::GpuWorkTimes | PacerCapability::GpuWorkDurations |
-                                   PacerCapability::DisplayTimes,
-                                 4);
+  // What slows a loop when its queue is full, what only measures, a wait for the GPU's work, display times and a display's side
+  // that skips reach no tier above the baseline
+  const PacerCapabilities noTier(PacerCapability::WaitForImage | PacerCapability::FrameCallback | PacerCapability::PresentWaits |
+                                   PacerCapability::AcquireWaits | PacerCapability::WaitForGpuWork | PacerCapability::GpuWorkTimes |
+                                   PacerCapability::GpuWorkDurations | shown | Skips,
+                                 1);
   for (const PacerTier tier : EveryTier)
   {
     EXPECT_EQ(Reaches(noTier, tier), tier == PacerTier::TimerPeriodOnly) << Number(tier);
@@ -288,28 +310,31 @@ TEST(PacerTier, ATierIsItsCapabilitySet)
 TEST(PacerTier, TheOrderIsWhoPlacesTheFrameThenWhatHoldsTheLoopThenWhereTheRefreshesAre)
 {
   using PC::PacerTierUtil::Rate;
-  const PacerCapability timed = PacerCapability::PresentAtTime;
   const PacerCapability wait = PacerCapability::WaitForPresent;
   const PacerCapability vblank = PacerCapability::VBlankTimes;
-  // A display's side that places a frame and skips one that is overdue is above everything else
-  EXPECT_EQ(Rate(PacerCapabilities(timed | Skips | wait | vblank)).Tier, PacerTier::TimedSkipVBlankWaitForPresent);
-  EXPECT_EQ(Rate(PacerCapabilities(timed | Skips | wait)).Tier, PacerTier::TimedSkipTimerWaitForPresent);
-  EXPECT_EQ(Rate(PacerCapabilities(timed | Skips | vblank)).Tier, PacerTier::TimedSkipVBlankPeriodOnly);
-  EXPECT_EQ(Rate(PacerCapabilities(timed | Skips)).Tier, PacerTier::TimedSkipTimerPeriodOnly);
-  // A time on the present by itself is above everything without one
-  EXPECT_EQ(Rate(PacerCapabilities(timed | wait | vblank)).Tier, PacerTier::TimedVBlankWaitForPresent);
-  EXPECT_EQ(Rate(PacerCapabilities(timed | wait)).Tier, PacerTier::TimedTimerWaitForPresent);
-  EXPECT_EQ(Rate(PacerCapabilities(timed | vblank)).Tier, PacerTier::TimedVBlankPeriodOnly);
-  EXPECT_EQ(Rate(PacerCapabilities(timed)).Tier, PacerTier::TimedTimerPeriodOnly);
+  const PacerCapability shown = PacerCapability::DisplayTimes;
+  // A time on the present is above everything without one; the display's side that skips changes no tier
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | wait | vblank)).Tier, PacerTier::AtTimeVBlankWaitForPresent);
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | Skips | wait | vblank)).Tier, PacerTier::AtTimeVBlankWaitForPresent);
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | wait)).Tier, PacerTier::AtTimeTimerWaitForPresent);
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | vblank)).Tier, PacerTier::AtTimeVBlankPeriodOnly);
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent)).Tier, PacerTier::AtTimeTimerPeriodOnly);
+  // A duration on the present comes next, where the set sees where frames were shown: the wait first, then display times
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | wait | vblank)).Tier, PacerTier::AfterDurationVBlankWaitForPresent);
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | wait)).Tier, PacerTier::AfterDurationTimerWaitForPresent);
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | vblank | shown)).Tier, PacerTier::AfterDurationVBlankDisplayTimes);
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | shown)).Tier, PacerTier::AfterDurationTimerDisplayTimes);
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | wait | vblank | shown)).Tier, PacerTier::AfterDurationVBlankWaitForPresent);
   // Without one the vertical blank times come before the wait: they are what makes the loop's placing good
   EXPECT_EQ(Rate(PacerCapabilities(wait | vblank)).Tier, PacerTier::VBlankWaitForPresent);
   EXPECT_EQ(Rate(PacerCapabilities(vblank)).Tier, PacerTier::VBlankPeriodOnly);
   EXPECT_EQ(Rate(PacerCapabilities(wait)).Tier, PacerTier::TimerWaitForPresent);
   EXPECT_EQ(Rate(PacerCapabilities()).Tier, PacerTier::TimerPeriodOnly);
-  // A time the frame before it stays changes none of them
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentAfterDuration | wait | vblank)).Tier, PacerTier::VBlankWaitForPresent);
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentAfterDuration)).Tier, PacerTier::TimerPeriodOnly);
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentAfterDuration | timed | wait)).Tier, PacerTier::TimedTimerWaitForPresent);
+  // A duration the pacer can not see the result of is the frame loop's
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | vblank)).Tier, PacerTier::VBlankPeriodOnly);
+  EXPECT_EQ(Rate(PacerCapabilities(Duration)).Tier, PacerTier::TimerPeriodOnly);
+  // A time on the present and a duration: the time
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | TimedPresent | wait)).Tier, PacerTier::AtTimeTimerWaitForPresent);
   // The numbers are 1 to 12 in that order
   for (uint32_t index = 0; index < EveryTier.size(); ++index)
   {
@@ -334,23 +359,30 @@ TEST(PacerTier, ATierIsAMajorTierAndASubTier)
     const PacerTier tier = EveryTier[index];
     EXPECT_EQ(static_cast<uint32_t>(MajorOf(tier)), (index / 4u) + 1u) << index;
     EXPECT_EQ(SubTierOf(tier), (index % 4u) + 1u) << index;
-    // A pacer is built for the two major tiers below the first, and a tier of the first is paced as the same sub tier of
-    // the second
-    EXPECT_EQ(HasPacer(tier), index >= 4u) << index;
-    EXPECT_EQ(PacedAs(tier), index >= 4u ? tier : EveryTier[index + 4u]) << index;
+    // A pacer is built for the first and the third major tier; a tier of the second is paced as the frame loop's tier of the
+    // same capabilities
+    const bool afterDuration = index >= 4u && index < 8u;
+    EXPECT_EQ(HasPacer(tier), !afterDuration) << index;
     EXPECT_TRUE(HasPacer(PacedAs(tier))) << index;
-    EXPECT_EQ(SubTierOf(PacedAs(tier)), SubTierOf(tier)) << index;
+    EXPECT_EQ(PacedAs(tier) == tier, !afterDuration) << index;
+    EXPECT_EQ(MajorOf(PacedAs(tier)), afterDuration ? PacerMajorTier::LoopPlaces : MajorOf(tier)) << index;
   }
-  EXPECT_EQ(MajorOf(PacerTier::TimedSkipTimerPeriodOnly), PacerMajorTier::DisplayPlacesAndSkips);
-  EXPECT_EQ(MajorOf(PacerTier::TimedVBlankWaitForPresent), PacerMajorTier::DisplayPlaces);
+  EXPECT_EQ(PacedAs(PacerTier::AfterDurationVBlankWaitForPresent), PacerTier::VBlankWaitForPresent);
+  EXPECT_EQ(PacedAs(PacerTier::AfterDurationTimerWaitForPresent), PacerTier::TimerWaitForPresent);
+  EXPECT_EQ(PacedAs(PacerTier::AfterDurationVBlankDisplayTimes), PacerTier::VBlankPeriodOnly);
+  EXPECT_EQ(PacedAs(PacerTier::AfterDurationTimerDisplayTimes), PacerTier::TimerPeriodOnly);
+  EXPECT_EQ(MajorOf(PacerTier::AtTimeTimerPeriodOnly), PacerMajorTier::DisplayPlacesAtTime);
+  EXPECT_EQ(MajorOf(PacerTier::AfterDurationVBlankWaitForPresent), PacerMajorTier::DisplayPlacesAfterDuration);
   EXPECT_EQ(MajorOf(PacerTier::TimerPeriodOnly), PacerMajorTier::LoopPlaces);
   // The sub tiers of the display's side: the wait first. Of the loop: the vertical blank times first
-  EXPECT_EQ(SubTierOf(PacerTier::TimedTimerWaitForPresent), 2u);
-  EXPECT_EQ(SubTierOf(PacerTier::TimedVBlankPeriodOnly), 3u);
+  EXPECT_EQ(SubTierOf(PacerTier::AtTimeTimerWaitForPresent), 2u);
+  EXPECT_EQ(SubTierOf(PacerTier::AtTimeVBlankPeriodOnly), 3u);
+  EXPECT_EQ(SubTierOf(PacerTier::AfterDurationTimerWaitForPresent), 2u);
+  EXPECT_EQ(SubTierOf(PacerTier::AfterDurationVBlankDisplayTimes), 3u);
   EXPECT_EQ(SubTierOf(PacerTier::VBlankPeriodOnly), 2u);
   EXPECT_EQ(SubTierOf(PacerTier::TimerWaitForPresent), 3u);
   // A value that is no tier is taken as the tier next to it
-  EXPECT_EQ(MajorOf(static_cast<PacerTier>(0)), PacerMajorTier::DisplayPlacesAndSkips);
+  EXPECT_EQ(MajorOf(static_cast<PacerTier>(0)), PacerMajorTier::DisplayPlacesAtTime);
   EXPECT_EQ(SubTierOf(static_cast<PacerTier>(0)), 1u);
   EXPECT_EQ(MajorOf(static_cast<PacerTier>(13)), PacerMajorTier::LoopPlaces);
   EXPECT_EQ(SubTierOf(static_cast<PacerTier>(13)), 4u);
@@ -369,48 +401,64 @@ TEST(PacerTier, TheDisplaysSideHoldsAFrameInThreeWays)
   EXPECT_FALSE(DisplaySideHolds(PacerCapabilities()));
   static_assert(PC::PacerTierUtil::MinHoldingSwapInterval == 2u);
 
-  // A swap interval on the present is in the rating beside the tier, and changes no tier
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentSwapInterval, 4)), (PacerRating{PacerTier::TimerPeriodOnly, EveryRaise, true, false}));
+  // A swap interval of two or more, or a duration, places a frame after the one before: without a wait for a present or display
+  // times the pacer sees nothing of it and the tier is the frame loop's; the display's side holds all the same
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentSwapInterval, 4)),
+            (PacerRating{PacerTier::TimerPeriodOnly, EveryRaise | PacerCapability::DisplayTimes, true, false}));
   EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes, 4)),
-            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent, true, false}));
-  // So is a time the frame before it stays
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentAfterDuration | PacerCapability::VBlankTimes)),
-            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent, true, false}));
-  // A time before which a frame is not shown holds too, and that one does change the tier
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentAtTime | PacerCapability::VBlankTimes)),
-            (PacerRating{PacerTier::TimedVBlankPeriodOnly, Skips | PacerCapability::WaitForPresent, true, false}));
+            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent | PacerCapability::DisplayTimes, true, false}));
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | PacerCapability::VBlankTimes)),
+            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent | PacerCapability::DisplayTimes, true, false}));
+  // With a wait for a present it is the second major tier
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)),
+            (PacerRating{PacerTier::AfterDurationVBlankWaitForPresent, TimedPresent, true, false}));
+  // A time before which a frame is not shown holds too, and is the first major tier
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | PacerCapability::VBlankTimes)),
+            (PacerRating{PacerTier::AtTimeVBlankPeriodOnly, PacerCapability::WaitForPresent, true, false}));
 }
 
 TEST(PacerTier, ARatingIsTheBestTierWhatWouldRaiseItAndWhetherDisplayTimesAreReported)
 {
   using PC::PacerTierUtil::Rate;
-  // The baseline: each of the three raises it. A display's side that skips does not, without a time on the present
+  // The baseline: each of the three raises it. A duration on the present does not, as nothing would see where frames were shown
   EXPECT_EQ(Rate(PacerCapabilities()), (PacerRating{PacerTier::TimerPeriodOnly, EveryRaise, false, false}));
   EXPECT_EQ(PacerRating(), Rate(PacerCapabilities()));
-  // A wait for a present: vertical blank times or a timed present would raise it
+  // A wait for a present: vertical blank times or a present that places a frame would raise it
   EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::WaitForPresent)),
-            (PacerRating{PacerTier::TimerWaitForPresent, TimedPresent | PacerCapability::VBlankTimes, false, false}));
-  // Vertical blank times: a wait for a present or a timed present would
+            (PacerRating{PacerTier::TimerWaitForPresent, PlacingPresents | PacerCapability::VBlankTimes, false, false}));
+  // Vertical blank times: a wait for a present or a time on the present would
   EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::VBlankTimes)),
             (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent, false, false}));
-  // A present at a time, and nothing else: a time the frame before it stays raises nothing, a display's side that skips does
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentAtTime)),
-            (PacerRating{PacerTier::TimedTimerPeriodOnly, Skips | PacerCapability::WaitForPresent | PacerCapability::VBlankTimes, true, false}));
-  // All three: the best tier of a display that shows every frame, and only one that skips is above it
-  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentAtTime | PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)),
-            (PacerRating{PacerTier::TimedVBlankWaitForPresent, Skips, true, false}));
-  // Everything: the best tier, and nothing raises it
+  // A present at a time, and nothing else: a duration raises nothing, a display's side that skips neither
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent)),
+            (PacerRating{PacerTier::AtTimeTimerPeriodOnly, PacerCapability::WaitForPresent | PacerCapability::VBlankTimes, true, false}));
+  // All three: the best tier, and nothing raises it
+  EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)),
+            (PacerRating{PacerTier::AtTimeVBlankWaitForPresent, PacerCapability::NoCapabilities, true, false}));
+  // Everything: the best tier, both marks
   EXPECT_EQ(Rate(PacerCapabilities(PC::Without(PacerCapability::AllCapabilities, PresentPair | AcquirePair), 4)),
-            (PacerRating{PacerTier::TimedSkipVBlankWaitForPresent, PacerCapability::NoCapabilities, true, true}));
+            (PacerRating{PacerTier::AtTimeVBlankWaitForPresent, PacerCapability::NoCapabilities, true, true, true}));
 
-  // Display times are the "+" beside a tier: reported, and no tier is changed by them
-  for (const PacerCapability capabilities :
-       {PacerCapability::NoCapabilities, PacerCapability::VBlankTimes, PacerCapability::PresentAtTime | PacerCapability::WaitForPresent})
+  // Display times are the "+" beside a tier: reported, and no tier is changed by them but where a duration needs them
+  for (const PacerCapability capabilities : {PacerCapability::NoCapabilities, PacerCapability::VBlankTimes,
+                                             TimedPresent | PacerCapability::WaitForPresent, Duration | PacerCapability::WaitForPresent})
   {
     const PacerRating without = Rate(PacerCapabilities(capabilities));
     const PacerRating with = Rate(PacerCapabilities(capabilities | PacerCapability::DisplayTimes));
     EXPECT_FALSE(without.ReportsDisplayTimes);
     EXPECT_TRUE(with.ReportsDisplayTimes);
+    EXPECT_EQ(with.Tier, without.Tier);
+  }
+  EXPECT_EQ(Rate(PacerCapabilities(Duration)).Tier, PacerTier::TimerPeriodOnly);
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | PacerCapability::DisplayTimes)).Tier, PacerTier::AfterDurationTimerDisplayTimes);
+  // The display's side that skips is the "s" beside a tier: reported, and no tier is changed by it
+  for (const PacerCapability capabilities :
+       {PacerCapability::NoCapabilities, TimedPresent | PacerCapability::VBlankTimes, Duration | PacerCapability::WaitForPresent})
+  {
+    const PacerRating without = Rate(PacerCapabilities(capabilities));
+    const PacerRating with = Rate(PacerCapabilities(capabilities | Skips));
+    EXPECT_FALSE(without.SkipsOverdue);
+    EXPECT_TRUE(with.SkipsOverdue);
     EXPECT_EQ(with.Tier, without.Tier);
     EXPECT_EQ(with.RaisesTier, without.RaisesTier);
   }
@@ -447,7 +495,8 @@ TEST(PacerTier, EverySetIsRatedAtTheBestTierItReachesAndNeverBelowASetItContains
       {
         ASSERT_TRUE(Number(tier) >= Number(rating.Tier) || !Reaches(set, tier)) << bits;
       }
-      ASSERT_EQ(rating.RaisesTier == PacerCapability::NoCapabilities, rating.Tier == PacerTier::TimedSkipVBlankWaitForPresent) << bits;
+      ASSERT_EQ(rating.RaisesTier == PacerCapability::NoCapabilities, rating.Tier == PacerTier::AtTimeVBlankWaitForPresent) << bits;
+      ASSERT_EQ(rating.SkipsOverdue, set.Has(Skips)) << bits;
       ASSERT_EQ(rating.ReportsDisplayTimes, set.Has(PacerCapability::DisplayTimes)) << bits;
       ASSERT_EQ(rating.DisplaySideHolds, PC::PacerTierUtil::DisplaySideHolds(set)) << bits;
 
@@ -479,13 +528,18 @@ TEST(PacerTier, ALongerSwapIntervalNeverLowersARating)
   const PacerCapabilities two(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes, 2);
 
   // The present takes a swap interval, and a longest one of 1 holds nothing: the display's side holds with a longer one, and
-  // the tier is the same with either
+  // without a wait for a present or display times the tier is the same with either
   EXPECT_EQ(Rate(one).Tier, PacerTier::VBlankPeriodOnly);
   EXPECT_FALSE(Rate(one).DisplaySideHolds);
   EXPECT_EQ(Rate(two).Tier, PacerTier::VBlankPeriodOnly);
   EXPECT_TRUE(Rate(two).DisplaySideHolds);
   EXPECT_TRUE(two.Contains(one));
   EXPECT_FALSE(one.Contains(two));
+  // With a wait for a present a longer one places frames after the one before: the second major tier
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes | PacerCapability::WaitForPresent, 1)).Tier,
+            PacerTier::VBlankWaitForPresent);
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes | PacerCapability::WaitForPresent, 2)).Tier,
+            PacerTier::AfterDurationVBlankWaitForPresent);
 }
 
 namespace
@@ -495,10 +549,12 @@ namespace
   // The texts are there at compile time
   static_assert(Text::NameOf(PacerTier::TimerPeriodOnly) == "timer");
   static_assert(Text::NameOf(PacerTier::VBlankWaitForPresent) == "vertical blank times, wait for a present");
-  static_assert(Text::NameOf(PacerTier::TimedTimerPeriodOnly) == "timed present");
+  static_assert(Text::NameOf(PacerTier::AtTimeTimerPeriodOnly) == "time on the present");
+  static_assert(Text::NumberOf(PacerTier::AfterDurationTimerDisplayTimes) == "2.4");
   static_assert(Text::NumberOf(PacerTier::VBlankWaitForPresent) == "3.1");
   static_assert(Text::MajorTierCount * PC::PacerTierUtil::SubTiersPerMajorTier == Text::TierCount);
   static_assert(Text::DisplayTimesMark == "+");
+  static_assert(Text::SkipsOverdueMark == "s");
   static_assert(Text::NameOf(PacerCapability::VBlankTimes) == "vertical blank times");
   // The counts are the enums': the lowest tier's number, and a bit per capability
   static_assert(Text::TierCount == static_cast<uint32_t>(PacerTier::TimerPeriodOnly));

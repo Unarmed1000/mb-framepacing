@@ -51,14 +51,16 @@ namespace MB::FramePacing::Pacer
   //! Which tier paces: where the refreshes are comes from vertical blank times when they are active and from a grid on the clock
   //! when not, the loop is held by a wait for a present when that is active, and where the present takes a time before which
   //! the frame is not shown it is given PresentPlan::NotBeforeTime, with which the display's side puts a frame on its refresh
-  //! and no present is held by the loop. Those are the eight tiers of PacerTier that have a pacer (PacerMajorTier::DisplayPlaces
+  //! and no present is held by the loop. Those are the eight tiers of PacerTier that have a pacer (PacerMajorTier::DisplayPlacesAtTime
   //! and LoopPlaces). The four where the display's side places the frame are built against the simulation's display only: no
   //! system has been measured with them. A present that takes a time the frame before it stays is given
   //! PresentPlan::MinimumDuration next to everything the loop does without it, at whatever tier, and one that takes a swap
-  //! interval is given PresentPlan::SwapInterval the same way.
+  //! interval is given PresentPlan::SwapInterval the same way: a set that rates the second major tier with them
+  //! (PacerMajorTier::DisplayPlacesAfterDuration) is paced as the frame loop's tier of the same capabilities, as no pacer is built
+  //! for it yet (PacerTierUtil::PacedAs).
   //!
-  //! A set that says the display's side skips a frame that is overdue (PacerCapability::PresentSkipsOverdue) rates the first
-  //! major tier and is paced as the second: every present is taken as shown, which one that was skipped is not.
+  //! A set that says the display's side skips a frame that is overdue (PacerCapability::PresentSkipsOverdue) is rated with it
+  //! (PacerRating::SkipsOverdue) and paced as without it: every present is taken as shown, which one that was skipped is not.
   //!
   //! A change of the active set takes effect when the frame that is open has ended (at once when none is). The frames and
   //! their ids, the animation time, the swap interval with the rule's frame window, the GPU's work and the presents that can be

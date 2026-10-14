@@ -19,12 +19,14 @@ namespace MB::FramePacing::Pacer
     // How the present holds a frame
 
     //! The present takes a swap interval, from 1 to a maximum (PacerCapabilities::MaxPresentSwapInterval), and holds the frame for
-    //! that many refreshes
+    //! that many refreshes. With a maximum of two or more it places a frame relative to the one before, in whole refreshes: the
+    //! second major tier, as PresentAfterDuration
     PresentSwapInterval = 1u << 0u,
     //! The present takes a time before which the frame is not shown
     PresentAtTime = 1u << 1u,
-    //! The present takes a time the frame before it stays on screen at least. It places no frame by itself (it counts from
-    //! wherever that frame was shown), so it makes no tier: it is given wherever it is active
+    //! The present takes a time the frame before it stays on screen at least: the display's side places a frame relative to the
+    //! one before (the second major tier, with a wait for a present or display times to see where frames were shown). It is given
+    //! wherever it is active
     PresentAfterDuration = 1u << 2u,
 
     // What the calls do to the frame loop. A set has one of each pair or neither: with neither the call may wait, and the pacer goes
@@ -61,12 +63,13 @@ namespace MB::FramePacing::Pacer
     //! When a present was shown, or that it has a result without a time, frames later
     DisplayTimes = 1u << 14u,
 
-    // What the display's side does with presents that carry a time (PresentAtTime). A fact of the platform or of the present
-    // mode, not something a pacer switches
+    // What the display's side does with presents that are due. A fact of the platform or of the present mode, not something a
+    // pacer switches
 
-    //! Of two presents whose times have both passed, the later is shown and the earlier never: a frame that is overdue is
-    //! left out. Without it every present is shown, in the order it was made, for a refresh at least. It is rated
-    //! (PacerMajorTier::DisplayPlacesAndSkips) and no pacer is built for it: a pacer takes every frame as shown
+    //! Of two presents that are both due, the later is shown and the earlier never: a frame that is overdue is left out (with a
+    //! time on the present, or without one, as a queue that shows the newest ready frame). Without it every present is shown, in
+    //! the order it was made, for a refresh at least. It is rated
+    //! beside every tier (PacerRating::SkipsOverdue, the "s"), not a tier: no pacer relies on it yet
     PresentSkipsOverdue = 1u << 15u,
 
     //! Every capability there is

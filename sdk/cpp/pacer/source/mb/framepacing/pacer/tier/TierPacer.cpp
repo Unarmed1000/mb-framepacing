@@ -15,16 +15,16 @@ namespace MB::FramePacing::Pacer
   namespace
   {
     //! The tier of the three things a pacer uses: who puts a frame on its refresh, where the refreshes are, and what holds
-    //! the loop. Never a tier of the display that skips: no pacer is built for it
+    //! the loop. Never a tier of a duration on the present: no pacer is built for it, and the loop places those frames
     constexpr PacerTier TierOf(const bool timedPresent, const bool onVBlanks, const bool waitsForPresent) noexcept
     {
       if (timedPresent)
       {
         if (onVBlanks)
         {
-          return waitsForPresent ? PacerTier::TimedVBlankWaitForPresent : PacerTier::TimedVBlankPeriodOnly;
+          return waitsForPresent ? PacerTier::AtTimeVBlankWaitForPresent : PacerTier::AtTimeVBlankPeriodOnly;
         }
-        return waitsForPresent ? PacerTier::TimedTimerWaitForPresent : PacerTier::TimedTimerPeriodOnly;
+        return waitsForPresent ? PacerTier::AtTimeTimerWaitForPresent : PacerTier::AtTimeTimerPeriodOnly;
       }
       if (onVBlanks)
       {

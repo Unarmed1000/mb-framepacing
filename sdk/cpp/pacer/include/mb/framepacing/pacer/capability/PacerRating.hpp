@@ -9,20 +9,26 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built). What a set of capabilities is worth
-  //! (PacerTierUtil::Rate): the best tier it reaches, what would raise it, and two facts beside the tier. As made, it is the
-  //! rating of a set without capabilities.
+  //! (PacerTierUtil::Rate): the best tier it reaches, what would raise it, and three facts beside the tier, two of them the marks
+  //! written after its number. As made, it is the rating of a set without capabilities.
   struct PacerRating
   {
     PacerTier Tier{PacerTier::TimerPeriodOnly};
     //! The capabilities any one of which, added to the set, raises its tier; none at the best tier.
     PacerCapability RaisesTier{PacerCapability::PresentAtTime | PacerCapability::WaitForPresent | PacerCapability::VBlankTimes};
     //! The present can hold a frame for two refreshes or more (a time, a minimum duration, or a swap interval of 2 or more).
-    //! True at every tier where the display's side places the frame; where the frame loop does, it says that a present's
-    //! minimum duration or swap interval holds such a frame, where without it the loop does.
+    //! True at every tier where the display's side places the frame; where the frame loop does (a duration without a wait for a
+    //! present or display times), it says that a present's minimum duration or swap interval holds such a frame, where without
+    //! it the loop does.
     bool DisplaySideHolds{false};
     //! The application reports when its frames were shown (DisplayTimes), so the animation error can be worked out where the
-    //! application runs: the "+" beside a tier's number. It changes no tier.
+    //! application runs: the "+" after a tier's number (PacerTierText::DisplayTimesMark). It is what reaches the second major
+    //! tier's sub tiers without a wait for a present, and changes no other tier.
     bool ReportsDisplayTimes{false};
+    //! The display's side shows the newer of two frames that are both due and never the older (PresentSkipsOverdue): the "s"
+    //! after a tier's number (PacerTierText::SkipsOverdueMark). It describes the system (a display may skip whether asked or
+    //! not) and is a rating only, on every tier: no pacer relies on it yet, so it changes no tier.
+    bool SkipsOverdue{false};
 
     constexpr bool operator==(const PacerRating& other) const noexcept = default;
   };

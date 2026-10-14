@@ -402,13 +402,18 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     rule's frame windows), no allocation per frame after that (only `SetSettings` with a larger frame window allocates).
   - **Capabilities and tiers** (`pacer/capability/`): an application says what it has and what of it is active (`PacerCapabilities`;
     the active set is how it controls the pacer). A tier is the capabilities a set needs (`PacerTierUtil::Rate`, usable without a
-    pacer). **Three major tiers of four sub tiers, written "3.1"** (the user, 2026-10-09): major = who places a frame on its refresh
-    (1: the display's side, which also skips an overdue frame, `PresentAtTime` + `PresentSkipsOverdue`, **rated only, no pacer**; 2:
-    the display's side, `PresentAtTime`, built against the simulation only; 3: the frame loop). The sub tier is a rank inside it
-    from `WaitForPresent` and `VBlankTimes` (the wait first where the display places the frame, the vertical blank times first
-    where the loop does). No capability that changes how good the pacing is may hide inside a place. **Only a time before which a
-    frame is not shown makes a tier** (decision 16): `PresentAfterDuration` and `PresentSwapInterval` are rated beside it
-    (`DisplaySideHolds`) and given on every present where active. `PacerTierText` has the words and `NumberOf(tier)`; an
+    pacer). **A tier is a way of placing a frame; a capability combines with every way** (the user's ruling, 2026-10-14,
+    decision 19, reversing decision 16). **Three major tiers of four sub tiers, written "3.1"**: 1 = a time on the present
+    (`PresentAtTime`, the display places against a clock; built against the simulation only); 2 = a duration on the present
+    (`PresentAfterDuration`, or `PresentSwapInterval` up to 2 or more; the display places after the frame before) **with a wait
+    for a present or display times** (without either the latency creeps after a late frame: the set falls to 3.x), **rated
+    only, paced as the frame loop's tier of the same capabilities** (`PacedAs`: 2.1→3.1, 2.2→3.3, 2.3→3.2, 2.4→3.4) until its
+    pacer is built and measured against 3.1; 3 = the frame loop. Sub tiers from `WaitForPresent` and `VBlankTimes` (major 2:
+    `DisplayTimes` in place of the wait for .3 and .4); the wait first where the display places the frame, the vertical blank
+    times first where the loop does, proposals until measured. **Marks:** "+" display times, **"s"** `PresentSkipsOverdue`
+    (`PacerRating::SkipsOverdue`, `PacerTierText::SkipsOverdueMark`: describes the system, a rating only until a pacer relies
+    on it). The GPU wait and GPU work times: capabilities, no tier, no mark. `DisplaySideHolds` stays beside the tier. No
+    capability that changes how good the pacing is may hide inside a place. `PacerTierText` has the words and `NumberOf(tier)`; an
     application shows no texts of its own. **Every tier has both aims** (`PacerAim::Smoothness`, the default, and `LowLatency`): an
     aim is never built in as a tier's only behaviour, and the pacer does not pick it (the user: not now).
   - **Built from parts** (the user: no restart, four whole pacers taken apart under their tests): `TierPacer` (`pacer/tier/`) holds

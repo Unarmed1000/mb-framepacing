@@ -20,21 +20,29 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
   //! The sub tiers a major tier has.
   inline constexpr uint32_t SubTiersPerMajorTier = 4;
 
-  //! Whether the display's side places a frame: the present takes a time before which the frame is not shown (PresentAtTime),
-  //! so the frame is shown at the refresh it is for whenever the present is made. A time the frame before it stays on screen
-  //! (PresentAfterDuration) places nothing by itself, as it counts from wherever that frame was shown: it is in a rating as
-  //! DisplaySideHolds.
-  [[nodiscard]] constexpr bool HasTimedPresent(const PacerCapabilities& capabilities) noexcept
+  //! Whether the display's side places a frame against a clock: the present takes a time before which the frame is not shown
+  //! (PresentAtTime), so the frame is shown at the refresh it is for whenever the present is made.
+  [[nodiscard]] constexpr bool HasPresentAtTime(const PacerCapabilities& capabilities) noexcept
   {
     return capabilities.Has(PacerCapability::PresentAtTime);
   }
 
-  //! Whether the display's side places a frame and leaves out one that is overdue: a time on the present (PresentAtTime), and
-  //! of two presents that are both due the later is shown and the earlier never (PresentSkipsOverdue). Without a time on the
-  //! present there is no "due", so the second alone is nothing.
-  [[nodiscard]] constexpr bool SkipsOverduePresents(const PacerCapabilities& capabilities) noexcept
+  //! Whether the display's side can place a frame relative to the one before it: the present takes a time the frame before it
+  //! stays on screen at least (PresentAfterDuration), or a swap interval of two or more (PresentSwapInterval with a longest swap
+  //! interval of MinHoldingSwapInterval or more), the same in whole refreshes. A swap interval of one places nothing beyond what
+  //! a display that shows one frame per refresh does.
+  [[nodiscard]] constexpr bool HasPresentAfterDuration(const PacerCapabilities& capabilities) noexcept
   {
-    return HasTimedPresent(capabilities) && capabilities.Has(PacerCapability::PresentSkipsOverdue);
+    return capabilities.Has(PacerCapability::PresentAfterDuration) ||
+           (capabilities.Has(PacerCapability::PresentSwapInterval) && capabilities.MaxPresentSwapInterval() >= MinHoldingSwapInterval);
+  }
+
+  //! Whether the pacer learns where a frame was shown: a wait for a present (WaitForPresent) or display times (DisplayTimes).
+  //! Placed relative to the frame before, a late frame moves every frame after it a refresh later; without either the pacer
+  //! does not see that, and the latency creeps up a refresh at a time.
+  [[nodiscard]] constexpr bool SeesWhereFramesWereShown(const PacerCapabilities& capabilities) noexcept
+  {
+    return capabilities.Has(PacerCapability::WaitForPresent) || capabilities.Has(PacerCapability::DisplayTimes);
   }
 
   //! The major tier of a tier: who places a frame on its refresh. A value that is no tier is taken as the tier next to it.
@@ -43,9 +51,9 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     const auto number = static_cast<uint32_t>(tier);
     if (number <= SubTiersPerMajorTier)
     {
-      return PacerMajorTier::DisplayPlacesAndSkips;
+      return PacerMajorTier::DisplayPlacesAtTime;
     }
-    return number <= (2u * SubTiersPerMajorTier) ? PacerMajorTier::DisplayPlaces : PacerMajorTier::LoopPlaces;
+    return number <= (2u * SubTiersPerMajorTier) ? PacerMajorTier::DisplayPlacesAfterDuration : PacerMajorTier::LoopPlaces;
   }
 
   //! The sub tier of a tier, 1 to SubTiersPerMajorTier: its rank inside its major tier. 3 and 2 are tier "3.2". A value that is
@@ -60,48 +68,61 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     return number > (3u * SubTiersPerMajorTier) ? SubTiersPerMajorTier : (((number - 1u) % SubTiersPerMajorTier) + 1u);
   }
 
-  //! Whether a pacer is built for the tier. None is for the major tier of a display that skips a frame that is overdue: it is
-  //! rated, and that is all.
+  //! Whether a pacer is built for the tier. None is for the major tier of a duration on the present yet: it is rated, and paced
+  //! as the frame loop's tier of the same capabilities (PacedAs).
   [[nodiscard]] constexpr bool HasPacer(const PacerTier tier) noexcept
   {
-    return MajorOf(tier) != PacerMajorTier::DisplayPlacesAndSkips;
+    return MajorOf(tier) != PacerMajorTier::DisplayPlacesAfterDuration;
   }
 
-  //! The tier a set of that tier is paced as: the tier itself where a pacer is built for it, and for a tier of a display that
-  //! skips the same sub tier of the display that shows every frame. That pacer takes every frame as shown, which a frame the
-  //! display skipped is not.
+  //! The tier a set of that tier is paced as: the tier itself where a pacer is built for it, and for a tier of a duration on the
+  //! present the frame loop's tier of the same capabilities, with the duration given on every present: 2.1 as 3.1 (vertical
+  //! blank times and a wait), 2.2 as 3.3 (a wait), 2.3 as 3.2 (vertical blank times), 2.4 as 3.4.
   [[nodiscard]] constexpr PacerTier PacedAs(const PacerTier tier) noexcept
   {
-    return HasPacer(tier) ? tier : static_cast<PacerTier>(static_cast<uint32_t>(tier) + SubTiersPerMajorTier);
+    switch (tier)
+    {
+    case PacerTier::AfterDurationVBlankWaitForPresent:
+      return PacerTier::VBlankWaitForPresent;
+    case PacerTier::AfterDurationTimerWaitForPresent:
+      return PacerTier::TimerWaitForPresent;
+    case PacerTier::AfterDurationVBlankDisplayTimes:
+      return PacerTier::VBlankPeriodOnly;
+    case PacerTier::AfterDurationTimerDisplayTimes:
+      return PacerTier::TimerPeriodOnly;
+    default:
+      return tier;
+    }
   }
 
-  //! Whether the set reaches the tier: it has what the tier's major tier needs (a time on the present, and a display's side
-  //! that skips), and the wait for a present and the vertical blank times that the tier is named for. TimerPeriodOnly needs
+  //! Whether the set reaches the tier: it has what the tier's major tier needs (a time on the present; a duration on the present),
+  //! and the wait for a present, the vertical blank times and the display times that the tier is named for. TimerPeriodOnly needs
   //! nothing, so every set reaches it.
   [[nodiscard]] constexpr bool Reaches(const PacerCapabilities& capabilities, const PacerTier tier) noexcept
   {
-    const bool skips = SkipsOverduePresents(capabilities);
-    const bool timed = HasTimedPresent(capabilities);
+    const bool atTime = HasPresentAtTime(capabilities);
+    const bool afterDuration = HasPresentAfterDuration(capabilities);
     const bool wait = capabilities.Has(PacerCapability::WaitForPresent);
     const bool vblank = capabilities.Has(PacerCapability::VBlankTimes);
+    const bool displayTimes = capabilities.Has(PacerCapability::DisplayTimes);
     switch (tier)
     {
-    case PacerTier::TimedSkipVBlankWaitForPresent:
-      return skips && vblank && wait;
-    case PacerTier::TimedSkipTimerWaitForPresent:
-      return skips && wait;
-    case PacerTier::TimedSkipVBlankPeriodOnly:
-      return skips && vblank;
-    case PacerTier::TimedSkipTimerPeriodOnly:
-      return skips;
-    case PacerTier::TimedVBlankWaitForPresent:
-      return timed && vblank && wait;
-    case PacerTier::TimedTimerWaitForPresent:
-      return timed && wait;
-    case PacerTier::TimedVBlankPeriodOnly:
-      return timed && vblank;
-    case PacerTier::TimedTimerPeriodOnly:
-      return timed;
+    case PacerTier::AtTimeVBlankWaitForPresent:
+      return atTime && vblank && wait;
+    case PacerTier::AtTimeTimerWaitForPresent:
+      return atTime && wait;
+    case PacerTier::AtTimeVBlankPeriodOnly:
+      return atTime && vblank;
+    case PacerTier::AtTimeTimerPeriodOnly:
+      return atTime;
+    case PacerTier::AfterDurationVBlankWaitForPresent:
+      return afterDuration && vblank && wait;
+    case PacerTier::AfterDurationTimerWaitForPresent:
+      return afterDuration && wait;
+    case PacerTier::AfterDurationVBlankDisplayTimes:
+      return afterDuration && vblank && displayTimes;
+    case PacerTier::AfterDurationTimerDisplayTimes:
+      return afterDuration && displayTimes;
     case PacerTier::VBlankWaitForPresent:
       return vblank && wait;
     case PacerTier::VBlankPeriodOnly:
@@ -118,36 +139,49 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
   //! PresentSwapInterval with a longest swap interval of 2 or more.
   [[nodiscard]] constexpr bool DisplaySideHolds(const PacerCapabilities& capabilities) noexcept
   {
-    return capabilities.Has(PacerCapability::PresentAtTime) || capabilities.Has(PacerCapability::PresentAfterDuration) ||
-           (capabilities.Has(PacerCapability::PresentSwapInterval) && capabilities.MaxPresentSwapInterval() >= MinHoldingSwapInterval);
+    return HasPresentAtTime(capabilities) || HasPresentAfterDuration(capabilities);
   }
 
-  //! The rating of a set: the best tier it reaches, the capabilities that would raise it, whether display times are reported
-  //! and whether the display's side holds.
+  //! The rating of a set: the best tier it reaches, the capabilities that would raise it, and the facts beside it: whether display
+  //! times are reported, whether the display's side holds and whether it skips a frame that is overdue.
   [[nodiscard]] constexpr PacerRating Rate(const PacerCapabilities& capabilities) noexcept
   {
     PacerRating rating;
     rating.ReportsDisplayTimes = capabilities.Has(PacerCapability::DisplayTimes);
     rating.DisplaySideHolds = DisplaySideHolds(capabilities);
+    rating.SkipsOverdue = capabilities.Has(PacerCapability::PresentSkipsOverdue);
     // The best tier: the first one of the list that the set reaches (every set reaches the last)
-    auto number = static_cast<uint8_t>(PacerTier::TimedSkipVBlankWaitForPresent);
+    auto number = static_cast<uint8_t>(PacerTier::AtTimeVBlankWaitForPresent);
     while (!Reaches(capabilities, static_cast<PacerTier>(number)))
     {
       ++number;
     }
     rating.Tier = static_cast<PacerTier>(number);
-    // What the set does not have and would be raised by: a time on the present; with one, a display's side that skips (which
-    // is nothing without the time); a wait for a present; vertical blank times
+    // What the set does not have and would be raised by: a time on the present; without one, a duration on the present (or a
+    // swap interval of two or more) where the set sees where frames were shown, and display times where it has a duration and no
+    // wait for a present; a wait for a present; vertical blank times
+    const bool atTime = HasPresentAtTime(capabilities);
+    const bool afterDuration = HasPresentAfterDuration(capabilities);
+    const bool wait = capabilities.Has(PacerCapability::WaitForPresent);
     rating.RaisesTier = PacerCapability::NoCapabilities;
-    if (!HasTimedPresent(capabilities))
+    if (!atTime)
     {
       rating.RaisesTier = rating.RaisesTier | PacerCapability::PresentAtTime;
+      if (!afterDuration && SeesWhereFramesWereShown(capabilities))
+      {
+        rating.RaisesTier = rating.RaisesTier | PacerCapability::PresentAfterDuration;
+        // A swap interval on the present does the same, of two or more, where the present takes none yet
+        if (!capabilities.Has(PacerCapability::PresentSwapInterval))
+        {
+          rating.RaisesTier = rating.RaisesTier | PacerCapability::PresentSwapInterval;
+        }
+      }
+      if (afterDuration && !wait && !rating.ReportsDisplayTimes)
+      {
+        rating.RaisesTier = rating.RaisesTier | PacerCapability::DisplayTimes;
+      }
     }
-    else if (!capabilities.Has(PacerCapability::PresentSkipsOverdue))
-    {
-      rating.RaisesTier = rating.RaisesTier | PacerCapability::PresentSkipsOverdue;
-    }
-    if (!capabilities.Has(PacerCapability::WaitForPresent))
+    if (!wait)
     {
       rating.RaisesTier = rating.RaisesTier | PacerCapability::WaitForPresent;
     }

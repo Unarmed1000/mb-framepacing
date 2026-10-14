@@ -168,9 +168,9 @@ TEST(TierPacer, TheCapabilitySetsGiveTheRatingsAndTheTierThatPaces)
 
   // A time on the present: the tier above the same set without one
   PC::TierPacer timed(Settings(), PacerCapabilities(AtTime | Wait | PacerCapability::DisplayTimes));
-  EXPECT_EQ(timed.Rating().Tier, PacerTier::TimedTimerWaitForPresent);
+  EXPECT_EQ(timed.Rating().Tier, PacerTier::AtTimeTimerWaitForPresent);
   EXPECT_TRUE(timed.Rating().ReportsDisplayTimes);
-  EXPECT_EQ(timed.WorkingTier(), PacerTier::TimedTimerWaitForPresent);
+  EXPECT_EQ(timed.WorkingTier(), PacerTier::AtTimeTimerWaitForPresent);
 
   // What is active is a part of what the application has: a capability it does not have is left out
   timed.SetActiveCapabilities(PacerCapabilities(VBlank | Wait));
@@ -178,7 +178,7 @@ TEST(TierPacer, TheCapabilitySetsGiveTheRatingsAndTheTierThatPaces)
   timed.SetActiveCapabilities(PacerCapabilities());
   EXPECT_EQ(timed.ActiveRating().Tier, PacerTier::TimerPeriodOnly);
   EXPECT_EQ(timed.WorkingTier(), PacerTier::TimerPeriodOnly);
-  EXPECT_EQ(timed.Rating().Tier, PacerTier::TimedTimerWaitForPresent);
+  EXPECT_EQ(timed.Rating().Tier, PacerTier::AtTimeTimerWaitForPresent);
   // And what the application has can get smaller: what is active and gone goes out of the active set
   timed.SetActiveCapabilities(PacerCapabilities(Wait | PacerCapability::DisplayTimes));
   timed.SetCapabilities(PacerCapabilities(PacerCapability::DisplayTimes));
@@ -441,20 +441,20 @@ TEST(TierPacer, WithATimeOnThePresentTheTierThatPacesIsOneOfTheFourWithOne)
   for (const PacerCapability timed : {AtTime, AtTime | AfterDuration})
   {
     const PC::TierPacer timer(Settings(), PacerCapabilities(timed));
-    EXPECT_EQ(timer.WorkingTier(), PacerTier::TimedTimerPeriodOnly);
+    EXPECT_EQ(timer.WorkingTier(), PacerTier::AtTimeTimerPeriodOnly);
     const PC::TierPacer waits(Settings(), PacerCapabilities(timed | Wait));
-    EXPECT_EQ(waits.WorkingTier(), PacerTier::TimedTimerWaitForPresent);
+    EXPECT_EQ(waits.WorkingTier(), PacerTier::AtTimeTimerWaitForPresent);
 
     // Until a vertical blank is read the pacer is on a timer, and says so
     Loop vblank(Settings(), PacerCapabilities(timed | VBlank));
-    EXPECT_EQ(vblank.Pacer.ActiveRating().Tier, PacerTier::TimedVBlankPeriodOnly);
-    EXPECT_EQ(vblank.Pacer.WorkingTier(), PacerTier::TimedTimerPeriodOnly);
+    EXPECT_EQ(vblank.Pacer.ActiveRating().Tier, PacerTier::AtTimeVBlankPeriodOnly);
+    EXPECT_EQ(vblank.Pacer.WorkingTier(), PacerTier::AtTimeTimerPeriodOnly);
     static_cast<void>(vblank.Frame());
-    EXPECT_EQ(vblank.Pacer.WorkingTier(), PacerTier::TimedVBlankPeriodOnly);
+    EXPECT_EQ(vblank.Pacer.WorkingTier(), PacerTier::AtTimeVBlankPeriodOnly);
 
     Loop all(Settings(), PacerCapabilities(timed | VBlank | Wait));
     static_cast<void>(all.Frame());
-    EXPECT_EQ(all.Pacer.WorkingTier(), PacerTier::TimedVBlankWaitForPresent);
+    EXPECT_EQ(all.Pacer.WorkingTier(), PacerTier::AtTimeVBlankWaitForPresent);
     // Left out of the active set, the tier is the one without it
     all.Pacer.SetActiveCapabilities(PacerCapabilities(VBlank | Wait));
     EXPECT_EQ(all.Pacer.WorkingTier(), PacerTier::VBlankWaitForPresent);
@@ -482,15 +482,23 @@ TEST(TierPacer, AWaitThePlanAsksForMayTakeFiftyMillisecondsAtTheLeast)
   EXPECT_EQ(gpuPlan.WaitForGpuWorkTimeout.Nanoseconds(), 50'000'000);
 }
 
-TEST(TierPacer, ATimeTheFrameBeforeStaysMakesNoTierAndIsGivenAllTheSame)
+TEST(TierPacer, ADurationOnThePresentIsRatedTheSecondMajorTierAndPacedAsTheFrameLoop)
 {
-  // The duration alone: the tier is the loop's, as rated and as paced, and the present still gets its duration
+  // With a wait for a present: rated the second major tier, paced as the frame loop's tier of the same capabilities, as no pacer
+  // is built for it yet; the present still gets its duration
   Loop loop(Settings(), PacerCapabilities(AfterDuration | VBlank | Wait));
-  EXPECT_EQ(loop.Pacer.Rating().Tier, PacerTier::VBlankWaitForPresent);
+  EXPECT_EQ(loop.Pacer.Rating().Tier, PacerTier::AfterDurationVBlankWaitForPresent);
   EXPECT_TRUE(loop.Pacer.Rating().DisplaySideHolds);
   static_cast<void>(loop.Frame());
   EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::VBlankWaitForPresent);
+  EXPECT_EQ(loop.Pacer.WorkingTier(), PC::PacerTierUtil::PacedAs(loop.Pacer.ActiveRating().Tier));
 
+  // With display times and no wait: 2.4, paced as 3.4
+  const PC::TierPacer shown(Settings(), PacerCapabilities(AfterDuration | PacerCapability::DisplayTimes));
+  EXPECT_EQ(shown.Rating().Tier, PacerTier::AfterDurationTimerDisplayTimes);
+  EXPECT_EQ(shown.WorkingTier(), PacerTier::TimerPeriodOnly);
+
+  // Alone: the pacer would not see where frames were shown, so the tier is the loop's, as rated and as paced
   PC::TierPacer timer(Settings(), PacerCapabilities(AfterDuration));
   EXPECT_EQ(timer.Rating().Tier, PacerTier::TimerPeriodOnly);
   EXPECT_EQ(timer.WorkingTier(), PacerTier::TimerPeriodOnly);
@@ -500,23 +508,24 @@ TEST(TierPacer, ATimeTheFrameBeforeStaysMakesNoTierAndIsGivenAllTheSame)
   EXPECT_GT(plan.MinimumDuration.Nanoseconds(), 0);
 }
 
-TEST(TierPacer, ADisplayThatSkipsIsRatedAndPacedAsOneThatShowsEveryFrame)
+TEST(TierPacer, ADisplayThatSkipsIsAMarkBesideTheTierAndPacedAsOneThatShowsEveryFrame)
 {
   const PacerCapability skips = PacerCapability::PresentSkipsOverdue;
-  // Rated as the first major tier, paced by the pacer of the second: no pacer is built for a display that skips
+  // The tier of the same set without it, with the mark: every present is taken as shown
   Loop loop(Settings(), PacerCapabilities(AtTime | skips | VBlank | Wait));
-  EXPECT_EQ(loop.Pacer.Rating().Tier, PacerTier::TimedSkipVBlankWaitForPresent);
-  EXPECT_EQ(loop.Pacer.ActiveRating().Tier, PacerTier::TimedSkipVBlankWaitForPresent);
+  EXPECT_EQ(loop.Pacer.Rating().Tier, PacerTier::AtTimeVBlankWaitForPresent);
+  EXPECT_TRUE(loop.Pacer.Rating().SkipsOverdue);
+  EXPECT_TRUE(loop.Pacer.ActiveRating().SkipsOverdue);
   static_cast<void>(loop.Frame());
-  EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::TimedVBlankWaitForPresent);
-  EXPECT_EQ(loop.Pacer.WorkingTier(), PC::PacerTierUtil::PacedAs(loop.Pacer.ActiveRating().Tier));
+  EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::AtTimeVBlankWaitForPresent);
 
   const PC::TierPacer timer(Settings(), PacerCapabilities(AtTime | skips));
-  EXPECT_EQ(timer.Rating().Tier, PacerTier::TimedSkipTimerPeriodOnly);
-  EXPECT_EQ(timer.WorkingTier(), PacerTier::TimedTimerPeriodOnly);
-  // Without a time on the present it is nothing
+  EXPECT_EQ(timer.Rating().Tier, PacerTier::AtTimeTimerPeriodOnly);
+  EXPECT_EQ(timer.WorkingTier(), PacerTier::AtTimeTimerPeriodOnly);
+  // Without a time on the present it is the mark all the same: a queue that shows the newest ready frame skips too
   const PC::TierPacer untimed(Settings(), PacerCapabilities(skips | Wait));
   EXPECT_EQ(untimed.Rating().Tier, PacerTier::TimerWaitForPresent);
+  EXPECT_TRUE(untimed.Rating().SkipsOverdue);
   EXPECT_EQ(untimed.WorkingTier(), PacerTier::TimerWaitForPresent);
 }
 

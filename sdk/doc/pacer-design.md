@@ -1096,7 +1096,8 @@ name for each tier and each capability, the number a tier is shown as ("3.1"), a
 that says what it uses and what that gives, a shorter line of 44 characters or less, how many tiers there are, and the
 mark for a set that reports display times.
 
-**The list is three major tiers of four sub tiers each** (decided on 2026-10-09; what it replaced is below). A major
+**The list is three major tiers of four sub tiers each** (decided on 2026-10-09; what it replaced is below; rearranged on
+2026-10-14 by decision 19, which this section's account of the first layout predates). A major
 tier is who places a frame on its refresh, and a tier is written as its major tier and its sub tier: "3.1". It is
 still one order, 1.1 the best and 3.4 the baseline that every set reaches, and no two sets that are paced differently
 share a place.
@@ -1489,7 +1490,7 @@ Sources:
 [EGL_ANDROID_presentation_time](https://registry.khronos.org/EGL/extensions/ANDROID/EGL_ANDROID_presentation_time.txt),
 [MTLDrawable present(at:)](<https://developer.apple.com/documentation/metal/mtldrawable/present(at:)>).
 
-**Decided on 2026-10-09: rated now, built later.** A display's side that skips is major tier 1 of the list ("Tiers"),
+**Decided on 2026-10-09: rated now, built later; since decision 19 (2026-10-14) a mark beside the tier, "s", not a tier.** A display's side that skips was major tier 1 of the list ("Tiers"),
 with a capability of its own, `PresentSkipsOverdue`, and no pacer. What a pacer for it takes:
 
 - the simulation's display has to be able to skip, and can then not say at a present when the frame is shown;
@@ -1817,6 +1818,8 @@ The statistics stay.
 
 ## What each tier allows, and whether the display gets back to the animation timer
 
+> Written before decision 19 (2026-10-14): the tiers of a time on the present, 2.1 to 2.4 here, are 1.1 to 1.4 now.
+
 **The animation timer is the same at every tier.** It advances in whole refreshes of the display, at every tier, so a wait
 that wakes early or late never reaches the motion. What it does after a refresh was lost is one rule for all tiers ("A lost
 refresh and game time" below).
@@ -2118,7 +2121,7 @@ measured only where a section above says so.
    vertical blanks at two refreshes per frame under a GPU load; and a second system, as all of it is one.
 2. **Gaps in what is built.** In major tier 3 on vertical blanks a
    frame that is shown earlier than the pacer placed it is not taken, so the pacer is then a refresh ahead of what it
-   says. That a present's time was not kept is not seen (major tier 2 with a wait could). An application can not say
+   says. That a present's time was not kept is not seen (major tier 1 with a wait could). An application can not say
    that its display's refresh rate is variable ("Variable refresh"). With both timed presents active the absolute time
    alone is given, which after a lost refresh brings a frame back at two refreshes per frame without a wait.
 3. **Decisions that are open** ("Decisions needed"): 3, the setting of 9, what is open of 10, and of 7 the first
@@ -2136,11 +2139,15 @@ measured only where a section above says so.
 6. **The documents**: the guide is written anew for this pacer. Still missing in it: how an application makes each
    wait and each report on its graphics API.
 7. **Measured**: no run of a tier pacer has been captured and analysed with the tools; the sub tiers of major tier 3
-   are not measured against each other; major tier 2 has run on no system, as the one at hand has no present with an
+   are not measured against each other; major tier 1 has run on no system, as the one at hand has no present with an
    absolute time.
+8. **A pacer for major tier 2** (decision 19, 2026-10-14): rated and paced as the frame loop's tier of the same
+   capabilities, with the duration on every present. To build: the loop that presents early and follows where frames were
+   shown, the simulation's display that takes a duration, and then major tier 2 measured against 3.1 on the system that has
+   only the relative time.
 
-Not planned, and written down above: a pacer for major tier 1; an aim the pacer picks; pacing by display times; variable
-refresh.
+Not planned, and written down above: a pacer that relies on a display's side that skips (the "s"); an aim the pacer picks;
+pacing by display times; variable refresh.
 
 ## Decisions needed
 
@@ -2244,7 +2251,8 @@ refresh.
     finer is decided. One thing to watch then: on the one system the wait for a frame slot held the loop while the
     GPU's work itself was short (decision 17), so there it brakes from the display's side.
 
-16. **Which timed present puts a set where the display's side places the frame**: decided on 2026-10-09 and built: only
+16. **Which timed present puts a set where the display's side places the frame**: decided on 2026-10-09 and built, and
+    **reversed on 2026-10-14 by decision 19**: only
     a time before which a frame is not shown (`PresentAtTime`), by the list's own rule of who places the frame. A time
     the frame before stays (`PresentAfterDuration`) is rated beside the tier as a swap interval on the present is
     ("the display's side holds"), and its duration is given at every tier. What spoke against it: the duration is the
@@ -2290,6 +2298,41 @@ refresh.
     Nothing of the pacer is changed by this. Counting by the one rule would change when the rule slows down (no longer
     on work over a frame's time or on a late start) and with it the golden data. To decide, with runs: whether the
     count keeps what it means under a name that is not "late", or follows the rule.
+
+19. **A tier is a way of placing a frame**: decided on 2026-10-14 (the user's ruling, through the first integration's
+    session) and built as a rating. The test for what is a tier: a capability combines with every way of placing a frame;
+    a tier is a way of placing one, and a present uses one. It reverses decision 16 and rearranges the list, twelve tiers as
+    before:
+
+    - **Major tier 1, a time on the present** (`PresentAtTime`): the display's side places the frame against a clock. The
+      former major tiers 1 and 2 merged.
+    - **Major tier 2, a duration on the present** (`PresentAfterDuration`, Vulkan's relative present time, Metal's minimum
+      duration; a swap interval of two or more is the same in whole refreshes): the display's side places the frame after the
+      one before, and the loop may present early. A present takes one target time, so it is no capability of major tier 1:
+      it is a tier of its own. After a late frame every later duration counts from that frame, so the display stays smooth
+      but each late frame adds a refresh of latency, which the pacer sees only with a wait for a present or display times.
+      **Its sub tiers without a wait are reached only with display times** ("+"); a set with neither falls to major tier 3,
+      where the loop stays tied to the clock or the vertical blanks and a late frame costs a second error but no latency.
+      Revisit if a measurement shows the duration without display times beating 3.2. **No pacer is built for it yet**: such a
+      set is paced as the frame loop's tier of the same capabilities, with the duration on every present, as before
+      (`PacerTierUtil::PacedAs`). Why it was asked for: on Windows 11 with one vendor's driver the window surface has only the
+      relative time (relative 1, absolute 0, windowed and in borderless full screen), so that system had no tier where the
+      display places the frame.
+    - **Major tier 3, the frame loop**: unchanged.
+    - **Sub tiers**, the same two capabilities in every major tier: .1 vertical blank times and a wait for a present, .2 and
+      .3 one each, .4 neither (in major tier 2, with display times). Until measured, the wait comes first where the display
+      places the frame and the vertical blank times where the loop does, as before.
+    - **Two marks beside the tier**: "+" for display times, as before, and **"s"** for a display's side that skips a frame
+      that is overdue (`PresentSkipsOverdue`). Skipping combines with every way of placing a frame (a queue that shows the
+      newest ready frame skips without a time on the present), so it is a mark and no longer major tier 1. It describes the
+      system, which often skips whether asked or not (Android does with a time on the present), and is a rating only until
+      the pacer relies on it (a low-latency aim that queues a spare frame and counts on the newest being picked would); then it
+      would earn a sub tier. A skip is right by the animation error where the target time is the display time the frame's
+      animation was made for, with less than a refresh of slack: the skipped frame then costs no error, and the display is on
+      time again at once.
+    - The wait for the GPU's work and its times stay capabilities with no tier and no mark.
+    - **What is to be measured**: major tier 2 against 3.1 (the data so far, of one system, on a timer and under CPU load,
+      shows nothing of tier 2 ahead), and .2 against .3.
 
 ## What changes for whom
 
