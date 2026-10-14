@@ -246,6 +246,14 @@ tools/tests -t tools`; CI's `lint`).
     (`sorter_push_event_out_of_order`; a third of the events of a test trace with two such marks, when they were appended). Keep
     the tests of it (`test_a_trace_written_in_pieces`, `TheAugmentedTrace_IsTheScripts_AndReadsBackWhole`). The frame timeline's
     messages are not in the Python package's protos: the tests write them field by field (`tools/tests/synthetic_trace.py`).
+  - **A frame's slices the tools add have the frame record's name** (`mbfp frame <run id> <frame index>`; the user, 2026-10-14):
+    the viewer highlights every slice of a hovered or clicked name, so the application's slice and ours go together. No arrows
+    from the application's slice (tried: one way works only for a record on a thread, the other edits the recorded packets).
+    So **the readers of the record leave out every slice under a track named `mb-framepacing: …`** (`trace_source.frame_records`,
+    `TraceReader.FrameRecords`, by the track's `parent_id`); keep the tests of it. The first track, **Refreshes (captured)**, is a
+    slice per capture of a capture card, a refresh long, `refresh a` / `refresh b` by the capture's index so the viewer colours
+    them in turn, `refresh, not decoded`, gaps where nothing was captured; none where the capture period is not the refresh
+    period (a camera). Instants keep `#<frame index>` in their names.
   - The clocks are tied by the frames only (`measure/doc/perfetto.md` "The clocks"): a delay the whole run shares can not be told
     from the clocks' difference. Never describe a track's position, or what the trace says of a frame, as measured beyond that.
   - It is out of `usage.md`, as every experimental feature is out of the workflow documents. DocImages has two pictures of it

@@ -22,7 +22,7 @@ from trace_alignment import (  # pyright: ignore[reportImplicitRelativeImport] (
     FrameRecord,
     parse_record_name,
 )
-from trace_events import TraceReadError  # pyright: ignore[reportImplicitRelativeImport]
+from trace_events import TOOLS_ROOT_PREFIX, TraceReadError  # pyright: ignore[reportImplicitRelativeImport]
 from trace_frames import SurfaceFrame, ThreadState  # pyright: ignore[reportImplicitRelativeImport]
 
 # The kernel's vertical blank events, as the trace processor shows them: slices named so on tracks named vblank-<crtc>
@@ -107,12 +107,15 @@ class TraceSource:
     def frame_records(self) -> list[FrameRecord]:
         """The frame record: the slices named for a frame on any track, ascending by their start, with the process their
         track belongs to. Their times are on the trace's own clock here. A slice that had not ended when the trace did, or
-        whose name is not a frame's, is left out."""
+        whose name is not a frame's, is left out, and so are the tools' own slices of a frame (an augmented trace's tracks,
+        under a track named for a run)."""
         rows = self._rows(
             "SELECT s.ts AS ts, s.name AS name, p.name AS process FROM slice s "
             + "LEFT JOIN thread_track tt ON tt.id = s.track_id LEFT JOIN thread th ON th.utid = tt.utid "
             + "LEFT JOIN process_track pt ON pt.id = s.track_id LEFT JOIN process p ON p.upid = COALESCE(pt.upid, th.upid) "
-            + f"WHERE s.name GLOB {quoted(RECORD_NAME_PREFIX + '*')} AND s.dur >= 0 ORDER BY s.ts"
+            + "LEFT JOIN track own ON own.id = s.track_id LEFT JOIN track parent ON parent.id = own.parent_id "
+            + f"WHERE s.name GLOB {quoted(RECORD_NAME_PREFIX + '*')} AND s.dur >= 0 "
+            + f"AND IFNULL(parent.name, '') NOT GLOB {quoted(TOOLS_ROOT_PREFIX + '*')} ORDER BY s.ts"
         )
         records: list[FrameRecord] = []
         for row in rows:

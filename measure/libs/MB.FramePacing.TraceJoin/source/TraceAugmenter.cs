@@ -129,7 +129,7 @@ namespace MB.FramePacing.TraceJoin
           writer = new TraceTrackWriter(file, run.Key, run.Name, time => TraceAlignmentUtil.ToTraceNs(time, snapshots));
           writer.WriteAttributes(attributes);
           foreach (var track in TraceTrackText.All)
-            writer.WriteTrack(track, TraceEvents.Of(track, run.Frames, run.Captures, alignment, run.PeriodNs));
+            writer.WriteTrack(track, TraceEvents.Of(track, run, alignment));
           if (sourcePath != null)
             TraceTrackWriter.CopySource(sourcePath, file);
         }

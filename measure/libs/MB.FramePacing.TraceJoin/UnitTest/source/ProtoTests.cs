@@ -132,7 +132,18 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       string flow = Convert.ToHexString(BitConverter.GetBytes(TraceTrackWriter.StableId("1/", "flow/3")));
       string description = TraceTrackText.DescriptionOf(TraceTrack.FrameEvents);
       string descriptor =
-        "08" + id + "120C" + Hex("Frame events") + "28" + root + "6006" + "72" + Varint((ulong)description.Length) + Hex(description) + "7802";
+        "08"
+        + id
+        + "120C"
+        + Hex("Frame events")
+        + "28"
+        + root
+        + "60" // the track's place among its siblings
+        + Varint((ulong)TraceTrack.FrameEvents)
+        + "72"
+        + Varint((ulong)description.Length)
+        + Hex(description)
+        + "7802";
       string begin =
         "22"
         + "052007"

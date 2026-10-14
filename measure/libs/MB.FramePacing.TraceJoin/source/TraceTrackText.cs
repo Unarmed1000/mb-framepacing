@@ -23,6 +23,7 @@ namespace MB.FramePacing.TraceJoin
     public static string NameOf(TraceTrack track) =>
       track switch
       {
+        TraceTrack.Refreshes => "Refreshes (captured)",
         TraceTrack.OnScreen => "On screen (measured)",
         TraceTrack.Intended => "Intended display (the pacer's)",
         TraceTrack.Cpu => "CPU (from the markers)",
@@ -37,6 +38,8 @@ namespace MB.FramePacing.TraceJoin
     public static string DescriptionOf(TraceTrack track) =>
       track switch
       {
+        TraceTrack.Refreshes =>
+          "Each capture of the display for a refresh, named a and b in turn; a capture that was not decoded is named so, and a gap is a refresh not captured. A capture card's captures only.",
         TraceTrack.OnScreen =>
           "Each frame from the moment a capture of the display first showed it for as long as it stayed. Measured by mb-framepacing.",
         TraceTrack.Intended => "When the application's frame pacer aimed for each frame to be shown, as its marker carried it.",

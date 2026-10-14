@@ -180,16 +180,23 @@ And none of the three shows a delay the whole run shares ([the clocks](#the-cloc
 
 Under one track named `mb-framepacing: <run>`, in this order. A slice's arguments have its values.
 
-| Track                          | What                                                                                                      |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| On screen (measured)           | A slice per frame from its display time for its time on screen, named `#<frame index>`                    |
-| Intended display (the pacer's) | A slice per frame from its intended display time to the next frame's                                      |
-| CPU (from the markers)         | A slice from a frame's CPU start time for its CPU busy time, with an arrow to the frame's slice on screen |
-| Animation error (ms)           | A value per frame: animation time step minus display time step                                            |
-| Display time step (ms)         | A value per frame: how long the frame before it stayed                                                    |
-| Lateness (ms)                  | A value per frame: how long after its intended display time it was shown                                  |
-| Frame events                   | Late frames, frame indices that were skipped, frames out of order, torn frames                            |
-| Capture events                 | The capture's own gaps: captures not decoded, not recorded, dropped by the source or missed               |
+| Track                          | What                                                                                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Refreshes (captured)           | A slice per capture of a capture card, a refresh long, named `refresh a` and `refresh b` in turn (`refresh, not decoded` for a capture that was not decoded); a gap is a refresh that was not captured. None for a camera |
+| On screen (measured)           | A slice per frame from its display time for its time on screen                                                                                                                                                            |
+| Intended display (the pacer's) | A slice per frame from its intended display time to the next frame's                                                                                                                                                      |
+| CPU (from the markers)         | A slice from a frame's CPU start time for its CPU busy time, with an arrow to the frame's slice on screen                                                                                                                 |
+| Animation error (ms)           | A value per frame: animation time step minus display time step                                                                                                                                                            |
+| Display time step (ms)         | A value per frame: how long the frame before it stayed                                                                                                                                                                    |
+| Lateness (ms)                  | A value per frame: how long after its intended display time it was shown                                                                                                                                                  |
+| Frame events                   | Late frames, frame indices that were skipped, frames out of order, torn frames                                                                                                                                            |
+| Capture events                 | The capture's own gaps: captures not decoded, not recorded, dropped by the source or missed                                                                                                                               |
+
+**A frame's slices have the frame record's name** (`mbfp frame <run id> <frame index>`, the name the application gives its own
+slice of the frame): hover over or click any of them, the application's own included, and the viewer highlights every slice of that
+frame. The refreshes show how many refreshes each frame stayed on screen: its slice on screen covers one block, two or more.
+The tools' slices are no frame record: what reads the record (a join, `trace-info`) leaves out every slice under a track named
+`mb-framepacing: …`, so an augmented trace can be given again.
 
 The terms are [the vocabulary's](../../sdk/doc/vocabulary.md), and a name says what the capture's data says and no more: a frame
 index that was skipped is not called dropped.

@@ -113,7 +113,10 @@ namespace MB.FramePacing.TraceJoin
     }
 
     /// <summary>The name of the track everything of a run is under.</summary>
-    public static string RootName(string runName) => $"mb-framepacing: {runName}";
+    public static string RootName(string runName) => RootNamePrefix + runName;
+
+    /// <summary>What the name of the track that holds a run's tracks begins with: what the tracks the tools added are known by.</summary>
+    public const string RootNamePrefix = "mb-framepacing: ";
 
     /// <summary>
     /// The bytes of a recorded trace, as packets can be put next to them: a whole-file gzip is unpacked, a trace as it is. A file that is

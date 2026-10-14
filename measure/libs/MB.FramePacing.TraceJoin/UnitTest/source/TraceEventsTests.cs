@@ -21,6 +21,9 @@ namespace MB.FramePacing.TraceJoin.UnitTest
   {
     private static readonly TraceAlignment g_plain = new TraceAlignment(TraceAnchor.Nothing, 0);
 
+    // The golden capture's run id, as its markers carry it
+    private const uint GoldenRunId = 1;
+
     [Test]
     public void OnScreen_ASlicePerFrameFromItsDisplayTimeForItsTimeOnScreen()
     {
@@ -31,11 +34,12 @@ namespace MB.FramePacing.TraceJoin.UnitTest
         Frame(9, 2_000, onScreenNs: 300, skippedBefore: 2, flags: new[] { "SkippedBefore", "Late" }, cpuStartNs: 1_200, cpuBusyNs: 100)
       );
 
-      var slices = TraceEvents.OnScreen(made, new TraceAlignment(TraceAnchor.Given, 100, AppClockOffsetNs: 10, VBlankShiftNs: 1), 500);
+      var slices = TraceEvents.OnScreen(made, 3, new TraceAlignment(TraceAnchor.Given, 100, AppClockOffsetNs: 10, VBlankShiftNs: 1), 500);
 
+      // Named as the application's frame record names the frame
       Assert.That(
         slices.Select(s => (s.StartNs, s.EndNs, s.Name)),
-        Is.EqualTo(new[] { (909L, 1_409L, "#7"), (1_409L, 1_909L, "#8"), (1_909L, 2_209L, "#9") })
+        Is.EqualTo(new[] { (909L, 1_409L, "mbfp frame 3 7"), (1_409L, 1_909L, "mbfp frame 3 8"), (1_909L, 2_209L, "mbfp frame 3 9") })
       );
       Assert.That(slices.All(s => s.Track == TraceTrack.OnScreen && s.Kind == TraceEventKind.Slice), Is.True);
       Assert.That(
@@ -70,11 +74,11 @@ namespace MB.FramePacing.TraceJoin.UnitTest
     {
       var golden = GoldenRun().Frames;
 
-      var slices = TraceEvents.OnScreen(golden, TraceAlignmentUtil.Align(golden), PeriodNs);
+      var slices = TraceEvents.OnScreen(golden, GoldenRunId, TraceAlignmentUtil.Align(golden), PeriodNs);
 
       Assert.That(slices.Count, Is.EqualTo(388));
-      Assert.That(slices[0].Name, Is.EqualTo("#388"));
-      Assert.That(slices[^1].Name, Is.EqualTo("#775"));
+      Assert.That(slices[0].Name, Is.EqualTo("mbfp frame 1 388"));
+      Assert.That(slices[^1].Name, Is.EqualTo("mbfp frame 1 775"));
       for (int i = 0; i + 1 < slices.Count; ++i)
       {
         Assert.That(slices[i].StartNs, Is.LessThanOrEqualTo(slices[i].EndNs));
@@ -94,13 +98,13 @@ namespace MB.FramePacing.TraceJoin.UnitTest
         Frame(5, 0, intendedDisplayNs: 2_100, targetNs: 400)
       );
 
-      var slices = TraceEvents.Intended(made, new TraceAlignment(TraceAnchor.Nothing, 0, AppClockOffsetNs: 5));
+      var slices = TraceEvents.Intended(made, 2, new TraceAlignment(TraceAnchor.Nothing, 0, AppClockOffsetNs: 5));
 
       Assert.That(
         slices.Select(s => (s.Name, s.StartNs, s.EndNs)),
-        Is.EqualTo(new[] { ("#1", 1_005L, 1_505L), ("#3", 1_505L, 2_105L), ("#5", 2_105L, 2_505L) })
+        Is.EqualTo(new[] { ("mbfp frame 2 1", 1_005L, 1_505L), ("mbfp frame 2 3", 1_505L, 2_105L), ("mbfp frame 2 5", 2_105L, 2_505L) })
       );
-      Assert.That(TraceEvents.Intended(Frames(Frame(1, 0)), g_plain), Is.Empty);
+      Assert.That(TraceEvents.Intended(Frames(Frame(1, 0)), 2, g_plain), Is.Empty);
     }
 
     [Test]
@@ -117,11 +121,19 @@ namespace MB.FramePacing.TraceJoin.UnitTest
         Frame(6, 0, cpuStartNs: 4_000, cpuBusyNs: 0)
       );
 
-      var slices = TraceEvents.Cpu(made, g_plain);
+      var slices = TraceEvents.Cpu(made, uint.MaxValue, g_plain);
 
       Assert.That(
         slices.Select(s => (s.Name, s.StartNs, s.EndNs, s.Flow)),
-        Is.EqualTo(new[] { ("#1", 1_000L, 1_300L, 2UL), ("#2", 2_000L, 3_000L, 3UL), ("#3", 3_000L, 3_200L, 4UL), ("#6", 4_000L, 4_000L, 7UL) })
+        Is.EqualTo(
+          new[]
+          {
+            ("mbfp frame 4294967295 1", 1_000L, 1_300L, 2UL),
+            ("mbfp frame 4294967295 2", 2_000L, 3_000L, 3UL),
+            ("mbfp frame 4294967295 3", 3_000L, 3_200L, 4UL),
+            ("mbfp frame 4294967295 6", 4_000L, 4_000L, 7UL),
+          }
+        )
       );
       Assert.That(slices[1].Arguments, Is.EqualTo(new[] { TraceArgument.Of("frame index", 2), TraceArgument.Of("CPU busy (ms)", 0.0015) }));
     }
@@ -132,10 +144,10 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       var golden = GoldenRun().Frames;
       var alignment = TraceAlignmentUtil.Align(golden);
 
-      Assert.That(TraceEvents.Intended(golden, alignment).Count, Is.EqualTo(golden.Count(f => f.IntendedDisplayTime != null)));
-      var cpuSlices = TraceEvents.Cpu(golden, alignment);
+      Assert.That(TraceEvents.Intended(golden, GoldenRunId, alignment).Count, Is.EqualTo(golden.Count(f => f.IntendedDisplayTime != null)));
+      var cpuSlices = TraceEvents.Cpu(golden, GoldenRunId, alignment);
       Assert.That(cpuSlices.Count, Is.EqualTo(golden.Count(f => f.CpuStartTime != null && f.CpuBusy != null)));
-      var shown = TraceEvents.OnScreen(golden, alignment, PeriodNs).Where(s => s.Flow != 0).ToDictionary(s => s.Flow);
+      var shown = TraceEvents.OnScreen(golden, GoldenRunId, alignment, PeriodNs).Where(s => s.Flow != 0).ToDictionary(s => s.Flow);
       foreach (var work in cpuSlices)
       {
         // A frame's CPU work is done before the frame is on screen
@@ -258,6 +270,67 @@ namespace MB.FramePacing.TraceJoin.UnitTest
     }
 
     [Test]
+    public void Refreshes_ARefreshPerCaptureNamedInTurnWithTheGapsLeftOpen()
+    {
+      var made = new[]
+      {
+        MadeCapture(1, 500),
+        MadeCapture(2, 1_000),
+        MadeCapture(3, 2_000, "Undecodable"),
+        // Not recorded: no time, a gap
+        MadeCapture(4, null, "NotRecorded"),
+        MadeCapture(5, 4_000),
+        // Closer than a period to the one before: cut there
+        MadeCapture(6, 4_600),
+        // A clock that went back: left out, and it cuts nothing
+        MadeCapture(7, 4_500),
+        MadeCapture(8, 6_000),
+        MadeCapture(9, 9_000),
+      };
+
+      var slices = TraceEvents.Refreshes(made, new TraceAlignment(TraceAnchor.Given, 100, VBlankShiftNs: 10), (1_000, 6_000), 1_000);
+
+      Assert.That(
+        slices.Select(s => (s.StartNs, s.EndNs, s.Name, s.Arguments.Single().Whole)),
+        Is.EqualTo(
+          new[]
+          {
+            (890L, 1_890L, "refresh a", 2L),
+            (1_890L, 2_890L, "refresh, not decoded", 3L),
+            (3_890L, 4_490L, "refresh b", 5L),
+            (4_490L, 5_490L, "refresh a", 6L),
+            (5_890L, 6_890L, "refresh a", 8L),
+          }
+        )
+      );
+      Assert.That(slices.All(s => s.Track == TraceTrack.Refreshes && s.Kind == TraceEventKind.Slice), Is.True);
+    }
+
+    [Test]
+    public void Refreshes_TheGoldenCaptureHasARefreshPerCaptureAndACameraNone()
+    {
+      var run = GoldenRun();
+      var alignment = TraceAlignmentUtil.Align(run.Frames);
+
+      var slices = TraceEvents.Of(TraceTrack.Refreshes, run, alignment);
+
+      var (first, last) = TraceEvents.CaptureRangeOf(run.Frames);
+      Assert.That(
+        slices.Count,
+        Is.EqualTo(run.Captures.Count(c => c.CaptureTime is { } time && time.Nanoseconds >= first && time.Nanoseconds <= last))
+      );
+      Assert.That(slices.Select(s => s.Name).Distinct().Order(), Is.EqualTo(new[] { "refresh a", "refresh b" }));
+      for (int i = 0; i + 1 < slices.Count; ++i)
+      {
+        // A refresh long, cut where the next capture begins: the file's times are rounded to the nanosecond
+        Assert.That(slices[i].EndNs - slices[i].StartNs, Is.EqualTo(PeriodNs - 1).Or.EqualTo(PeriodNs));
+        Assert.That(slices[i].EndNs, Is.LessThanOrEqualTo(slices[i + 1].StartNs));
+      }
+      // A camera films faster than the display refreshes: its captures are not refreshes
+      Assert.That(TraceEvents.Of(TraceTrack.Refreshes, run with { CapturePeriodNs = PeriodNs / 4 }, alignment), Is.Empty);
+    }
+
+    [Test]
     public void EveryTrack_HasItsEventsItsNameAndItsDescription()
     {
       var run = GoldenRun();
@@ -267,7 +340,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       {
         Assert.That(names.Add(TraceTrackText.NameOf(track)), Is.True);
         Assert.That(TraceTrackText.DescriptionOf(track), Is.Not.Empty);
-        var events = TraceEvents.Of(track, run.Frames, run.Captures, alignment, PeriodNs);
+        var events = TraceEvents.Of(track, run, alignment);
         Assert.That(events.All(e => e.Track == track), Is.True, track.ToString());
         if (TraceTrackText.IsCounter(track))
         {
@@ -284,7 +357,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
           Assert.That(events.Count, Is.GreaterThan(380));
         }
       }
-      Assert.That(names.Count, Is.EqualTo(8));
+      Assert.That(names.Count, Is.EqualTo(9));
     }
   }
 }

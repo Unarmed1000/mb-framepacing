@@ -97,6 +97,7 @@ class Run:
     frames: list[FrameRow]
     captures: list[CaptureCsvRow]
     period_ns: int
+    capture_period_ns: int
 
 
 def pick_run(summary: AnalysisSummary, run_id: int | None) -> SummaryRun:
@@ -132,7 +133,7 @@ def read_run(capture: Path, run_id: int | None, from_seconds: float | None, to_s
     captures = read_captures(captures_file) if captures_file.exists() else []
     period = picked.pacing.refresh_period_ns if picked.pacing is not None else summary.capture_period_ns
     name = picked.name or picked.sequence_id or f"run {picked.run_id}"
-    return Run(picked.run_id, name, f"{picked.run_id}/{picked.sequence_id or ''}", frames, captures, period)
+    return Run(picked.run_id, name, f"{picked.run_id}/{picked.sequence_id or ''}", frames, captures, period, summary.capture_period_ns)
 
 
 def write_tracks(
@@ -150,7 +151,7 @@ def write_tracks(
             writer = TrackWriter(file, run.key, run.name, lambda time_ns: to_trace_ns(time_ns, snapshots))
             writer.write_attributes(attributes)
             for track in Track:
-                writer.write_track(track, track_events(track, run.frames, run.captures, alignment, run.period_ns))
+                writer.write_track(track, track_events(track, run.run_id, run.frames, run.captures, alignment, run.period_ns, run.capture_period_ns))
             if source is not None:
                 copy_source(source, file)
         _ = partial.replace(output)

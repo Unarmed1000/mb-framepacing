@@ -22,14 +22,24 @@ namespace MB.FramePacing.TraceJoin
     /// <summary>The run's id, as its markers carry it: what the frame record's slices in a trace are known by.</summary>
     public uint RunId { get; init; }
 
-    /// <summary>The run by its id, with the name it was given or else its sequence id as the summary writes it.</summary>
+    /// <summary>
+    /// The capture's period, in whole nanoseconds: the refresh period for a capture card, shorter for a camera (0: not known). A capture is
+    /// a refresh only where the two are the same.
+    /// </summary>
+    public long CapturePeriodNs { get; init; }
+
+    /// <summary>
+    /// The run by its id, with the name it was given or else its sequence id as the summary writes it. <paramref name="periodNs"/> is the
+    /// display's refresh period, <paramref name="capturePeriodNs"/> the capture's.
+    /// </summary>
     public static TraceRun Create(
       uint runId,
       string? sequenceId,
       string? name,
       IReadOnlyList<FrameRow> frames,
       IReadOnlyList<CaptureCsvRow> captures,
-      long periodNs
+      long periodNs,
+      long capturePeriodNs
     )
     {
       string id = runId.ToString(CultureInfo.InvariantCulture);
@@ -37,13 +47,25 @@ namespace MB.FramePacing.TraceJoin
         !string.IsNullOrEmpty(name) ? name
         : !string.IsNullOrEmpty(sequenceId) ? sequenceId
         : $"run {id}";
-      return new TraceRun(shown, $"{id}/{sequenceId ?? string.Empty}", frames, captures, periodNs) { RunId = runId };
+      return new TraceRun(shown, $"{id}/{sequenceId ?? string.Empty}", frames, captures, periodNs)
+      {
+        RunId = runId,
+        CapturePeriodNs = capturePeriodNs,
+      };
     }
 
     /// <summary>
     /// A run of an analysis output: its refresh period is the run's own where the analysis measured one, else the capture period.
     /// </summary>
     public static TraceRun Of(AnalysisSummary summary, SummaryRun run, IReadOnlyList<FrameRow> frames, IReadOnlyList<CaptureCsvRow> captures) =>
-      Create(run.RunId, run.SequenceId, run.Name, frames, captures, (run.Pacing?.RefreshPeriod ?? summary.CapturePeriod).Nanoseconds);
+      Create(
+        run.RunId,
+        run.SequenceId,
+        run.Name,
+        frames,
+        captures,
+        (run.Pacing?.RefreshPeriod ?? summary.CapturePeriod).Nanoseconds,
+        summary.CapturePeriod.Nanoseconds
+      );
   }
 }

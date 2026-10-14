@@ -211,7 +211,8 @@ namespace MB.FramePacing.TraceJoin
     /// <summary>
     /// The frame record (<see cref="FrameRecordSlice"/>): the slices named for a frame on any track, ascending by their start, with the
     /// annotations they have and the process their track belongs to. Their times are on the trace's own clock here (TraceLoader takes
-    /// them to the record's). A slice that had not ended when the trace did, or whose name is not a frame's, is left out.
+    /// them to the record's). A slice that had not ended when the trace did, or whose name is not a frame's, is left out, and so are the
+    /// tools' own slices of a frame (an augmented trace's tracks, under a track named for a run).
     /// </summary>
     public static IReadOnlyList<FrameRecordSlice> FrameRecords(ITraceQueries trace)
     {
@@ -223,7 +224,9 @@ namespace MB.FramePacing.TraceJoin
         $"SELECT s.ts AS ts, s.dur AS dur, s.name AS name, {annotations}, p.name AS process FROM slice s "
           + "LEFT JOIN thread_track tt ON tt.id = s.track_id LEFT JOIN thread th ON th.utid = tt.utid "
           + "LEFT JOIN process_track pt ON pt.id = s.track_id LEFT JOIN process p ON p.upid = COALESCE(pt.upid, th.upid) "
-          + $"WHERE s.name GLOB {Quoted(FrameRecordText.NamePrefix + "*")} AND s.dur >= 0 ORDER BY s.ts"
+          + "LEFT JOIN track own ON own.id = s.track_id LEFT JOIN track parent ON parent.id = own.parent_id "
+          + $"WHERE s.name GLOB {Quoted(FrameRecordText.NamePrefix + "*")} AND s.dur >= 0 "
+          + $"AND IFNULL(parent.name, '') NOT GLOB {Quoted(TraceTrackWriter.RootNamePrefix + "*")} ORDER BY s.ts"
       );
       var records = new List<FrameRecordSlice>(rows.RowCount);
       for (int row = 0; row < rows.RowCount; ++row)

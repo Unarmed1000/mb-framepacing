@@ -122,6 +122,11 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.That(values[TraceTrackText.NameOf(TraceTrack.DisplayStep)], Is.EqualTo(run.Frames.Count - 1));
       Assert.That(TraceReader.Errors(processor), Is.Empty);
       Assert.That(TraceReader.TraceRange(processor), Is.EqualTo((data.FirstNs, data.LastNs)));
+      // The tools' slices of a frame have the record's name, so that the viewer highlights them with it; they are no record
+      using var recorded = TraceProcessor.Start(m_processor, TraceTestData.File(trace));
+      var records = TraceReader.FrameRecords(recorded);
+      Assert.That(records, Is.Not.Empty);
+      Assert.That(TraceReader.FrameRecords(processor), Is.EqualTo(records));
     }
 
     [Test]

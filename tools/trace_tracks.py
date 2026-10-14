@@ -31,6 +31,7 @@ from perfetto.protos.perfetto.trace.perfetto_trace_pb2 import TracePacket, Track
 from perfetto.trace_builder.proto_builder import StreamingTraceProtoBuilder
 from trace_events import (  # pyright: ignore[reportImplicitRelativeImport] (a script next to this one: its folder is on sys.path)
     COUNTER_TRACKS,
+    TOOLS_ROOT_PREFIX,
     TRACK_DESCRIPTIONS,
     ArgValue,
     Counter,
@@ -67,7 +68,7 @@ def stable_id(run_key: str, name: str) -> int:
 
 def root_name(run_name: str) -> str:
     """The name of the track everything of a run is under."""
-    return f"mb-framepacing: {run_name}"
+    return TOOLS_ROOT_PREFIX + run_name
 
 
 def copy_source(source: Path, output: BinaryIO) -> None:

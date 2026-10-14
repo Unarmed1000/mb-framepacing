@@ -173,7 +173,11 @@ namespace MB.FramePacing.Analysis
           long periodNs = (run.Pacing?.RefreshPeriod ?? timeline.CapturePeriod).Nanoseconds;
           try
           {
-            join = TraceJoiner.Join(TraceRun.Create(run.RunId, run.SequenceId, run.Name, rows, captures, periodNs), data, trace);
+            join = TraceJoiner.Join(
+              TraceRun.Create(run.RunId, run.SequenceId, run.Name, rows, captures, periodNs, timeline.CapturePeriod.Nanoseconds),
+              data,
+              trace
+            );
           }
           catch (TraceException ex)
           {

@@ -16,9 +16,9 @@ import unittest
 from pathlib import Path
 
 from trace_alignment import align
-from trace_events import Track, counters, cpu, frame_events, intended, on_screen
+from trace_events import Track, capture_range_of, counters, cpu, frame_events, intended, on_screen, refreshes
 
-from .golden_capture import CAPTURE, PERIOD_NS, frames
+from .golden_capture import CAPTURE, PERIOD_NS, captures, frames
 
 TOOL = Path(__file__).resolve().parent.parent / "trace_augment.py"
 REQUIRED = os.environ.get("MB_REQUIRE_TRACE_PROCESSOR", "") not in ("", "0")
@@ -34,6 +34,8 @@ except ImportError as error:
     UNAVAILABLE = f"Perfetto's Python package is not installed ({error}): uv run --group trace python -m unittest ..."
 
 RUN_NAME = "busy-full-rate"
+# The golden capture's run id, as its markers carry it
+RUN_ID = 1
 
 
 def run_tool(*arguments: str | Path | int) -> subprocess.CompletedProcess[str]:
@@ -113,9 +115,13 @@ class RoundTripTests(unittest.TestCase):
                 )
                 return [(int(row.ts), float(row.value)) for row in rows]
 
-            self.assertEqual(slices(Track.ON_SCREEN), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in on_screen(golden, alignment, PERIOD_NS)])
-            self.assertEqual(slices(Track.INTENDED), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in intended(golden, alignment)])
-            self.assertEqual(slices(Track.CPU), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in cpu(golden, alignment)])
+            refreshed = refreshes(captures(), alignment, capture_range_of(golden), PERIOD_NS)
+            self.assertEqual(slices(Track.REFRESHES), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in refreshed])
+            self.assertEqual(
+                slices(Track.ON_SCREEN), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in on_screen(golden, RUN_ID, alignment, PERIOD_NS)]
+            )
+            self.assertEqual(slices(Track.INTENDED), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in intended(golden, RUN_ID, alignment)])
+            self.assertEqual(slices(Track.CPU), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in cpu(golden, RUN_ID, alignment)])
             self.assertEqual(slices(Track.FRAME_EVENTS), [(e.time_ns + boot, 0, e.name) for e in frame_events(golden, alignment)])
             expected = list(counters(golden, alignment))
             for track in (Track.ANIMATION_ERROR, Track.DISPLAY_STEP, Track.LATENESS):
@@ -126,7 +132,7 @@ class RoundTripTests(unittest.TestCase):
             row = source._rows(
                 "SELECT EXTRACT_ARG(s.arg_set_id, 'debug.frame index') AS frame, EXTRACT_ARG(s.arg_set_id, 'debug.flags') AS flags, "
                 + "EXTRACT_ARG(s.arg_set_id, 'debug.lateness (ms)') AS lateness FROM slice s JOIN track t ON s.track_id = t.id "
-                + f"WHERE t.name = {quoted(Track.ON_SCREEN.value)} AND s.name = '#{late.frame_index}'"
+                + f"WHERE t.name = {quoted(Track.ON_SCREEN.value)} AND s.name = 'mbfp frame {RUN_ID} {late.frame_index}'"
             )[0]
             self.assertEqual(int(row.frame), late.frame_index)
             self.assertIn("Late", str(row.flags))
@@ -136,8 +142,17 @@ class RoundTripTests(unittest.TestCase):
                 + "JOIN track ta ON a.track_id = ta.id JOIN track tb ON b.track_id = tb.id "
                 + f"WHERE ta.name = {quoted(Track.CPU.value)} AND tb.name = {quoted(Track.ON_SCREEN.value)} AND a.name = b.name"
             )[0]
-            self.assertEqual(int(flows.count), len(list(cpu(golden, alignment))))
+            self.assertEqual(int(flows.count), len(list(cpu(golden, RUN_ID, alignment))))
             self.assertEqual(source.errors(), {})
+
+    def test_the_frame_record_read_from_an_augmented_trace_is_the_applications_alone(self) -> None:
+        # The tools' slices of a frame have the record's name, so that the viewer highlights them with it; they are no record
+        with TraceSource(self.trace) as recorded, TraceSource(self.augmented()) as augmented:
+            records = recorded.frame_records()
+            self.assertGreater(len(records), 0)
+            self.assertEqual(augmented.frame_records(), records)
+            named = augmented._rows(f"SELECT COUNT(*) AS count FROM slice WHERE name GLOB 'mbfp frame {RUN_ID} *'")[0]
+            self.assertGreater(int(named.count), 3 * len(records))
 
     def test_what_the_recorded_trace_held_is_still_there(self) -> None:
         queries = {

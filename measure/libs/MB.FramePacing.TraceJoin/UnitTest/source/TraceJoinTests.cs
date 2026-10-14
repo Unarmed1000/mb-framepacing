@@ -233,12 +233,15 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       var frames = Frames();
       var captures = Array.Empty<CaptureCsvRow>();
       Assert.That(
-        TraceRun.Create(7, "seq", "named", frames, captures, 1),
-        Is.EqualTo(new TraceRun("named", "7/seq", frames, captures, 1) { RunId = 7 })
+        TraceRun.Create(7, "seq", "named", frames, captures, 1, 1),
+        Is.EqualTo(new TraceRun("named", "7/seq", frames, captures, 1) { RunId = 7, CapturePeriodNs = 1 })
       );
-      Assert.That(TraceRun.Create(7, "seq", null, frames, captures, 1).Name, Is.EqualTo("seq"));
-      Assert.That(TraceRun.Create(7, "seq", string.Empty, frames, captures, 1).Name, Is.EqualTo("seq"));
-      Assert.That(TraceRun.Create(7, null, null, frames, captures, 1), Is.EqualTo(new TraceRun("run 7", "7/", frames, captures, 1) { RunId = 7 }));
+      Assert.That(TraceRun.Create(7, "seq", null, frames, captures, 1, 1).Name, Is.EqualTo("seq"));
+      Assert.That(TraceRun.Create(7, "seq", string.Empty, frames, captures, 1, 1).Name, Is.EqualTo("seq"));
+      Assert.That(
+        TraceRun.Create(7, null, null, frames, captures, 1, 1),
+        Is.EqualTo(new TraceRun("run 7", "7/", frames, captures, 1) { RunId = 7, CapturePeriodNs = 1 })
+      );
       var golden = GoldenRun();
       Assert.That(golden.Name, Is.EqualTo("busy-full-rate"));
       Assert.That(golden.PeriodNs, Is.EqualTo(PeriodNs));

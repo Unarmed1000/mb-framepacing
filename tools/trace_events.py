@@ -5,6 +5,7 @@ Perfetto trace, as plain values with nothing of Perfetto in it (trace_tracks.py 
 
 A track is a line of the trace viewer. Each holds one kind of thing, in time order, and none of its slices overlap:
 
+    Refreshes (captured)             a slice per capture of a capture card, a refresh long, two names in turn
     On screen (measured)             a slice per frame, from its display time for its time on screen
     Intended display (the pacer's)   a slice per frame from its intended display time to the next frame's
     CPU (from the markers)           a slice from a frame's CPU start time for its CPU busy time
@@ -14,6 +15,8 @@ A track is a line of the trace viewer. Each holds one kind of thing, in time ord
     Frame events                     late frames, frame indices that were skipped, frames out of order, torn frames
     Capture events                   captures not decoded, dropped by the source, or missed
 
+A frame's slices are named as the application's frame record names it (mbfp frame <run id> <frame index>): the viewer
+highlights every slice of the name that is hovered or clicked, so a frame's own slice and the tools' slices of it go together.
 The names say what the capture's data says and no more (sdk/doc/vocabulary.md has the terms). Every time is on the system
 clock the application's clock is (trace_alignment.Alignment), in whole nanoseconds."""
 
@@ -22,9 +25,16 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
 
-from trace_alignment import Alignment, TimedFrame  # pyright: ignore[reportImplicitRelativeImport] (a script next to this one: its folder is on sys.path)
+from trace_alignment import (  # pyright: ignore[reportImplicitRelativeImport] (a script next to this one: its folder is on sys.path)
+    Alignment,
+    TimedFrame,
+    record_name,
+)
 
 NS_PER_MS = 1_000_000
+
+# What the name of the track that holds a run's tracks begins with: what the tracks the tools added are known by
+TOOLS_ROOT_PREFIX = "mb-framepacing: "
 
 ArgValue = int | float | str | bool
 
@@ -40,6 +50,7 @@ class TraceReadError(RuntimeError):
 class Track(Enum):
     """The tracks, in the order they are shown. The value is the track's name in the trace."""
 
+    REFRESHES = "Refreshes (captured)"
     ON_SCREEN = "On screen (measured)"
     INTENDED = "Intended display (the pacer's)"
     CPU = "CPU (from the markers)"
@@ -53,6 +64,7 @@ class Track(Enum):
 COUNTER_TRACKS = frozenset({Track.ANIMATION_ERROR, Track.DISPLAY_STEP, Track.LATENESS})
 
 TRACK_DESCRIPTIONS: dict[Track, str] = {
+    Track.REFRESHES: "Each capture of the display for a refresh, named a and b in turn; a capture that was not decoded is named so, and a gap is a refresh not captured. A capture card's captures only.",
     Track.ON_SCREEN: "Each frame from the moment a capture of the display first showed it for as long as it stayed. Measured by mb-framepacing.",
     Track.INTENDED: "When the application's frame pacer aimed for each frame to be shown, as its marker carried it.",
     Track.CPU: "Each frame's CPU start time and CPU busy time, as its marker carried them.",
@@ -171,7 +183,7 @@ def _frame_args(frame: Frame, period_ns: int) -> tuple[tuple[str, ArgValue], ...
     return tuple(args)
 
 
-def on_screen(frames: Sequence[Frame], alignment: Alignment, period_ns: int) -> Iterator[Slice]:
+def on_screen(frames: Sequence[Frame], run_id: int, alignment: Alignment, period_ns: int) -> Iterator[Slice]:
     """A slice per frame for its time on screen, cut where the next frame's begins (one track holds no two slices at once). The
     slice's flow number is the frame's index plus one, as its CPU slice's is."""
     for index, frame in enumerate(frames):
@@ -181,11 +193,16 @@ def on_screen(frames: Sequence[Frame], alignment: Alignment, period_ns: int) -> 
             end = min(end, alignment.display_time(frames[index + 1].first_seen_ns))
         has_cpu = frame.cpu_start_ns is not None and frame.cpu_busy_ns is not None
         yield Slice(
-            Track.ON_SCREEN, start, max(end, start), frame_name(frame.frame_index), _frame_args(frame, period_ns), frame.frame_index + 1 if has_cpu else 0
+            Track.ON_SCREEN,
+            start,
+            max(end, start),
+            record_name(run_id, frame.frame_index),
+            _frame_args(frame, period_ns),
+            frame.frame_index + 1 if has_cpu else 0,
         )
 
 
-def intended(frames: Sequence[Frame], alignment: Alignment) -> Iterator[Slice]:
+def intended(frames: Sequence[Frame], run_id: int, alignment: Alignment) -> Iterator[Slice]:
     """A slice per frame from its intended display time to the next frame's that is not before it. The last frame's is as long
     as its target frame time, or has no length. A frame whose intended display time is before the one before it (a clock that
     went back, a marker that is wrong) gets none: a track is in time order."""
@@ -202,10 +219,10 @@ def intended(frames: Sequence[Frame], alignment: Alignment) -> Iterator[Slice]:
                 end = following
                 break
         last_end = end
-        yield Slice(Track.INTENDED, start, end, frame_name(frame.frame_index), (("frame index", frame.frame_index),))
+        yield Slice(Track.INTENDED, start, end, record_name(run_id, frame.frame_index), (("frame index", frame.frame_index),))
 
 
-def cpu(frames: Sequence[Frame], alignment: Alignment) -> Iterator[Slice]:
+def cpu(frames: Sequence[Frame], run_id: int, alignment: Alignment) -> Iterator[Slice]:
     """A slice per frame from its CPU start time for its CPU busy time, cut where the next frame's begins. A frame whose CPU
     start is before the one before it (a clock that went back, a marker that is wrong) gets none: a track is in time order."""
     worked = [f for f in frames if f.cpu_start_ns is not None and f.cpu_busy_ns is not None]
@@ -222,7 +239,7 @@ def cpu(frames: Sequence[Frame], alignment: Alignment) -> Iterator[Slice]:
                 break
         last_end = end
         args: tuple[tuple[str, ArgValue], ...] = (("frame index", frame.frame_index), ("CPU busy (ms)", milliseconds(frame.cpu_busy_ns or 0)))
-        yield Slice(Track.CPU, start, end, frame_name(frame.frame_index), args, frame.frame_index + 1)
+        yield Slice(Track.CPU, start, end, record_name(run_id, frame.frame_index), args, frame.frame_index + 1)
 
 
 def counters(frames: Sequence[Frame], alignment: Alignment) -> Iterator[Counter]:
@@ -287,6 +304,36 @@ def capture_events(captures: Sequence[Capture], alignment: Alignment, capture_ra
     return events
 
 
+REFRESH_NAMES = ("refresh a", "refresh b")
+NOT_DECODED_REFRESH = "refresh, not decoded"
+
+
+def refreshes(captures: Sequence[Capture], alignment: Alignment, capture_range: tuple[int, int], period_ns: int) -> list[Slice]:
+    """A slice per capture from capture_range's first time to its last on the capture's clock: a capture card captures once per
+    refresh, so each is a refresh, a period long and cut where the next capture begins. Named a and b by the capture's index, so
+    the viewer colours them in turn (a capture not decoded is named so); a capture that was not recorded or was missed has none,
+    and shows as a gap. A capture before the end of the one before it (a clock that went back) gets none: a track is in time
+    order."""
+    first, last = capture_range
+    timed = [c for c in captures if c.capture_ns is not None and first <= c.capture_ns <= last]
+    slices: list[Slice] = []
+    last_end: int | None = None
+    for index, capture in enumerate(timed):
+        start = alignment.capture_time(capture.capture_ns or 0) - alignment.vblank_shift_ns
+        if last_end is not None and start < last_end:
+            continue
+        end = start + max(period_ns, 0)
+        for later in timed[index + 1 :]:
+            following = alignment.capture_time(later.capture_ns or 0) - alignment.vblank_shift_ns
+            if following >= start:
+                end = min(end, following)
+                break
+        last_end = end
+        name = NOT_DECODED_REFRESH if capture.capture_status == "Undecodable" else REFRESH_NAMES[capture.capture_index % 2]
+        slices.append(Slice(Track.REFRESHES, start, end, name, (("capture index", capture.capture_index),)))
+    return slices
+
+
 def capture_range_of(frames: Sequence[Frame]) -> tuple[int, int]:
     """From the first frame's display time to the end of the last frame's time on screen, on the capture's clock."""
     if not frames:
@@ -294,14 +341,20 @@ def capture_range_of(frames: Sequence[Frame]) -> tuple[int, int]:
     return (min(f.first_seen_ns for f in frames), max(f.first_seen_ns + max(f.on_screen_ns, 0) for f in frames))
 
 
-def track_events(track: Track, frames: Sequence[Frame], captures: Sequence[Capture], alignment: Alignment, period_ns: int) -> Iterator[Event]:
-    """One track's events, in time order."""
-    if track is Track.ON_SCREEN:
-        yield from on_screen(frames, alignment, period_ns)
+def track_events(
+    track: Track, run_id: int, frames: Sequence[Frame], captures: Sequence[Capture], alignment: Alignment, period_ns: int, capture_period_ns: int
+) -> Iterator[Event]:
+    """One track's events, in time order. The refreshes are a capture card's captures only, whose period is the refresh period
+    (a camera captures faster: its captures are not refreshes)."""
+    if track is Track.REFRESHES:
+        if capture_period_ns == period_ns:
+            yield from refreshes(captures, alignment, capture_range_of(frames), period_ns)
+    elif track is Track.ON_SCREEN:
+        yield from on_screen(frames, run_id, alignment, period_ns)
     elif track is Track.INTENDED:
-        yield from intended(frames, alignment)
+        yield from intended(frames, run_id, alignment)
     elif track is Track.CPU:
-        yield from cpu(frames, alignment)
+        yield from cpu(frames, run_id, alignment)
     elif track in COUNTER_TRACKS:
         yield from (counter for counter in counters(frames, alignment) if counter.track is track)
     elif track is Track.FRAME_EVENTS:
