@@ -197,19 +197,21 @@ namespace MB.FramePacing.Charts
             : NanosecondTimeSpan.MaxValue;
         // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
+        // Off by delta time jitter (the display was even, the timer was not, by less than the intended period): yellow, as on the report
+        bool isJitter = (frame.Flags & PresentedFrameFlags.DeltaTimeJitter) != 0;
         for (int k = from; k < to; ++k)
         {
           bool firstRefresh = k == from;
           string kind =
             isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
-            : firstRefresh ? (frame.AnimationError is { } e && e.Duration() > threshold ? "off" : "ok")
+            : firstRefresh ? (frame.AnimationError is { } e && e.Duration() > threshold ? (isJitter ? "off-jitter" : "off") : "ok")
             : (k - from) * refresh.Nanoseconds < intendedHold.Nanoseconds - (refresh.Nanoseconds / 2) ? "hold"
             : "again";
           used.Add(kind == "strip-static-b" ? "strip-static-a" : kind);
           double x0 = XOf(RefreshAt(k));
           double x1 = XOf(RefreshAt(k + 1));
           parts.Add(new RectShape(kind, N(x0 + 2, 1), N(displayY, 1), N(x1 - x0 - 4, 1), N(DisplayH, 0), "6"));
-          parts.Add(new TextShape((x0 + x1) / 2, displayY + (DisplayH / 2) + 5, Label(frame), kind == "again" ? "cell-text dark-text" : "cell-text"));
+          parts.Add(new TextShape((x0 + x1) / 2, displayY + (DisplayH / 2) + 5, Label(frame), kind is "again" or "off-jitter" ? "cell-text dark-text" : "cell-text"));
         }
 
         double cx = (XOf(RefreshAt(from)) + XOf(RefreshAt(from + 1))) / 2;
@@ -235,8 +237,8 @@ namespace MB.FramePacing.Charts
         if (error.Duration() > threshold)
         {
           double pill = (value.Length * 7.4) + 18;
-          parts.Add(new RectShape("err-pill", N(cx - (pill / 2), 1), N(errorY - 15, 1), N(pill, 1), N(21, 0), "10.5"));
-          parts.Add(new TextShape(cx, errorY, value, "err"));
+          parts.Add(new RectShape(isJitter ? "err-pill-jitter" : "err-pill", N(cx - (pill / 2), 1), N(errorY - 15, 1), N(pill, 1), N(21, 0), "10.5"));
+          parts.Add(new TextShape(cx, errorY, value, isJitter ? "err-jitter" : "err"));
         }
         else
           parts.Add(new TextShape(cx, errorY, value, "zero"));
@@ -272,6 +274,7 @@ namespace MB.FramePacing.Charts
     {
       ("ok", "the frame's first refresh, within the error threshold"),
       ("off", "the frame's first refresh, off by more than the error threshold"),
+      ("off-jitter", "the frame's first refresh, off by delta time jitter: less than the intended period"),
       ("hold", "held as the next frame was animated for"),
       ("again", "held longer: the next frame is late"),
       ("strip-static-a", "static: nothing animates"),

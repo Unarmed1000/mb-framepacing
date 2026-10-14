@@ -497,7 +497,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(Of("arrow").Count(), Is.EqualTo(boxes + 1), "a present arrow per box, and the key's");
       // Every frame appears on a bright vsync: the line at the left edge of its first refresh (ok or off cell, 2 px inside it) is not faint
       var brightX = Of("vsync").Select(e => double.Parse((string)e.Attribute("x1")!, System.Globalization.CultureInfo.InvariantCulture)).ToHashSet();
-      var firstCells = Of("ok").Concat(Of("off")).Where(e => (string?)e.Attribute("height") == "40");
+      var firstCells = Of("ok").Concat(Of("off")).Concat(Of("off-jitter")).Where(e => (string?)e.Attribute("height") == "40");
       foreach (var cell in firstCells)
       {
         double x = double.Parse((string)cell.Attribute("x")!, System.Globalization.CultureInfo.InvariantCulture) - 2;
@@ -506,15 +506,38 @@ namespace MB.FramePacing.Charts.UnitTest
       // Every box is labelled with its frame, however narrow it is (a narrow one in the smaller font)
       int labels = document.Descendants().Count(e => (string?)e.Attribute("class") is "frame" or "box-time" && e.Value.StartsWith('#'));
       Assert.That(labels, Is.EqualTo(boxes), "a frame label per CPU box");
-      // Every frame's first refresh is ok or off (the key adds one swatch of each kind it uses)
-      int firstRefreshes = Of("ok").Count() + Of("off").Count() - (Of("ok").Any() ? 1 : 0) - (Of("off").Any() ? 1 : 0);
-      Assert.That(firstRefreshes, Is.EqualTo(frames.Count), "a first refresh per frame");
+      // Every frame's first refresh is ok, off or off by delta time jitter (the key adds one swatch of each kind it uses)
+      int Cells(string cls) => Of(cls).Count() - (Of(cls).Any() ? 1 : 0);
+      Assert.That(Cells("ok") + Cells("off") + Cells("off-jitter"), Is.EqualTo(frames.Count), "a first refresh per frame");
       Assert.That(
-        Of("err-pill").Count(),
+        Of("err-pill").Count() + Of("err-pill-jitter").Count(),
         Is.EqualTo(frames.Count(f => f.AnimationError is { } e && e.Duration() > chart.ErrorThreshold)),
         "an error pill per frame off by more than the threshold"
       );
       Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
+    }
+
+    /// <summary>
+    /// The frame timeline card of a naive timer on an even display: a frame off by delta time jitter has a yellow first refresh and error
+    /// pill, as the report's bars, and no other frame has either.
+    /// </summary>
+    [Test]
+    public void FrameTimeline_DeltaTimeJitterIsYellow()
+    {
+      var (_, report, _) = Analyze("60-naive-5ms");
+      var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
+      var section = RunSection.Create(chart, 1.0, 1.4);
+      var frames = section.Section.Run.Frames;
+      int jitter = frames.Count(f => (f.Flags & PresentedFrameFlags.DeltaTimeJitter) != 0);
+      Assert.That(jitter, Is.GreaterThan(5), "the section has frames of delta time jitter");
+      var document = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section));
+      int Count(string cls) => document.Descendants().Count(e => (string?)e.Attribute("class") == cls);
+
+      // The key adds one swatch
+      Assert.That(Count("off-jitter") - 1, Is.EqualTo(jitter));
+      Assert.That(Count("err-pill-jitter"), Is.EqualTo(jitter));
+      Assert.That(Count("err-jitter"), Is.EqualTo(jitter));
+      Assert.That(document.Descendants().Any(e => e.Value == "the frame's first refresh, off by delta time jitter: less than the intended period"), Is.True);
     }
 
     /// <summary>
