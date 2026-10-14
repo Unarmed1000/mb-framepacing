@@ -61,7 +61,7 @@ CI checks it):
 | ----------------------- | -------------- | -------: |
 | `MB.FramePacing`        | netstandard2.1 | 20.0 KiB |
 | `MB.FramePacing.Marker` | netstandard2.1 | 28.0 KiB |
-| `MB.FramePacing.Trace`  | netstandard2.1 |  8.5 KiB |
+| `MB.FramePacing.Trace`  | netstandard2.1 | 14.0 KiB |
 | `MB.FramePacing.Data`   | net10.0        | 97.0 KiB |
 
 <!-- /sdk-csharp-size-table -->

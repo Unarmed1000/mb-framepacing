@@ -98,7 +98,11 @@ TEST(FrameDetailName, EveryDetailIsNamedAsTheGoldenDataHasIt)
     columns.emplace_back(line.substr(begin));
     ASSERT_EQ(columns.size(), 4u) << line;
     const auto detail = DetailOf(columns[0]);
-    ASSERT_TRUE(detail.has_value()) << line;
+    if (!detail.has_value())
+    {
+      ADD_FAILURE() << "no detail: " << line;
+      continue;
+    }
     const TR::FrameDetailName name(*detail, static_cast<uint32_t>(std::stoul(columns[1])), std::stoull(columns[2]));
     EXPECT_EQ(name.View(), columns[3]) << line;
     EXPECT_EQ(std::strlen(name.CStr()), name.View().size()) << line;
