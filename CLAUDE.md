@@ -264,7 +264,10 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
     `TraceReader.FrameRecords`, by the track's `parent_id`); keep the tests of it. The first track, **Refreshes (captured)**, is a
     slice per capture of a capture card, a refresh long, `refresh a` / `refresh b` by the capture's index so the viewer colours
     them in turn, `refresh, not decoded`, gaps where nothing was captured; none where the capture period is not the refresh
-    period (a camera). Instants keep `#<frame index>` in their names.
+    period (a camera). Instants keep `#<frame index>` in their names. **A frame on screen carries its verdict as `correlation_id_str`**
+    (field 53; `trace_events.verdict`, `TraceEvents.VerdictOf`; the user's choice, 2026-10-14): late, delta time jitter, off,
+    static, unknown, on time. The viewer picks the colours by hash (no colour field in the protos, Chrome's `cname` ignored): never
+    choose strings for the colour they hash to.
   - The clocks are tied by the frames only (`measure/doc/perfetto.md` "The clocks"): a delay the whole run shares can not be told
     from the clocks' difference. Never describe a track's position, or what the trace says of a frame, as measured beyond that.
   - `usage.md` has a short section on it (5.) and the README one ("A Perfetto trace of the run"); `perfetto.md` has the whole of

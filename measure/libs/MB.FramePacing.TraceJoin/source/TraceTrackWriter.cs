@@ -60,6 +60,7 @@ namespace MB.FramePacing.TraceJoin
     private const int EventName = 23;
     private const int EventDoubleCounterValue = 44;
     private const int EventFlowIds = 47;
+    private const int EventCorrelationIdStr = 53;
     private const int AnnotationIntValue = 4;
     private const int AnnotationDoubleValue = 5;
     private const int AnnotationStringValue = 6;
@@ -202,6 +203,8 @@ namespace MB.FramePacing.TraceJoin
             m_message.Text(EventName, one.Name);
             if (one.Flow != 0)
               m_message.Fixed64(EventFlowIds, StableId(m_runKey, "flow/" + one.Flow.ToString(CultureInfo.InvariantCulture)));
+            if (one.Group.Length > 0)
+              m_message.Text(EventCorrelationIdStr, one.Group);
             WriteEvent(sequence, start);
             // A slice does not end before it begins, also where the clock it was on is one that can go back
             m_message.Clear();

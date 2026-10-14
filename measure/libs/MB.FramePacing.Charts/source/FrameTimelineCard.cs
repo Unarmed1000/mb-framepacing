@@ -211,7 +211,14 @@ namespace MB.FramePacing.Charts
           double x0 = XOf(RefreshAt(k));
           double x1 = XOf(RefreshAt(k + 1));
           parts.Add(new RectShape(kind, N(x0 + 2, 1), N(displayY, 1), N(x1 - x0 - 4, 1), N(DisplayH, 0), "6"));
-          parts.Add(new TextShape((x0 + x1) / 2, displayY + (DisplayH / 2) + 5, Label(frame), kind is "again" or "off-jitter" ? "cell-text dark-text" : "cell-text"));
+          parts.Add(
+            new TextShape(
+              (x0 + x1) / 2,
+              displayY + (DisplayH / 2) + 5,
+              Label(frame),
+              kind is "again" or "off-jitter" ? "cell-text dark-text" : "cell-text"
+            )
+          );
         }
 
         double cx = (XOf(RefreshAt(from)) + XOf(RefreshAt(from + 1))) / 2;

@@ -28,9 +28,13 @@ namespace MB.FramePacing.TraceJoin
     /// </summary>
     public long CapturePeriodNs { get; init; }
 
+    /// <summary>The |animation error| above which a frame counts as off, in whole nanoseconds, as the analysis had it.</summary>
+    public long ErrorThresholdNs { get; init; }
+
     /// <summary>
     /// The run by its id, with the name it was given or else its sequence id as the summary writes it. <paramref name="periodNs"/> is the
-    /// display's refresh period, <paramref name="capturePeriodNs"/> the capture's.
+    /// display's refresh period, <paramref name="capturePeriodNs"/> the capture's, and <paramref name="errorThresholdNs"/> the
+    /// analysis's error threshold.
     /// </summary>
     public static TraceRun Create(
       uint runId,
@@ -39,7 +43,8 @@ namespace MB.FramePacing.TraceJoin
       IReadOnlyList<FrameRow> frames,
       IReadOnlyList<CaptureCsvRow> captures,
       long periodNs,
-      long capturePeriodNs
+      long capturePeriodNs,
+      long errorThresholdNs
     )
     {
       string id = runId.ToString(CultureInfo.InvariantCulture);
@@ -51,6 +56,7 @@ namespace MB.FramePacing.TraceJoin
       {
         RunId = runId,
         CapturePeriodNs = capturePeriodNs,
+        ErrorThresholdNs = errorThresholdNs,
       };
     }
 
@@ -65,7 +71,8 @@ namespace MB.FramePacing.TraceJoin
         frames,
         captures,
         (run.Pacing?.RefreshPeriod ?? summary.CapturePeriod).Nanoseconds,
-        summary.CapturePeriod.Nanoseconds
+        summary.CapturePeriod.Nanoseconds,
+        summary.ErrorThreshold.Nanoseconds
       );
   }
 }

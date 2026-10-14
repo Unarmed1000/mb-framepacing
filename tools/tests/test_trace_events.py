@@ -23,14 +23,16 @@ from trace_events import (
     on_screen,
     refreshes,
     track_events,
+    verdict,
 )
 
 from .golden_capture import PERIOD_NS, MadeCapture, MadeFrame, captures, frames
 
 PLAIN = Alignment(Anchor.NOTHING, 0)
 
-# The golden capture's run id, as its markers carry it
+# The golden capture's run id, as its markers carry it, and the error threshold it was analysed with
 GOLDEN_RUN = 1
+THRESHOLD_NS = 1_000_000
 
 
 class OnScreenTests(unittest.TestCase):
@@ -41,7 +43,7 @@ class OnScreenTests(unittest.TestCase):
             # On screen for longer than to the next frame's display time (a gap in the capture): cut there
             MadeFrame(9, 2_000, on_screen_ns=300, skipped_before=2, flags=("SkippedBefore", "Late"), cpu_start_ns=1_200, cpu_busy_ns=100),
         ]
-        slices = list(on_screen(made, 3, Alignment(Anchor.GIVEN, 100, app_clock_offset_ns=10, vblank_shift_ns=1), 500))
+        slices = list(on_screen(made, 3, Alignment(Anchor.GIVEN, 100, app_clock_offset_ns=10, vblank_shift_ns=1), 500, THRESHOLD_NS))
         # Named as the application's frame record names the frame
         self.assertEqual(
             [(s.start_ns, s.end_ns, s.name) for s in slices],
@@ -67,11 +69,26 @@ class OnScreenTests(unittest.TestCase):
         self.assertEqual(dict(slices[2].args)["flags"], "SkippedBefore, Late")
         # Only a frame that has a CPU slice is joined to one
         self.assertEqual([s.flow for s in slices], [0, 0, 10])
+        # Each in its verdict's colour: a late frame, and two within the error threshold
+        self.assertEqual([s.group for s in slices], ["on time", "on time", "late"])
+
+    def test_a_frames_verdict_is_the_first_that_fits(self) -> None:
+        self.assertEqual(verdict(MadeFrame(1, 0, flags=("Late", "DeltaTimeJitter", "StaticAfter")), THRESHOLD_NS), "late")
+        self.assertEqual(verdict(MadeFrame(1, 0, animation_error_ns=-4_000_000, flags=("DeltaTimeJitter",)), THRESHOLD_NS), "delta time jitter")
+        self.assertEqual(verdict(MadeFrame(1, 0, animation_error_ns=-4_000_000, flags=("StaticAfter",)), THRESHOLD_NS), "off")
+        self.assertEqual(verdict(MadeFrame(1, 0, animation_error_ns=1_000_001), THRESHOLD_NS), "off")
+        self.assertEqual(verdict(MadeFrame(1, 0, animation_error_ns=1_000_000), THRESHOLD_NS), "on time")
+        self.assertEqual(verdict(MadeFrame(1, 0, flags=("StaticAfter", "UncertainStep")), THRESHOLD_NS), "static")
+        self.assertEqual(verdict(MadeFrame(1, 0, flags=("UncertainStep",)), THRESHOLD_NS), "unknown")
+        self.assertEqual(verdict(MadeFrame(1, 0), THRESHOLD_NS), "on time")
 
     def test_the_golden_capture(self) -> None:
         golden = frames()
-        slices = list(on_screen(golden, GOLDEN_RUN, align(golden), PERIOD_NS))
+        slices = list(on_screen(golden, GOLDEN_RUN, align(golden), PERIOD_NS, THRESHOLD_NS))
         self.assertEqual(len(slices), 388)
+        # The busy clip at its full rate: its 33 late frames, the other frames off and the frames on time, no delta time jitter
+        self.assertEqual(sum(1 for s in slices if s.group == "late"), 33)
+        self.assertEqual({s.group for s in slices}, {"late", "off", "on time"})
         self.assertEqual(slices[0].name, "mbfp frame 1 388")
         self.assertEqual(slices[-1].name, "mbfp frame 1 775")
         for before, after in zip(slices, slices[1:], strict=False):
@@ -125,7 +142,7 @@ class IntendedAndCpuTests(unittest.TestCase):
         self.assertEqual(len(list(intended(golden, GOLDEN_RUN, alignment))), sum(1 for f in golden if f.intended_display_ns is not None))
         cpu_slices = list(cpu(golden, GOLDEN_RUN, alignment))
         self.assertEqual(len(cpu_slices), sum(1 for f in golden if f.cpu_start_ns is not None and f.cpu_busy_ns is not None))
-        shown = {s.flow: s for s in on_screen(golden, GOLDEN_RUN, alignment, PERIOD_NS) if s.flow != 0}
+        shown = {s.flow: s for s in on_screen(golden, GOLDEN_RUN, alignment, PERIOD_NS, THRESHOLD_NS) if s.flow != 0}
         for work in cpu_slices:
             # A frame's CPU work is done before the frame is on screen
             self.assertLessEqual(work.end_ns, shown[work.flow].start_ns)
@@ -248,7 +265,7 @@ class RefreshTests(unittest.TestCase):
         alignment = align(golden)
         first, last = capture_range_of(golden)
         slices = refreshes(captures(), alignment, (first, last), PERIOD_NS)
-        self.assertEqual(list(track_events(Track.REFRESHES, GOLDEN_RUN, golden, captures(), alignment, PERIOD_NS, PERIOD_NS)), slices)
+        self.assertEqual(list(track_events(Track.REFRESHES, GOLDEN_RUN, golden, captures(), alignment, PERIOD_NS, PERIOD_NS, THRESHOLD_NS)), slices)
         self.assertEqual(len(slices), sum(1 for c in captures() if c.capture_ns is not None and first <= c.capture_ns <= last))
         self.assertEqual({s.name for s in slices}, {"refresh a", "refresh b"})
         for before, after in zip(slices, slices[1:], strict=False):
@@ -256,7 +273,7 @@ class RefreshTests(unittest.TestCase):
             self.assertIn(before.end_ns - before.start_ns, (PERIOD_NS - 1, PERIOD_NS))
             self.assertLessEqual(before.end_ns, after.start_ns)
         # A camera films faster than the display refreshes: its captures are not refreshes
-        self.assertEqual(list(track_events(Track.REFRESHES, GOLDEN_RUN, golden, captures(), alignment, PERIOD_NS, PERIOD_NS // 4)), [])
+        self.assertEqual(list(track_events(Track.REFRESHES, GOLDEN_RUN, golden, captures(), alignment, PERIOD_NS, PERIOD_NS // 4, THRESHOLD_NS)), [])
 
 
 class TrackTests(unittest.TestCase):
@@ -265,7 +282,7 @@ class TrackTests(unittest.TestCase):
         alignment = align(golden)
         for track in Track:
             self.assertIn(track, TRACK_DESCRIPTIONS)
-            events = list(track_events(track, GOLDEN_RUN, golden, captures(), alignment, PERIOD_NS, PERIOD_NS))
+            events = list(track_events(track, GOLDEN_RUN, golden, captures(), alignment, PERIOD_NS, PERIOD_NS, THRESHOLD_NS))
             self.assertTrue(all(e.track is track for e in events), track)
             if track in COUNTER_TRACKS:
                 self.assertTrue(all(isinstance(e, Counter) for e in events), track)

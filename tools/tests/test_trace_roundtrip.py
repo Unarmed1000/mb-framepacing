@@ -118,7 +118,8 @@ class RoundTripTests(unittest.TestCase):
             refreshed = refreshes(captures(), alignment, capture_range_of(golden), PERIOD_NS)
             self.assertEqual(slices(Track.REFRESHES), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in refreshed])
             self.assertEqual(
-                slices(Track.ON_SCREEN), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in on_screen(golden, RUN_ID, alignment, PERIOD_NS)]
+                slices(Track.ON_SCREEN),
+                [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in on_screen(golden, RUN_ID, alignment, PERIOD_NS, 1_000_000)],
             )
             self.assertEqual(slices(Track.INTENDED), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in intended(golden, RUN_ID, alignment)])
             self.assertEqual(slices(Track.CPU), [(s.start_ns + boot, s.end_ns - s.start_ns, s.name) for s in cpu(golden, RUN_ID, alignment)])
@@ -143,6 +144,15 @@ class RoundTripTests(unittest.TestCase):
                 + f"WHERE ta.name = {quoted(Track.CPU.value)} AND tb.name = {quoted(Track.ON_SCREEN.value)} AND a.name = b.name"
             )[0]
             self.assertEqual(int(flows.count), len(list(cpu(golden, RUN_ID, alignment))))
+            # A frame's slice on screen carries its verdict as the correlation id that colours it
+            groups = source._rows(
+                "SELECT EXTRACT_ARG(s.arg_set_id, 'correlation_id') AS verdict, COUNT(*) AS count FROM slice s JOIN track t ON s.track_id = t.id "
+                + f"WHERE t.name = {quoted(Track.ON_SCREEN.value)} GROUP BY verdict ORDER BY verdict"
+            )
+            self.assertEqual(
+                {str(row.verdict): int(row.count) for row in groups},
+                {group: sum(1 for s in on_screen(golden, RUN_ID, alignment, PERIOD_NS, 1_000_000) if s.group == group) for group in ("late", "off", "on time")},
+            )
             self.assertEqual(source.errors(), {})
 
     def test_the_frame_record_read_from_an_augmented_trace_is_the_applications_alone(self) -> None:

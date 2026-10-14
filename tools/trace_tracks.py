@@ -157,6 +157,8 @@ class TrackWriter:
                 _annotate(begin.track_event, event.args)
                 if event.flow != 0:
                     begin.track_event.flow_ids.append(stable_id(self._run_key, f"flow/{event.flow}"))
+                if event.group:
+                    begin.track_event.correlation_id_str = event.group
                 self._builder.write_packet(begin)
                 # A slice does not end before it begins, also where the clock it was on is one that can go back
                 end = max(self._to_trace_ns(event.end_ns), start)

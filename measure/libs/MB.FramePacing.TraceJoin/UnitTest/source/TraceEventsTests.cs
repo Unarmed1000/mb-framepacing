@@ -21,8 +21,9 @@ namespace MB.FramePacing.TraceJoin.UnitTest
   {
     private static readonly TraceAlignment g_plain = new TraceAlignment(TraceAnchor.Nothing, 0);
 
-    // The golden capture's run id, as its markers carry it
+    // The golden capture's run id, as its markers carry it, and the error threshold it was analysed with
     private const uint GoldenRunId = 1;
+    private const long ThresholdNs = 1_000_000;
 
     [Test]
     public void OnScreen_ASlicePerFrameFromItsDisplayTimeForItsTimeOnScreen()
@@ -34,7 +35,13 @@ namespace MB.FramePacing.TraceJoin.UnitTest
         Frame(9, 2_000, onScreenNs: 300, skippedBefore: 2, flags: new[] { "SkippedBefore", "Late" }, cpuStartNs: 1_200, cpuBusyNs: 100)
       );
 
-      var slices = TraceEvents.OnScreen(made, 3, new TraceAlignment(TraceAnchor.Given, 100, AppClockOffsetNs: 10, VBlankShiftNs: 1), 500);
+      var slices = TraceEvents.OnScreen(
+        made,
+        3,
+        new TraceAlignment(TraceAnchor.Given, 100, AppClockOffsetNs: 10, VBlankShiftNs: 1),
+        500,
+        ThresholdNs
+      );
 
       // Named as the application's frame record names the frame
       Assert.That(
@@ -67,6 +74,24 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.That(slices[2].Arguments, Does.Contain(TraceArgument.Of("flags", "SkippedBefore, Late")));
       // Only a frame that has a CPU slice is joined to one
       Assert.That(slices.Select(s => s.Flow), Is.EqualTo(new ulong[] { 0, 0, 10 }));
+      // Each in its verdict's colour: two within the error threshold, and a late frame
+      Assert.That(slices.Select(s => s.Group), Is.EqualTo(new[] { "on time", "on time", "late" }));
+    }
+
+    [Test]
+    public void AFramesVerdict_IsTheFirstThatFits()
+    {
+      Assert.That(TraceEvents.VerdictOf(Frame(1, 0, flags: new[] { "Late", "DeltaTimeJitter", "StaticAfter" }), ThresholdNs), Is.EqualTo("late"));
+      Assert.That(
+        TraceEvents.VerdictOf(Frame(1, 0, animationErrorNs: -4_000_000, flags: new[] { "DeltaTimeJitter" }), ThresholdNs),
+        Is.EqualTo("delta time jitter")
+      );
+      Assert.That(TraceEvents.VerdictOf(Frame(1, 0, animationErrorNs: -4_000_000, flags: new[] { "StaticAfter" }), ThresholdNs), Is.EqualTo("off"));
+      Assert.That(TraceEvents.VerdictOf(Frame(1, 0, animationErrorNs: 1_000_001), ThresholdNs), Is.EqualTo("off"));
+      Assert.That(TraceEvents.VerdictOf(Frame(1, 0, animationErrorNs: 1_000_000), ThresholdNs), Is.EqualTo("on time"));
+      Assert.That(TraceEvents.VerdictOf(Frame(1, 0, flags: new[] { "StaticAfter", "UncertainStep" }), ThresholdNs), Is.EqualTo("static"));
+      Assert.That(TraceEvents.VerdictOf(Frame(1, 0, flags: new[] { "UncertainStep" }), ThresholdNs), Is.EqualTo("unknown"));
+      Assert.That(TraceEvents.VerdictOf(Frame(1, 0), ThresholdNs), Is.EqualTo("on time"));
     }
 
     [Test]
@@ -74,9 +99,12 @@ namespace MB.FramePacing.TraceJoin.UnitTest
     {
       var golden = GoldenRun().Frames;
 
-      var slices = TraceEvents.OnScreen(golden, GoldenRunId, TraceAlignmentUtil.Align(golden), PeriodNs);
+      var slices = TraceEvents.OnScreen(golden, GoldenRunId, TraceAlignmentUtil.Align(golden), PeriodNs, ThresholdNs);
 
       Assert.That(slices.Count, Is.EqualTo(388));
+      // The busy clip at its full rate: its 33 late frames, the other frames off and the frames on time, no delta time jitter
+      Assert.That(slices.Count(s => s.Group == "late"), Is.EqualTo(33));
+      Assert.That(slices.Select(s => s.Group).Distinct().Order(), Is.EqualTo(new[] { "late", "off", "on time" }));
       Assert.That(slices[0].Name, Is.EqualTo("mbfp frame 1 388"));
       Assert.That(slices[^1].Name, Is.EqualTo("mbfp frame 1 775"));
       for (int i = 0; i + 1 < slices.Count; ++i)
@@ -147,7 +175,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.That(TraceEvents.Intended(golden, GoldenRunId, alignment).Count, Is.EqualTo(golden.Count(f => f.IntendedDisplayTime != null)));
       var cpuSlices = TraceEvents.Cpu(golden, GoldenRunId, alignment);
       Assert.That(cpuSlices.Count, Is.EqualTo(golden.Count(f => f.CpuStartTime != null && f.CpuBusy != null)));
-      var shown = TraceEvents.OnScreen(golden, GoldenRunId, alignment, PeriodNs).Where(s => s.Flow != 0).ToDictionary(s => s.Flow);
+      var shown = TraceEvents.OnScreen(golden, GoldenRunId, alignment, PeriodNs, ThresholdNs).Where(s => s.Flow != 0).ToDictionary(s => s.Flow);
       foreach (var work in cpuSlices)
       {
         // A frame's CPU work is done before the frame is on screen

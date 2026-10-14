@@ -537,7 +537,10 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(Count("off-jitter") - 1, Is.EqualTo(jitter));
       Assert.That(Count("err-pill-jitter"), Is.EqualTo(jitter));
       Assert.That(Count("err-jitter"), Is.EqualTo(jitter));
-      Assert.That(document.Descendants().Any(e => e.Value == "the frame's first refresh, off by delta time jitter: less than the intended period"), Is.True);
+      Assert.That(
+        document.Descendants().Any(e => e.Value == "the frame's first refresh, off by delta time jitter: less than the intended period"),
+        Is.True
+      );
     }
 
     /// <summary>

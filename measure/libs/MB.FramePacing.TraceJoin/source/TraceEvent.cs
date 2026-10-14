@@ -17,6 +17,7 @@ namespace MB.FramePacing.TraceJoin
   /// <param name="EndNs">A slice's end; a moment's and a value's own time.</param>
   /// <param name="Flow">Joins a slice to the slice of another track that has the same number (0: none).</param>
   /// <param name="Value">A counter's value.</param>
+  /// <param name="Group">Gives the slices of one kind one colour in the viewer, whatever their names (empty: none).</param>
   public sealed record TraceEvent(
     TraceTrack Track,
     TraceEventKind Kind,
@@ -25,11 +26,19 @@ namespace MB.FramePacing.TraceJoin
     string Name,
     IReadOnlyList<TraceArgument> Arguments,
     ulong Flow = 0,
-    double Value = 0
+    double Value = 0,
+    string Group = ""
   )
   {
-    public static TraceEvent Slice(TraceTrack track, long startNs, long endNs, string name, IReadOnlyList<TraceArgument> arguments, ulong flow = 0) =>
-      new TraceEvent(track, TraceEventKind.Slice, startNs, endNs, name, arguments, flow);
+    public static TraceEvent Slice(
+      TraceTrack track,
+      long startNs,
+      long endNs,
+      string name,
+      IReadOnlyList<TraceArgument> arguments,
+      ulong flow = 0,
+      string group = ""
+    ) => new TraceEvent(track, TraceEventKind.Slice, startNs, endNs, name, arguments, flow, 0, group);
 
     public static TraceEvent Instant(TraceTrack track, long timeNs, string name, IReadOnlyList<TraceArgument> arguments) =>
       new TraceEvent(track, TraceEventKind.Instant, timeNs, timeNs, name, arguments);

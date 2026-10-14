@@ -200,7 +200,7 @@ Under one track named `mb-framepacing: <run>`, in this order. A slice's argument
 | Track                          | What                                                                                                                                                                                                                      |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Refreshes (captured)           | A slice per capture of a capture card, a refresh long, named `refresh a` and `refresh b` in turn (`refresh, not decoded` for a capture that was not decoded); a gap is a refresh that was not captured. None for a camera |
-| On screen (measured)           | A slice per frame from its display time for its time on screen                                                                                                                                                            |
+| On screen (measured)           | A slice per frame from its display time for its time on screen, coloured by its verdict (below)                                                                                                                           |
 | Intended display (the pacer's) | A slice per frame from its intended display time to the next frame's                                                                                                                                                      |
 | CPU (from the markers)         | A slice from a frame's CPU start time for its CPU busy time, with an arrow to the frame's slice on screen                                                                                                                 |
 | Animation error (ms)           | A value per frame: animation time step minus display time step                                                                                                                                                            |
@@ -208,6 +208,11 @@ Under one track named `mb-framepacing: <run>`, in this order. A slice's argument
 | Lateness (ms)                  | A value per frame: how long after its intended display time it was shown                                                                                                                                                  |
 | Frame events                   | Late frames, frame indices that were skipped, frames out of order, torn frames                                                                                                                                            |
 | Capture events                 | The capture's own gaps: captures not decoded, not recorded, dropped by the source or missed                                                                                                                               |
+
+**A frame on screen is coloured by its verdict**, the first that fits: late, delta time jitter, off (an animation error beyond the
+error threshold otherwise), static, unknown (a step across a capture gap), on time. The verdict is the slice's correlation id,
+which the viewer colours by: each verdict has one colour across the trace, and the viewer, not the tools, picks it (a trace can
+not choose a colour), so it is not the report's red and yellow. The track's description has the legend.
 
 **A frame's slices have the frame record's name** (`mbfp frame <run id> <frame index>`, the name the application gives its own
 slice of the frame): hover over or click any of them, the application's own included, and the viewer highlights every slice of that

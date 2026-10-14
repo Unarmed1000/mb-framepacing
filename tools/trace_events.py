@@ -65,7 +65,9 @@ COUNTER_TRACKS = frozenset({Track.ANIMATION_ERROR, Track.DISPLAY_STEP, Track.LAT
 
 TRACK_DESCRIPTIONS: dict[Track, str] = {
     Track.REFRESHES: "Each capture of the display for a refresh, named a and b in turn; a capture that was not decoded is named so, and a gap is a refresh not captured. A capture card's captures only.",
-    Track.ON_SCREEN: "Each frame from the moment a capture of the display first showed it for as long as it stayed. Measured by mb-framepacing.",
+    Track.ON_SCREEN: "Each frame from the moment a capture of the display first showed it for as long as it stayed. Measured by mb-framepacing. "
+    + "Coloured by its verdict, one colour each (the viewer picks the colours): late, delta time jitter, off (beyond the error threshold "
+    + "otherwise), static, unknown (a capture gap), on time.",
     Track.INTENDED: "When the application's frame pacer aimed for each frame to be shown, as its marker carried it.",
     Track.CPU: "Each frame's CPU start time and CPU busy time, as its marker carried them.",
     Track.ANIMATION_ERROR: "Animation time step minus display time step, per frame. Zero is a frame shown for exactly as long as it animated for.",
@@ -116,7 +118,8 @@ class Capture(Protocol):
 
 @dataclass(frozen=True)
 class Slice:
-    """A stretch of time on a track. flow joins it to the slice of another track that has the same number (0: none)."""
+    """A stretch of time on a track. flow joins it to the slice of another track that has the same number (0: none). group
+    gives the slices of one kind one colour in the viewer, whatever their names (empty: none)."""
 
     track: Track
     start_ns: int
@@ -124,6 +127,7 @@ class Slice:
     name: str
     args: tuple[tuple[str, ArgValue], ...] = ()
     flow: int = 0
+    group: str = ""
 
 
 @dataclass(frozen=True)
@@ -183,9 +187,34 @@ def _frame_args(frame: Frame, period_ns: int) -> tuple[tuple[str, ArgValue], ...
     return tuple(args)
 
 
-def on_screen(frames: Sequence[Frame], run_id: int, alignment: Alignment, period_ns: int) -> Iterator[Slice]:
+# A frame's verdict, in the order they are given: the first that fits
+VERDICT_LATE = "late"
+VERDICT_DELTA_TIME_JITTER = "delta time jitter"
+VERDICT_OFF = "off"
+VERDICT_STATIC = "static"
+VERDICT_UNKNOWN = "unknown"
+VERDICT_ON_TIME = "on time"
+
+
+def verdict(frame: Frame, error_threshold_ns: int) -> str:
+    """What the analysis says of the frame, as one word for its colour: late, delta time jitter, off (an animation error beyond the
+    threshold otherwise), static (nothing animates while it is on screen), unknown (a step across a capture gap), or on time."""
+    if "Late" in frame.flags:
+        return VERDICT_LATE
+    if "DeltaTimeJitter" in frame.flags:
+        return VERDICT_DELTA_TIME_JITTER
+    if frame.animation_error_ns is not None and abs(frame.animation_error_ns) > error_threshold_ns:
+        return VERDICT_OFF
+    if "StaticAfter" in frame.flags:
+        return VERDICT_STATIC
+    if "UncertainStep" in frame.flags:
+        return VERDICT_UNKNOWN
+    return VERDICT_ON_TIME
+
+
+def on_screen(frames: Sequence[Frame], run_id: int, alignment: Alignment, period_ns: int, error_threshold_ns: int) -> Iterator[Slice]:
     """A slice per frame for its time on screen, cut where the next frame's begins (one track holds no two slices at once). The
-    slice's flow number is the frame's index plus one, as its CPU slice's is."""
+    slice's flow number is the frame's index plus one, as its CPU slice's is, and its group the frame's verdict."""
     for index, frame in enumerate(frames):
         start = alignment.display_time(frame.first_seen_ns)
         end = start + max(frame.on_screen_ns, 0)
@@ -199,6 +228,7 @@ def on_screen(frames: Sequence[Frame], run_id: int, alignment: Alignment, period
             record_name(run_id, frame.frame_index),
             _frame_args(frame, period_ns),
             frame.frame_index + 1 if has_cpu else 0,
+            verdict(frame, error_threshold_ns),
         )
 
 
@@ -342,7 +372,14 @@ def capture_range_of(frames: Sequence[Frame]) -> tuple[int, int]:
 
 
 def track_events(
-    track: Track, run_id: int, frames: Sequence[Frame], captures: Sequence[Capture], alignment: Alignment, period_ns: int, capture_period_ns: int
+    track: Track,
+    run_id: int,
+    frames: Sequence[Frame],
+    captures: Sequence[Capture],
+    alignment: Alignment,
+    period_ns: int,
+    capture_period_ns: int,
+    error_threshold_ns: int,
 ) -> Iterator[Event]:
     """One track's events, in time order. The refreshes are a capture card's captures only, whose period is the refresh period
     (a camera captures faster: its captures are not refreshes)."""
@@ -350,7 +387,7 @@ def track_events(
         if capture_period_ns == period_ns:
             yield from refreshes(captures, alignment, capture_range_of(frames), period_ns)
     elif track is Track.ON_SCREEN:
-        yield from on_screen(frames, run_id, alignment, period_ns)
+        yield from on_screen(frames, run_id, alignment, period_ns, error_threshold_ns)
     elif track is Track.INTENDED:
         yield from intended(frames, run_id, alignment)
     elif track is Track.CPU:

@@ -41,7 +41,9 @@ namespace MB.FramePacing.TraceJoin
         TraceTrack.Refreshes =>
           "Each capture of the display for a refresh, named a and b in turn; a capture that was not decoded is named so, and a gap is a refresh not captured. A capture card's captures only.",
         TraceTrack.OnScreen =>
-          "Each frame from the moment a capture of the display first showed it for as long as it stayed. Measured by mb-framepacing.",
+          "Each frame from the moment a capture of the display first showed it for as long as it stayed. Measured by mb-framepacing. "
+            + "Coloured by its verdict, one colour each (the viewer picks the colours): late, delta time jitter, off (beyond the error threshold "
+            + "otherwise), static, unknown (a capture gap), on time.",
         TraceTrack.Intended => "When the application's frame pacer aimed for each frame to be shown, as its marker carried it.",
         TraceTrack.Cpu => "Each frame's CPU start time and CPU busy time, as its marker carried them.",
         TraceTrack.AnimationError =>

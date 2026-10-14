@@ -35,7 +35,7 @@ namespace MB.FramePacing.TraceJoin
 
     /// <summary>One track's events of a run, in time order.</summary>
     public static IReadOnlyList<TraceEvent> Of(TraceTrack track, TraceRun run, TraceAlignment alignment) =>
-      Of(track, run.RunId, run.Frames, run.Captures, alignment, run.PeriodNs, run.CapturePeriodNs);
+      Of(track, run.RunId, run.Frames, run.Captures, alignment, run.PeriodNs, run.CapturePeriodNs, run.ErrorThresholdNs);
 
     /// <summary>
     /// One track's events, in time order. The refreshes are a capture card's captures only, whose period is the refresh period (a camera
@@ -48,12 +48,13 @@ namespace MB.FramePacing.TraceJoin
       IReadOnlyList<CaptureCsvRow> captures,
       TraceAlignment alignment,
       long periodNs,
-      long capturePeriodNs
+      long capturePeriodNs,
+      long errorThresholdNs
     ) =>
       track switch
       {
         TraceTrack.Refreshes => capturePeriodNs == periodNs ? Refreshes(captures, alignment, CaptureRangeOf(frames), periodNs) : [],
-        TraceTrack.OnScreen => OnScreen(frames, runId, alignment, periodNs),
+        TraceTrack.OnScreen => OnScreen(frames, runId, alignment, periodNs, errorThresholdNs),
         TraceTrack.Intended => Intended(frames, runId, alignment),
         TraceTrack.Cpu => Cpu(frames, runId, alignment),
         TraceTrack.AnimationError or TraceTrack.DisplayStep or TraceTrack.Lateness => Counters(track, frames, alignment),
@@ -77,7 +78,31 @@ namespace MB.FramePacing.TraceJoin
     /// A slice per frame for its time on screen, cut where the next frame's begins (one track holds no two slices at once). The slice's flow
     /// number is the frame's index plus one, as its CPU slice's is.
     /// </summary>
-    public static IReadOnlyList<TraceEvent> OnScreen(IReadOnlyList<FrameRow> frames, uint runId, TraceAlignment alignment, long periodNs)
+    /// <summary>
+    /// What the analysis says of a frame, as one word for its colour, the first that fits: late, delta time jitter, off (an animation error
+    /// beyond <paramref name="errorThresholdNs"/> otherwise), static (nothing animates while it is on screen), unknown (a step across a
+    /// capture gap), or on time.
+    /// </summary>
+    public static string VerdictOf(FrameRow frame, long errorThresholdNs)
+    {
+      if (frame.Flags.Contains("Late"))
+        return "late";
+      if (frame.Flags.Contains("DeltaTimeJitter"))
+        return "delta time jitter";
+      if (frame.AnimationError is { } error && Math.Abs(error.Nanoseconds) > errorThresholdNs)
+        return "off";
+      if (frame.Flags.Contains("StaticAfter"))
+        return "static";
+      return frame.Flags.Contains("UncertainStep") ? "unknown" : "on time";
+    }
+
+    public static IReadOnlyList<TraceEvent> OnScreen(
+      IReadOnlyList<FrameRow> frames,
+      uint runId,
+      TraceAlignment alignment,
+      long periodNs,
+      long errorThresholdNs
+    )
     {
       var slices = new List<TraceEvent>(frames.Count);
       for (int index = 0; index < frames.Count; ++index)
@@ -94,7 +119,8 @@ namespace MB.FramePacing.TraceJoin
             Math.Max(end, start),
             RecordName(runId, frame.FrameIndex),
             FrameArguments(frame, periodNs),
-            frame.HasCpuWork() ? frame.FrameIndex + 1 : 0
+            frame.HasCpuWork() ? frame.FrameIndex + 1 : 0,
+            VerdictOf(frame, errorThresholdNs)
           )
         );
       }

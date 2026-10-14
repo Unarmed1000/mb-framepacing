@@ -172,7 +172,16 @@ namespace MB.FramePacing.Analysis
           try
           {
             join = TraceJoiner.Join(
-              TraceRun.Create(run.RunId, run.SequenceId, run.Name, rows, captures, periodNs, timeline.CapturePeriod.Nanoseconds),
+              TraceRun.Create(
+                run.RunId,
+                run.SequenceId,
+                run.Name,
+                rows,
+                captures,
+                periodNs,
+                timeline.CapturePeriod.Nanoseconds,
+                timeline.ErrorThreshold.Nanoseconds
+              ),
               data,
               trace
             );
