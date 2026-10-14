@@ -67,6 +67,14 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "The report's title instead of 'Run N  name' (every run gets it; a section's time range is still added).",
       };
+      var descriptionOption = new Option<string[]>("--description")
+      {
+        Description = "With --timeline: a line under the title, instead of the card's own lines (repeat it for more lines).",
+      };
+      var frameLabelsOption = new Option<string?>("--frame-labels")
+      {
+        Description = "With --timeline: a label per presented frame of the section, comma separated, in order (e.g. A,B,C), instead of #index.",
+      };
       var stripSecondsOption = new Option<double?>("--strip-seconds")
       {
         Description = "The refresh strip shows only the first this many seconds of the section, with its own time axis (e.g. 1).",
@@ -111,6 +119,8 @@ namespace MB.FramePacing.App.Commands
         onlyOption,
         showOption,
         titleOption,
+        descriptionOption,
+        frameLabelsOption,
         stripSecondsOption,
         hideEmptyOption,
         noStaticClampOption,
@@ -128,6 +138,17 @@ namespace MB.FramePacing.App.Commands
         {
           if (result.GetResult(option) is { Implicit: false })
             result.AddError($"{option.Name} does not go with --playback.");
+        }
+      });
+      command.Validators.Add(result =>
+      {
+        // The description lines and the frame labels are the frame timeline's
+        if (result.GetValue(timelineOption))
+          return;
+        foreach (var option in new Option[] { descriptionOption, frameLabelsOption })
+        {
+          if (result.GetResult(option) is { Implicit: false })
+            result.AddError($"{option.Name} goes with --timeline only.");
         }
       });
       command.SetAction(parseResult =>
@@ -182,7 +203,14 @@ namespace MB.FramePacing.App.Commands
                 parseResult.GetValue(fromOption)
                 ?? throw new InvalidOperationException("--timeline needs --from (seconds since the run's first frame)");
               double to = parseResult.GetValue(toOption) ?? from + ReportFiles.TimelineSeconds;
-              foreach (var file in ReportFiles.WriteTimeline(run.Chart, run.FilePrefix, output, from, to, parseResult.GetValue(pngOption)))
+              var given = parseResult.GetValue(descriptionOption);
+              var timeline = new FrameTimelineOptions
+              {
+                Title = parseResult.GetValue(titleOption),
+                Description = given is { Length: > 0 } ? given : null,
+                FrameLabels = parseResult.GetValue(frameLabelsOption) is { } labels ? labels.Split(',').Select(l => l.Trim()).ToArray() : null,
+              };
+              foreach (var file in ReportFiles.WriteTimeline(run.Chart, run.FilePrefix, output, from, to, parseResult.GetValue(pngOption), timeline))
                 AnsiConsole.MarkupLineInterpolated($"[grey]{file}[/]");
               continue;
             }

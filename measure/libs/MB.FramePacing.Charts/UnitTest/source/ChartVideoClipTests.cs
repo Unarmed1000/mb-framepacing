@@ -509,12 +509,49 @@ namespace MB.FramePacing.Charts.UnitTest
       // Every frame's first refresh is ok, off or off by delta time jitter (the key adds one swatch of each kind it uses)
       int Cells(string cls) => Of(cls).Count() - (Of(cls).Any() ? 1 : 0);
       Assert.That(Cells("ok") + Cells("off") + Cells("off-jitter"), Is.EqualTo(frames.Count), "a first refresh per frame");
+      // Red only for a late frame, as on the report's refresh strip: a frame shown a refresh too soon has a green first refresh and a red pill
+      Assert.That(Cells("off"), Is.EqualTo(frames.Count(f => (f.Flags & PresentedFrameFlags.Late) != 0)), "a red first refresh per late frame");
+      Assert.That(Cells("off"), Is.GreaterThan(0), "the section has late frames");
       Assert.That(
         Of("err-pill").Count() + Of("err-pill-jitter").Count(),
         Is.EqualTo(frames.Count(f => f.AnimationError is { } e && e.Duration() > chart.ErrorThreshold)),
         "an error pill per frame off by more than the threshold"
       );
       Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
+    }
+
+    /// <summary>
+    /// A frame timeline card for a document, as mb-framepacing-explained's timing diagrams: its own title (with the section's frames and
+    /// seconds), its own description lines in place of the card's, and a label per frame; a wrong number of labels is refused.
+    /// </summary>
+    [Test]
+    public void FrameTimeline_TakesItsOwnTitleDescriptionAndFrameLabels()
+    {
+      var (_, report, _) = Analyze("60-busy-full-rate");
+      var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
+      var section = RunSection.Create(chart, 1.9, 2.25);
+      var frames = section.Section.Run.Frames;
+      var labels = Enumerable.Range(0, frames.Count).Select(i => ((char)('A' + i)).ToString()).ToArray();
+      var options = new FrameTimelineOptions
+      {
+        Title = "Slow frames",
+        Description = new[] { "B and E take longer than a refresh.", "The frames after them are shown late." },
+        FrameLabels = labels,
+      };
+      var document = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section, options));
+      var texts = document.Descendants().Where(e => e.Name.LocalName == "text").Select(e => e.Value).ToList();
+
+      Assert.That(texts, Has.Some.StartsWith("Slow frames, frames "));
+      Assert.That(texts, Does.Contain("B and E take longer than a refresh."));
+      Assert.That(texts, Does.Contain("The frames after them are shown late."));
+      Assert.That(texts, Has.None.Contains("presented frames on a"), "the card's own lines are replaced");
+      Assert.That(texts, Has.None.StartsWith("#"), "no frame index label");
+      Assert.That(texts.Where(labels.Contains).Distinct().Count(), Is.EqualTo(frames.Count), "every frame by its label");
+      Assert.That(texts, Does.Contain("CPU: from the CPU start time for CPU busy, labelled with the frame and its animation time"));
+      Assert.That(
+        () => FrameTimelineCard.Render(section, options with { FrameLabels = labels.Skip(1).ToArray() }),
+        Throws.InvalidOperationException.With.Message.Contains("one label per frame")
+      );
     }
 
     /// <summary>

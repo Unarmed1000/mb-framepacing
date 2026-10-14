@@ -113,7 +113,8 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// Write the frame timeline card (<see cref="FrameTimelineCard"/>) of <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> of
-    /// <paramref name="run"/> as &lt;prefix&gt;-timeline-&lt;from&gt;s-&lt;to&gt;s.svg (and .png). Returns the files written.
+    /// <paramref name="run"/> as &lt;prefix&gt;-timeline-&lt;from&gt;s-&lt;to&gt;s.svg (and .png), laid out as <paramref name="options"/> say.
+    /// Returns the files written.
     /// </summary>
     public static IReadOnlyList<string> WriteTimeline(
       ChartRun run,
@@ -121,11 +122,13 @@ namespace MB.FramePacing.Charts
       string directory,
       double fromSeconds,
       double toSeconds,
-      bool png = false
+      bool png = false,
+      FrameTimelineOptions? options = null
     )
     {
       var section = RunSection.Create(run, fromSeconds, toSeconds);
-      return WriteOne(FrameTimelineCard.Render(section), Path.Combine(directory, prefix + "-timeline" + SectionSuffix(section)), png).ToList();
+      return WriteOne(FrameTimelineCard.Render(section, options), Path.Combine(directory, prefix + "-timeline" + SectionSuffix(section)), png)
+        .ToList();
     }
 
     /// <summary>The whole run, or <paramref name="fromSeconds"/> to <paramref name="toSeconds"/> of it when either is given.</summary>

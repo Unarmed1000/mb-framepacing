@@ -5,7 +5,10 @@
 //* refreshes (bright where a frame could be aimed at its target rate), each frame's CPU work as a box from its CPU start time for its CPU busy
 //* (boxes that overlap go to further lanes), its present arrow, what every refresh showed, and each frame's animation time step, display
 //* time step and animation error. The CPU times are on the pacer's clock; they are placed on the capture's clock with the markers' intended
-//* display times (on-time frames appear at their intended vsync), or without those so that no frame is presented after it appears.
+//* display times (on-time frames appear at their intended vsync), or without those so that no frame is presented after it appears. A
+//* frame's first refresh is coloured as the report's refresh strip colours it (late red, delta time jitter yellow, else green) and its
+//* error as the report's error bars are; a card for a document takes its own title, description lines and frame labels
+//* (FrameTimelineOptions).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -36,12 +39,14 @@ namespace MB.FramePacing.Charts
     private const double RowStep = 26;
     private const double DisplayH = 40;
 
-    /// <summary>The SVG of <paramref name="section"/>: at most <see cref="MaxFrames"/> frames.</summary>
-    public static string Render(RunSection section, string? background = null) => SvgCardWriter.Write(Build(section), background);
+    /// <summary>The SVG of <paramref name="section"/>: at most <see cref="MaxFrames"/> frames, laid out as <paramref name="options"/> say.</summary>
+    public static string Render(RunSection section, FrameTimelineOptions? options = null, string? background = null) =>
+      SvgCardWriter.Write(Build(section, options), background);
 
-    /// <summary>The card of <paramref name="section"/> as shapes: at most <see cref="MaxFrames"/> frames.</summary>
-    public static CardDrawing Build(RunSection section)
+    /// <summary>The card of <paramref name="section"/> as shapes: at most <see cref="MaxFrames"/> frames, laid out as <paramref name="options"/> say.</summary>
+    public static CardDrawing Build(RunSection section, FrameTimelineOptions? options = null)
     {
+      options ??= FrameTimelineOptions.Default;
       var chart = section.Run;
       var run = chart.Run;
       var frames = section.Section.Run.Frames;
@@ -51,6 +56,11 @@ namespace MB.FramePacing.Charts
         throw new InvalidOperationException(
           $"The section has {frames.Count} presented frames; the frame timeline draws at most {MaxFrames}: choose a shorter section (--from, --to)"
         );
+      if (options.FrameLabels is { } labels && labels.Count != frames.Count)
+        throw new InvalidOperationException(
+          $"{labels.Count} frame labels for a section of {frames.Count} presented frames: give one label per frame, in order"
+        );
+      string LabelOf(int index) => options.FrameLabels is { } given ? given[index] : Label(frames[index]);
 
       var refresh = run.Pacing is { } pacing && pacing.RefreshPeriod > NanosecondTimeDuration.Zero ? pacing.RefreshPeriod : chart.CapturePeriod;
       var (offset, alignedBySchedule) = PacerToCapture(run.Frames);
@@ -109,7 +119,7 @@ namespace MB.FramePacing.Charts
       double height = legendY + 122;
 
       string title =
-        RunHeadline.Title(run)
+        (options.Title ?? RunHeadline.Title(run))
         + $", frames {frames[0].FrameIndex.ToString(CultureInfo.InvariantCulture)}–{last.FrameIndex.ToString(CultureInfo.InvariantCulture)}"
         + $" ({N(section.FromSeconds, 2)}–{N(section.ToSeconds, 2)} s)";
       var description = new List<string>
@@ -122,6 +132,9 @@ namespace MB.FramePacing.Charts
       };
       if (RunHeadline.SequenceLine(run) is { } sequence)
         description.Add(sequence);
+      // A card in a document says what the document wants instead: the diagrams have their title and their own lines only
+      if (options.Description is { } lines)
+        description = lines.ToList();
       double headerExtra = description.Count > 2 ? 19 * (description.Count - 2) : 0;
       var header = Header(title, description);
       var parts = new List<CardShape>();
@@ -168,13 +181,13 @@ namespace MB.FramePacing.Charts
         double boxWidth = x1 - x0 - (2 * inset);
         if (boxWidth >= 60)
         {
-          parts.Add(new TextShape(cx, y + 19, Label(frames[index]), "frame"));
+          parts.Add(new TextShape(cx, y + 19, LabelOf(index), "frame"));
           parts.Add(new TextShape(cx, y + 36, $"{Ms((frames[index].AnimationTime - firstAnimation).TotalMilliseconds)} ms", "box-time"));
         }
         else if (boxWidth >= 38)
-          parts.Add(new TextShape(cx, y + 27, Label(frames[index]), "frame"));
+          parts.Add(new TextShape(cx, y + 27, LabelOf(index), "frame"));
         else if (boxWidth >= 26)
-          parts.Add(new TextShape(cx, y + 26, Label(frames[index]), "box-time"));
+          parts.Add(new TextShape(cx, y + 26, LabelOf(index), "box-time"));
         double tip = displayY - 4;
         parts.Add(new LineShape("arrow", N(x1, 1), N(y + LaneH + 8, 1), N(x1, 1), N(tip - 8, 1)));
         parts.Add(new PathShape("arrowhead", $"M{N(x1 - 5, 1)},{N(tip - 9, 1)} L{N(x1 + 5, 1)},{N(tip - 9, 1)} L{N(x1, 1)},{N(tip, 1)} z"));
@@ -197,14 +210,21 @@ namespace MB.FramePacing.Charts
             : NanosecondTimeSpan.MaxValue;
         // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
-        // Off by delta time jitter (the display was even, the timer was not, by less than the intended period): yellow, as on the report
+        // The first refresh is coloured as the report's refresh strip colours it: late red, off by delta time jitter (the display was even,
+        // the timer was not, by less than the intended period) yellow, any other frame green; its error as the report's error bars are
+        bool isLate = (frame.Flags & PresentedFrameFlags.Late) != 0;
         bool isJitter = (frame.Flags & PresentedFrameFlags.DeltaTimeJitter) != 0;
         for (int k = from; k < to; ++k)
         {
           bool firstRefresh = k == from;
           string kind =
             isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
-            : firstRefresh ? (frame.AnimationError is { } e && e.Duration() > threshold ? (isJitter ? "off-jitter" : "off") : "ok")
+            : firstRefresh
+              ? (
+                isLate ? "off"
+                : isJitter ? "off-jitter"
+                : "ok"
+              )
             : (k - from) * refresh.Nanoseconds < intendedHold.Nanoseconds - (refresh.Nanoseconds / 2) ? "hold"
             : "again";
           used.Add(kind == "strip-static-b" ? "strip-static-a" : kind);
@@ -215,7 +235,7 @@ namespace MB.FramePacing.Charts
             new TextShape(
               (x0 + x1) / 2,
               displayY + (DisplayH / 2) + 5,
-              Label(frame),
+              LabelOf(i),
               kind is "again" or "off-jitter" ? "cell-text dark-text" : "cell-text"
             )
           );
@@ -251,9 +271,9 @@ namespace MB.FramePacing.Charts
           parts.Add(new TextShape(cx, errorY, value, "zero"));
       }
 
-      Key(parts, used, legendY, threshold);
+      double keyExtra = Key(parts, used, legendY, width, threshold, options.FrameLabels != null);
       header.Add(new GroupShape(headerExtra, parts));
-      return new CardDrawing(title, width, height + headerExtra, header, Array.Empty<CardPlot>());
+      return new CardDrawing(title, width, height + headerExtra + keyExtra, header, Array.Empty<CardPlot>());
     }
 
     /// <summary>
@@ -279,22 +299,39 @@ namespace MB.FramePacing.Charts
 
     private static readonly (string Kind, string Text)[] g_colours =
     {
-      ("ok", "the frame's first refresh, within the error threshold"),
-      ("off", "the frame's first refresh, off by more than the error threshold"),
+      ("ok", "the frame's first refresh, neither late nor off by delta time jitter"),
+      ("off", "the frame's first refresh, late: longer than animated for and than intended"),
       ("off-jitter", "the frame's first refresh, off by delta time jitter: less than the intended period"),
       ("hold", "held as the next frame was animated for"),
       ("again", "held longer: the next frame is late"),
       ("strip-static-a", "static: nothing animates"),
     };
 
-    private static void Key(List<CardShape> parts, HashSet<string> used, double legendY, NanosecondTimeDuration threshold)
+    /// <summary>
+    /// The key under the card, its entries going on to a further line where the card is too narrow for them: returns how much taller that
+    /// makes it than a key of one line per row.
+    /// </summary>
+    private static double Key(
+      List<CardShape> parts,
+      HashSet<string> used,
+      double legendY,
+      double width,
+      NanosecondTimeDuration threshold,
+      bool labelsGiven
+    )
     {
+      // An entry's text is about 6.9 pixels a character in the key's font, as the rest of the card reckons it
+      const double CharWidth = 6.9;
+      const double LineStep = 22;
+      double right = width - 20;
       parts.Add(new RectShape("box", N(20, 0), N(legendY - 12, 1), N(30, 0), N(16, 0), "4"));
       parts.Add(
         new TextShape(
           58,
           legendY + 1,
-          "CPU: from the CPU start time for CPU busy, labelled with the frame (#last digits of its index) and its animation time",
+          labelsGiven
+            ? "CPU: from the CPU start time for CPU busy, labelled with the frame and its animation time"
+            : "CPU: from the CPU start time for CPU busy, labelled with the frame (#last digits of its index) and its animation time",
           "sub",
           "start"
         )
@@ -310,27 +347,45 @@ namespace MB.FramePacing.Charts
       );
       const string present = "present: the frame is handed over and waits for its vsync";
       parts.Add(new TextShape(58, arrowY + 1, present, "sub", "start"));
-      double keyX = 58 + (present.Length * 6.9) + 36;
-      parts.Add(new LineShape("vsync", N(keyX, 1), N(arrowY - 13, 1), N(keyX, 1), N(arrowY + 4, 1)));
-      parts.Add(new LineShape("vsync-skip", N(keyX + 8, 1), N(arrowY - 13, 1), N(keyX + 8, 1), N(arrowY + 4, 1)));
-      parts.Add(new TextShape(keyX + 22, arrowY + 1, "vsync: bright can be aimed at the frame's target, faint is skipped", "sub", "start"));
-      double coloursY = legendY + 52;
+      const string vsync = "vsync: bright can be aimed at the frame's target, faint is skipped";
+      double keyX = 58 + (present.Length * CharWidth) + 36;
+      double vsyncY = arrowY;
+      if (keyX + 22 + (vsync.Length * CharWidth) > right)
+      {
+        // On a line of its own, its lines under the present arrow's
+        keyX = arrowX - 4;
+        vsyncY = arrowY + 26;
+      }
+      parts.Add(new LineShape("vsync", N(keyX, 1), N(vsyncY - 13, 1), N(keyX, 1), N(vsyncY + 4, 1)));
+      parts.Add(new LineShape("vsync-skip", N(keyX + 8, 1), N(vsyncY - 13, 1), N(keyX + 8, 1), N(vsyncY + 4, 1)));
+      parts.Add(new TextShape(keyX + 22, vsyncY + 1, vsync, "sub", "start"));
+      double coloursY = vsyncY + 26;
       double x = 20;
       foreach (var (kind, label) in g_colours.Where(c => used.Contains(c.Kind)))
       {
+        double entry = 22 + (label.Length * CharWidth);
+        if (x > 20 && x + entry > right)
+        {
+          coloursY += LineStep;
+          x = 20;
+        }
         parts.Add(new RectShape(kind, N(x, 1), N(coloursY - 11, 1), N(14, 0), N(14, 0), "4"));
         parts.Add(new TextShape(x + 22, coloursY + 1, label, "sub", "start"));
-        x += 22 + (label.Length * 6.9) + 28;
+        x += entry + 28;
       }
-      parts.Add(
-        new TextShape(
-          20,
-          coloursY + 26,
-          $"Animation error = animation time step − display time step: + shown too soon, − shown too late; error threshold {Ms(threshold.Value.TotalMilliseconds)} ms",
-          "sub",
-          "start"
-        )
-      );
+      const string error = "Animation error = animation time step − display time step: + shown too soon, − shown too late";
+      string thresholdText = $"error threshold {Ms(threshold.Value.TotalMilliseconds)} ms";
+      double errorY = coloursY + 26;
+      if (20 + ((error.Length + 2 + thresholdText.Length) * CharWidth) <= right)
+        parts.Add(new TextShape(20, errorY, $"{error}; {thresholdText}", "sub", "start"));
+      else
+      {
+        parts.Add(new TextShape(20, errorY, error, "sub", "start"));
+        errorY += LineStep;
+        parts.Add(new TextShape(20, errorY, char.ToUpperInvariant(thresholdText[0]) + thresholdText[1..], "sub", "start"));
+      }
+      // The original layout has the error line 78 below the key's first line
+      return errorY - (legendY + 78);
     }
   }
 }

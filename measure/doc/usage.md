@@ -241,11 +241,20 @@ mb-framepacing render capture-20260924-153000 --timeline --from 12.5 --to 12.8  
 
 The **frame timeline** (`--timeline`, at most 40 frames) draws a short stretch as a timing diagram: every refresh (bright where a frame
 could be aimed at its target, faint where not), each frame's CPU work from its CPU start time for its CPU busy (boxes that overlap go to
-further lanes), its present arrow, what every refresh showed (green: the frame's first refresh within the error threshold, red: off by more, yellow: off by delta time jitter, dark green: held as the next frame was animated for, amber: held longer because the next frame is late, violet: a static frame,
-where nothing animates) and each frame's
-animation time step, display time step and animation error. The CPU times are on the pacer's clock; the markers' intended display
-times place them on the capture's clock (on-time frames appear at their intended vsync), otherwise they are placed so that no frame
-is presented after it first appears.
+further lanes), its present arrow, what every refresh showed (a frame's first refresh as the report's refresh strip colours it: red
+late, yellow off by delta time jitter, green otherwise; dark green: held as the next frame was animated for, amber: held longer
+because the next frame is late, violet: a static frame, where nothing animates) and each frame's animation time step, display time
+step and animation error (a red pill beyond the error threshold, yellow for delta time jitter, as the report's error bars). The CPU
+times are on the pacer's clock; the markers' intended display times place them on the capture's clock (on-time frames appear at
+their intended vsync), otherwise they are placed so that no frame is presented after it first appears.
+
+A timeline for a document, in the style of the timing diagrams it comes from, takes its own title (`--title`: the section's frames
+and seconds are added), its own lines under it in place of the card's two (`--description`, once per line) and a label per frame
+in place of its index (`--frame-labels A,B,C,...`, one per presented frame of the section, in order):
+
+```
+mb-framepacing render capture-20260924-153000 --timeline --from 1.5 --to 1.86 --title "Slow frames"   --description "C, H and J take longer than their intended period." --frame-labels A,B,C,D,E,F,G,H,I,J,K,L,M
+```
 
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`

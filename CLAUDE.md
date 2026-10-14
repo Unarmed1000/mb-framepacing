@@ -676,7 +676,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       - intended display time - lateness; without a schedule, no frame presented after it appears), present arrows, display cells. A
         static frame's cells are violet (`strip-static-a`/`-b`) and the error row says "static" on the static step after it; a frame is
         "held longer" (amber) for the refreshes beyond the time a late next frame was animated for: the `Late` flag, never a test of
-        the card's own.
+        the card's own. A frame's first refresh is coloured as the report's refresh strip (red only
+        for `Late`, yellow for `DeltaTimeJitter`, green otherwise) and its error pill as the error bars (red beyond the threshold,
+        yellow for jitter): the user's rule that our charts follow explained's fixed look with our colour rules (2026-10-15, after
+        asking the explained session how its diagrams draw). A card for a document (`FrameTimelineOptions`, `render --timeline`
+        `--title`, `--description` per line in place of the card's own two, `--frame-labels A,B,...` one per frame), and its key
+        wraps on a narrow card.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, and the GUI's
       Display card the report's display box (`RunHeadline.Display`, `DisplaySummary`), so add or change a number there, not in the GUI.
       A tile without a number shows "-" with `HasValue` false.
