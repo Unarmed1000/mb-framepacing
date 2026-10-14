@@ -725,11 +725,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - The pacer's `DisplayErrorCounter` counts by the same rule (the user's go, 2026-10-14): `TierPacer` gives it each frame's
       intended period in refreshes (the swap interval while pacing, the preferred swap interval while not; 0 = on demand). While
       pacing that changes no count (the golden runs are byte for byte the same); only a frame not paced counts differently.
-    - **Jitter** (`PresentedFrameFlags.Jitter`, the user, 2026-10-14: "jitter animation timer off by less than a intended refresh
+    - **Delta time jitter** (`PresentedFrameFlags.DeltaTimeJitter`, `DeltaTimeJitter` in the frames CSV, the vocabulary's term: never bare "jitter", which reads as an uneven display, the user, 2026-10-14: "jitter animation timer off by less than a intended refresh
       period"): an error frame that the cause split (`PacingAnalyzer.Split`) counts as delta time jitter, off by less than its
       intended period, and not late. Yellow (`#e3b341`) on the error bars (`bar-jitter`; a pixel column of many frames when every
-      error frame in it has jitter: `RunChartData.Jitter`, `OtherErrors`) and the refresh strip (`strip-jitter`, after late,
-      before static); nowhere else. `ClipManifest.IsJitter` mirrors it for the clip tests.
+      error frame in it has jitter: `RunChartData.DeltaTimeJitter`, `OtherErrors`) and the refresh strip (`strip-jitter`, after late,
+      before static); nowhere else. `ClipManifest.IsDeltaTimeJitter` mirrors it for the clip tests.
     - The pacer's frame window count (`FrameWindowState::LateFrames`) is another thing, "did not make its time": open as decision
       18 of `sdk/doc/pacer-design.md`.
     - Every frame's **target** (what the display time steps, the cause and the late share's amber are measured against; not late)

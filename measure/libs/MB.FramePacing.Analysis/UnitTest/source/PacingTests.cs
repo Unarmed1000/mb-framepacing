@@ -78,7 +78,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     private static bool IsLate(PresentedFrame frame) => frame.Flags.HasFlag(PresentedFrameFlags.Late);
 
-    private static bool IsJitter(PresentedFrame frame) => frame.Flags.HasFlag(PresentedFrameFlags.Jitter);
+    private static bool IsDeltaTimeJitter(PresentedFrame frame) => frame.Flags.HasFlag(PresentedFrameFlags.DeltaTimeJitter);
 
     [Test]
     public void SteadyFullRate_HasNoLateFrames()
@@ -138,7 +138,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       // Every frame is on screen for its intended refresh: none is late, however its animation step was off. The timer is off by a whole
       // intended period, which is more than jitter
       Assert.That(run.Pacing!.LateFrames, Is.Zero);
-      Assert.That(run.Frames.Count(IsJitter), Is.Zero, "off by a whole intended period");
+      Assert.That(run.Frames.Count(IsDeltaTimeJitter), Is.Zero, "off by a whole intended period");
       Assert.That(run.Pacing.ErrorFramesWithEvenDisplay, Is.EqualTo(20), "every 32 and 0 ms step");
       Assert.That(run.Pacing.ErrorFramesWithUnevenDisplay, Is.Zero);
       Assert.That(run.Pacing.Verdict, Is.EqualTo(PacingVerdict.DeltaTimeJitter));
@@ -319,7 +319,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
-    public void AShortAnimationStepOnAnEvenDisplay_IsJitter_NotLate()
+    public void AShortAnimationStepOnAnEvenDisplay_IsDeltaTimeJitter_NotLate()
     {
       // 7 or 8 ms more on screen than animated for at a 16 ms refresh, but on screen for the intended refresh: not late. The timer is off
       // by less than the intended period on an even display: jitter
@@ -330,12 +330,16 @@ namespace MB.FramePacing.Analysis.UnitTest
         var run = Analyze(Rows(frames));
 
         Assert.That(run.Pacing!.LateFrames, Is.Zero, $"{animation} ms");
-        Assert.That(run.Frames.Select((f, i) => (f, i)).Where(x => IsJitter(x.f)).Select(x => x.i), Is.EqualTo(new[] { 10 }), $"{animation} ms");
+        Assert.That(
+          run.Frames.Select((f, i) => (f, i)).Where(x => IsDeltaTimeJitter(x.f)).Select(x => x.i),
+          Is.EqualTo(new[] { 10 }),
+          $"{animation} ms"
+        );
       }
     }
 
     [Test]
-    public void ALateFrame_HasNoJitter()
+    public void ALateFrame_HasNoDeltaTimeJitter()
     {
       // Frame 10 stays a refresh longer: frame 11 is on screen half a refresh or more later than animated for and than intended. Late, and
       // not jitter
@@ -344,7 +348,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       var run = Analyze(Rows(frames));
 
       Assert.That(run.Frames.Select((f, i) => (f, i)).Where(x => IsLate(x.f)).Select(x => x.i), Is.EqualTo(new[] { 11 }));
-      Assert.That(run.Frames.Count(IsJitter), Is.Zero);
+      Assert.That(run.Frames.Count(IsDeltaTimeJitter), Is.Zero);
     }
 
     [Test]

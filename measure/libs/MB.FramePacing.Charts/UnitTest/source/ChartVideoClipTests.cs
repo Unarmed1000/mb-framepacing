@@ -93,7 +93,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(bars.Select(b => error.ValueX(b.X.Value)), Is.EqualTo(withError.Select(Seconds)).Within(1e-9), $"{clip}: a bar per error");
       Assert.That(
         bars.Select(b => b.Class == "bar-jitter"),
-        Is.EqualTo(withError.Select(manifest.IsJitter)),
+        Is.EqualTo(withError.Select(manifest.IsDeltaTimeJitter)),
         $"{clip}: the jitter colour on a bar exactly when the frame has jitter"
       );
       double zeroY = error.PixelY(0);
@@ -379,7 +379,7 @@ namespace MB.FramePacing.Charts.UnitTest
         Is.EqualTo(measured.Count(i => manifest.AnimationErrorNanoseconds(i) is { } e && e != 0)),
         $"{clip}: a bar per frame with an error"
       );
-      Assert.That(Of("bar-jitter").Count(), Is.EqualTo(measured.Count(manifest.IsJitter)), $"{clip}: a jitter bar per frame with jitter");
+      Assert.That(Of("bar-jitter").Count(), Is.EqualTo(measured.Count(manifest.IsDeltaTimeJitter)), $"{clip}: a jitter bar per frame with jitter");
       int Segments(string cls) => Of(cls).Sum(e => ((string)e.Attribute("d")!).Count(c => c == 'M'));
       Assert.That(
         new[] { "held", "held-late", "held-older", "held-dropped", "held-unknown" }.Sum(Segments),
@@ -409,12 +409,12 @@ namespace MB.FramePacing.Charts.UnitTest
       );
       Assert.That(
         StaticCells(),
-        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !manifest.IsLate(i) && !manifest.IsJitter(i)).Sum(Own)),
+        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !manifest.IsLate(i) && !manifest.IsDeltaTimeJitter(i)).Sum(Own)),
         $"{clip}: a violet cell per refresh of every static frame"
       );
       Assert.That(
         Of("strip-jitter").Count(),
-        Is.EqualTo(all.Where(manifest.IsJitter).Sum(Own)),
+        Is.EqualTo(all.Where(manifest.IsDeltaTimeJitter).Sum(Own)),
         $"{clip}: a jitter cell per refresh of every frame with jitter"
       );
       Assert.That(Of("strip-late").Count(), Is.EqualTo(all.Where(manifest.IsLate).Sum(Own)), $"{clip}: a red cell per refresh of every late frame");

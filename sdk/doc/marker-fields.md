@@ -147,7 +147,7 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
     step, a capture gap) has no late frame.
   - Late says nothing of where a frame is against a clock or a plan. After a lost refresh that a pacer does not catch up with,
     the frames that follow are a refresh behind for the rest of the run, with steps that are right: one frame is late.
-  - A frame has **jitter** (`Jitter` in the frames CSV, yellow on the report's error bars and refresh strip) when its animation
+  - A frame has **delta time jitter** (`DeltaTimeJitter` in the frames CSV, yellow on the report's error bars and refresh strip) when its animation
     error is beyond the error threshold, counts as delta time jitter (the display was even, the animation timer was not: see
     "Target frame time" and "Intended display time"), is smaller than the intended period, and the frame is not late. A timer off
     by a whole intended period or more is more than jitter.

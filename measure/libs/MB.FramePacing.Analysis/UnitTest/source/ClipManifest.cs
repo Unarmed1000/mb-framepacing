@@ -265,11 +265,11 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
-    /// The frame has jitter (frame 1 on): an error beyond the error threshold that the cause split counts as delta time jitter (with a
+    /// The frame has delta time jitter (frame 1 on): an error beyond the error threshold that the cause split counts as delta time jitter (with a
     /// schedule: the display time step is nearer the intended step than the animation time step is; without one: neither this step nor the
     /// one before is off its target and no frame was skipped), off by less than the intended period, and not late.
     /// </summary>
-    public bool IsJitter(int frame)
+    public bool IsDeltaTimeJitter(int frame)
     {
       if (frame <= 0 || AnimationErrorNanoseconds(frame) is not { } error || Math.Abs(error) <= ErrorThresholdNanoseconds || IsLate(frame))
         return false;

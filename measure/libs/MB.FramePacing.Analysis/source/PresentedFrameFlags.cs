@@ -58,10 +58,10 @@ namespace MB.FramePacing.Analysis
     StaticAssumed = 128,
 
     /// <summary>
-    /// Jitter: an error frame of delta time jitter (the cause the analysis counts it for: the display was even, the animation timer was
+    /// Delta time jitter: an error frame of delta time jitter (the cause the analysis counts it for: the display was even, the animation timer was
     /// not), whose animation timer is off by less than the frame's intended period, and that is not <see cref="Late"/>. An error of a whole
     /// intended period or more is not jitter.
     /// </summary>
-    Jitter = 256,
+    DeltaTimeJitter = 256,
   }
 }

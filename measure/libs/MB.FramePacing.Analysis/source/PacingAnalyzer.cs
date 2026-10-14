@@ -228,7 +228,7 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>
     /// Which cause each frame with an error counts for: bad pacing (uneven) or delta time jitter (even). A frame of delta time jitter whose
-    /// animation timer is off by less than its intended period, and that is not late, gets <see cref="PresentedFrameFlags.Jitter"/>.
+    /// animation timer is off by less than its intended period, and that is not late, gets <see cref="PresentedFrameFlags.DeltaTimeJitter"/>.
     /// <list type="bullet">
     /// <item>With the pacer's schedule the animation error splits exactly: the frame counts for the larger of its pacing and prediction error.</item>
     /// <item>
@@ -266,7 +266,7 @@ namespace MB.FramePacing.Analysis
         }
         ++even;
         if ((frame.Flags & PresentedFrameFlags.Late) == 0 && intendedPeriods[i] is { } period && error.Duration() < period.Value)
-          frames[i] = frame with { Flags = frame.Flags | PresentedFrameFlags.Jitter };
+          frames[i] = frame with { Flags = frame.Flags | PresentedFrameFlags.DeltaTimeJitter };
       }
       return (uneven, even);
     }

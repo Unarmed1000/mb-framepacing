@@ -275,7 +275,7 @@ Every panel says in its title what it shows; its key on the right names each col
 refresh strip has no key at all).
 
 The **refresh strip** draws one cell per refresh from each frame's first capture, a new shade with every frame, late frames red,
-frames with jitter yellow and static frames violet. Where frames the application rendered never reached the display (dropped, over a capture without gaps), the
+frames with delta time jitter yellow and static frames violet. Where frames the application rendered never reached the display (dropped, over a capture without gaps), the
 refreshes where they were due repeat the frame before and are orange. A refresh that showed an older frame out of order is pink. With a
 capture card, the other refreshes between a frame's last capture and the next frame (captures that could not be decoded or were not
 recorded) are grey; a camera sees each frame until the next one.
@@ -351,8 +351,8 @@ meant it to. The intended period is the marker's target frame time, else the ste
 time, else `--target-fps`, else one refresh (one more per frame the target dropped). A frame that stays a refresh behind after a
 late one has a step that is right and is not late (with the pacer's intended display times in the markers, `latenessNs` in the
 frames CSV says where each frame is against the plan). A frame presented on demand, a static step and a step across a capture gap
-have no late frame. A frame of delta time jitter whose timer is off by less than its intended period, and that is not late, has
-**jitter**: yellow on the error bars and the refresh strip, `Jitter` in the frames CSV.
+have no late frame. A frame of delta time jitter whose timer is off by less than its intended period, and that is not late, is
+flagged **delta time jitter**: yellow on the error bars and the refresh strip, `DeltaTimeJitter` in the frames CSV.
 
 What the display time steps are measured against, in order: the intended display times the application's frame pacer writes into
 the marker (then **Detailed statistics** also shows the pacing and prediction error), its target frame time in the marker, its

@@ -625,7 +625,7 @@ namespace MB.FramePacing.Charts
             continue;
           double x = view.XOfFrame(i);
           var (y0, y1) = (Math.Min(zeroY, YOf(value)), Math.Max(zeroY, YOf(value)));
-          bool jitter = (data.Frames[i].Flags & PresentedFrameFlags.Jitter) != 0;
+          bool jitter = (data.Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) != 0;
           anyJitter |= jitter;
           view.Move(
             parts,
@@ -663,7 +663,7 @@ namespace MB.FramePacing.Charts
             continue;
           double min = NanosecondsMs(errors.Values.KthSmallest(start, end, 0));
           double max = MaxMs(errors.Values, start, end);
-          bool jitter = data.OtherErrors.CountIn(frameStart, frameEnd) == 0 && data.Jitter.CountIn(frameStart, frameEnd) > 0;
+          bool jitter = data.OtherErrors.CountIn(frameStart, frameEnd) == 0 && data.DeltaTimeJitter.CountIn(frameStart, frameEnd) > 0;
           anyJitter |= jitter;
           if (count >= MinFramesForTypical)
           {
@@ -685,7 +685,7 @@ namespace MB.FramePacing.Charts
         view.MovePath(parts, "bar-jitter", jitterTypical, errorY, errorY + ErrorH);
       }
       if (anyJitter)
-        panelKey.Insert(1, (new[] { "bar-jitter" }, "jitter: off by less than the intended period", false));
+        panelKey.Insert(1, (new[] { "bar-jitter" }, "delta time jitter: off by less than the intended period", false));
       parts.AddRange(Key(view.PlotX1, errorY - 16, panelKey));
       parts.Add(new LineShape("zero-line", N(PlotX0, 0), N(zeroY, 0), N(view.PlotX1, 0), N(zeroY, 0)));
       parts.Add(new TextShape(PlotX0 - 10, zeroY + 4, "0", "vsync-n", "end"));
@@ -1317,7 +1317,7 @@ namespace MB.FramePacing.Charts
         }
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
         bool isLate = (frame.Flags & PresentedFrameFlags.Late) != 0;
-        bool isJitter = !isLate && (frame.Flags & PresentedFrameFlags.Jitter) != 0;
+        bool isJitter = !isLate && (frame.Flags & PresentedFrameFlags.DeltaTimeJitter) != 0;
         anyStatic |= isStatic && !isLate && !isJitter;
         anyLate |= isLate;
         anyJitter |= isJitter;
@@ -1366,7 +1366,7 @@ namespace MB.FramePacing.Charts
       if (anyLate)
         panelKey.Add((new[] { "strip-late" }, "late", false));
       if (anyJitter)
-        panelKey.Add((new[] { "strip-jitter" }, "jitter", false));
+        panelKey.Add((new[] { "strip-jitter" }, "delta time jitter", false));
       if (anyStatic)
         panelKey.Add((new[] { "strip-static-a", "strip-static-b" }, "static", false));
       if (anyDropped)

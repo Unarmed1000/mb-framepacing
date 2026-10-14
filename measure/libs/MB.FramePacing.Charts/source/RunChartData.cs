@@ -46,7 +46,7 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<WaveletMatrix> m_frameTimesAndCpuBusy;
     private readonly Lazy<FrameSequence> m_animatingCpuBusy;
     private readonly Lazy<RankBits> m_assumedStatic;
-    private readonly Lazy<RankBits> m_jitter;
+    private readonly Lazy<RankBits> m_deltaTimeJitter;
     private readonly Lazy<RankBits> m_otherErrors;
     private readonly Lazy<WaveletMatrix> m_allFrameTimesAndCpuBusy;
     private readonly Lazy<FrameSequence> m_drift;
@@ -184,9 +184,12 @@ namespace MB.FramePacing.Charts
           : FrameTimes
       );
       m_assumedStatic = Once(() => new RankBits(count, i => (Frames[i].Flags & PresentedFrameFlags.StaticAssumed) != 0));
-      m_jitter = Once(() => new RankBits(count, i => (Frames[i].Flags & PresentedFrameFlags.Jitter) != 0));
+      m_deltaTimeJitter = Once(() => new RankBits(count, i => (Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) != 0));
       m_otherErrors = Once(() =>
-        new RankBits(count, i => (Frames[i].Flags & PresentedFrameFlags.Jitter) == 0 && Frames[i].AnimationError?.Nanoseconds is { } e && e != 0)
+        new RankBits(
+          count,
+          i => (Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) == 0 && Frames[i].AnimationError?.Nanoseconds is { } e && e != 0
+        )
       );
       m_animatingCpuBusy = Once(() =>
         anyStatic.Value
@@ -350,10 +353,12 @@ namespace MB.FramePacing.Charts
     /// <summary>The static frames the analysis assumed: a dropped frame took their flag (PresentedFrameFlags.StaticAssumed).</summary>
     public RankBits AssumedStatic => m_assumedStatic.Value;
 
-    /// <summary>The frames with jitter: the animation timer off by less than the intended period (PresentedFrameFlags.Jitter).</summary>
-    public RankBits Jitter => m_jitter.Value;
+    /// <summary>
+    /// The frames with delta time jitter: the animation timer off by less than the intended period (PresentedFrameFlags.DeltaTimeJitter).
+    /// </summary>
+    public RankBits DeltaTimeJitter => m_deltaTimeJitter.Value;
 
-    /// <summary>The frames with an animation error that is not jitter.</summary>
+    /// <summary>The frames with an animation error that is not delta time jitter.</summary>
     public RankBits OtherErrors => m_otherErrors.Value;
 
     /// <summary>The CPU busy of the frames that animate: a static frame's (an idle wait inside the frame) is left out, as the frametime scale is.</summary>
