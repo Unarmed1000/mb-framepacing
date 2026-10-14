@@ -1,0 +1,6 @@
+detail,runId,frameIndex,name
+Wait,1,388,mbfp wait 1 388
+Present,1,388,mbfp present 1 388
+Gpu,7,200,mbfp gpu 7 200
+Display,0,0,mbfp display 0 0
+NotPresented,4294967295,18446744073709551615,mbfp not presented 4294967295 18446744073709551615

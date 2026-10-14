@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 # SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 # pyright: basic
-"""Regenerate measure/test-data/trace: what keeps this repository's two ways of joining
+"""Regenerate measure/test-data/trace (and the SDK's example trace): what keeps this repository's two ways of joining
 a capture with a Perfetto trace equal, the script (tools/trace_augment.py) and the tools (measure/libs/MB.FramePacing.TraceJoin).
 
 Everything in the folder is made here, from the SDK's golden capture (sdk/test-data/data/60-busy-full-rate) and a trace the
@@ -14,6 +14,11 @@ tests make to fit it (tools/tests/synthetic_trace.py: made up in every value, no
     frames.csv                 what the script says the trace says of each frame (--frames)
     digest.json                the length and SHA-256 of the traces the script writes (the capture alone, and each made-up trace
                                with the capture's tracks), and the numbers they were placed by
+
+and the SDK's example in sdk/test-data/trace:
+
+    example-app.pftrace        the made-up application's trace with the frame record and all of its second part
+                               (sdk/doc/trace-frame-record.md), for the same capture
 
     uv run --group trace tools/update_trace_test_data.py            # write the folder
     uv run --group trace tools/update_trace_test_data.py --check    # fail when the folder is not what the script makes now
@@ -33,6 +38,9 @@ ROOT = Path(__file__).resolve().parent.parent
 TOOL = ROOT / "tools" / "trace_augment.py"
 CAPTURE = ROOT / "sdk" / "test-data" / "data" / "60-busy-full-rate"
 TARGET = ROOT / "measure" / "test-data" / "trace"
+# The SDK's example of the frame record with its second part (sdk/doc/trace-frame-record.md), next to the record's golden data
+SDK_TARGET = ROOT / "sdk" / "test-data" / "trace"
+EXAMPLE = "example-app.pftrace"
 
 SYNTHETIC = "synthetic.pftrace"
 PIECES = "synthetic-pieces.pftrace"
@@ -101,10 +109,20 @@ def make() -> dict[str, bytes]:
         }
 
 
+def make_sdk() -> dict[str, bytes]:
+    """The SDK's file, by name: the made-up application's trace with the frame record and all of its second part."""
+    from tests import synthetic_trace  # noqa: PLC0415  # pyright: ignore[reportImplicitRelativeImport] (the folder next to this script)
+
+    return {EXAMPLE: synthetic_trace.build_example()}
+
+
 def differences() -> list[str]:
-    """The names of the files that are not what the script makes now. The folder's text files have line feeds in every checkout
+    """The paths of the files that are not what the script makes now. The folder's text files have line feeds in every checkout
     (.gitattributes), as they are written here."""
-    return [name for name, data in make().items() if not (TARGET / name).is_file() or (TARGET / name).read_bytes() != data]
+    changed: list[str] = []
+    for target, files in ((TARGET, make()), (SDK_TARGET, make_sdk())):
+        changed += [str(target / name) for name, data in files.items() if not (target / name).is_file() or (target / name).read_bytes() != data]
+    return changed
 
 
 def main() -> int:
@@ -113,13 +131,14 @@ def main() -> int:
     arguments = parser.parse_args(namespace=Arguments())
     if arguments.check:
         changed = differences()
-        for name in changed:
-            print(f"{TARGET / name} is not what tools/trace_augment.py makes now: run tools/update_trace_test_data.py", file=sys.stderr)
+        for path in changed:
+            print(f"{path} is not what this script makes now: run tools/update_trace_test_data.py", file=sys.stderr)
         return 1 if changed else 0
-    TARGET.mkdir(parents=True, exist_ok=True)
-    for name, data in make().items():
-        _ = (TARGET / name).write_bytes(data)
-        print(f"{TARGET / name}: {len(data)} bytes")
+    for target, files in ((TARGET, make()), (SDK_TARGET, make_sdk())):
+        target.mkdir(parents=True, exist_ok=True)
+        for name, data in files.items():
+            _ = (target / name).write_bytes(data)
+            print(f"{target / name}: {len(data)} bytes")
     return 0
 
 

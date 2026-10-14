@@ -305,7 +305,42 @@ namespace MB.FramePacing.TraceJoin
       )
       {
         FrameRecords = FrameRecords(trace).Count,
+        FrameRecordDetails = FrameRecordDetails(trace),
       };
+    }
+
+    /// <summary>The names of the frame record's second part, without their trailing space: what <see cref="FrameRecordDetails"/> counts by.</summary>
+    public static IReadOnlyList<string> FrameRecordDetailNames { get; } =
+      new[]
+      {
+        FrameRecordText.WaitNamePrefix,
+        FrameRecordText.PresentNamePrefix,
+        FrameRecordText.GpuNamePrefix,
+        FrameRecordText.DisplayNamePrefix,
+        FrameRecordText.NotPresentedNamePrefix,
+        FrameRecordText.EnvironmentName,
+        FrameRecordText.SwapChainRecreatedName,
+        FrameRecordText.SwapIntervalChangeName,
+      }
+        .Select(name => name.TrimEnd())
+        .ToArray();
+
+    /// <summary>
+    /// How many slices and moments of the frame record's second part the trace has, by the start of their name (only those it has any of).
+    /// Counted only: nothing of the second part is checked against the capture.
+    /// </summary>
+    public static IReadOnlyDictionary<string, long> FrameRecordDetails(ITraceQueries trace)
+    {
+      var counts = new Dictionary<string, long>();
+      foreach (string name in FrameRecordDetailNames)
+      {
+        // A name with ids has a space after the start; one without is the start itself
+        var rows = trace.Query($"SELECT COUNT(*) AS count FROM slice WHERE name = {Quoted(name)} OR name GLOB {Quoted(name + " *")}");
+        long count = rows.RowCount > 0 ? rows.Whole(0, 0) : 0;
+        if (count > 0)
+          counts[name] = count;
+      }
+      return counts;
     }
 
     private static Dictionary<string, long> Counts(TraceQueryResult rows)

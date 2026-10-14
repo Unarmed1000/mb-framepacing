@@ -28,5 +28,11 @@ namespace MB.FramePacing.TraceJoin
   {
     /// <summary>How many slices of the frame record (<see cref="FrameRecordSlice"/>) the trace has: without any, it is not joined.</summary>
     public int FrameRecords { get; init; }
+
+    /// <summary>
+    /// How many slices and moments of the frame record's second part the trace has (optional, not checked against the capture), by the start
+    /// of their name: "mbfp present" and so on (<see cref="TraceReader.FrameRecordDetails"/>). Empty for a trace without any.
+    /// </summary>
+    public IReadOnlyDictionary<string, long> FrameRecordDetails { get; init; } = new Dictionary<string, long>();
   }
 }

@@ -233,6 +233,16 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
       `FrameRecordName.TryParse`. Both are held to `sdk/test-data/trace/frame-records.csv`. On by default:
       `MB_FRAMEPACING_BUILD_TRACE` (needs the marker module; OFF leaves it out), Conan's `with_trace` (True), the consumer
       check (`subdirectory-trace`, `package-trace` against the default install, which must hold it). Not in Python (the script has the two strings it reads, held to the golden data by a test) and not in the Unity package.
+    - **Part 2, optional and not checked against the capture** (the user's request of 2026-10-14, agreed design): what happened
+      around each frame, in the same document and module. Per frame `mbfp wait|present|gpu <run> <index>` slices and an
+      `mbfp display <run> <index>` moment on tracks `mbfp waits|presents|gpu|display`; on `mbfp run` the moments
+      `mbfp not presented <run> <index>`, `mbfp environment`, `mbfp swap chain recreated`, `mbfp swap interval change` (with a
+      `runId` annotation). Values in no API's words (present modes `queue`, `queue, late at once`, `newest at refresh`,
+      `immediate`, `unknown`), but `platformFeatures`, the plain list of the extensions and protocols found. Strings in
+      `FrameRecordText` (C++ and C#, one table), names by `FrameDetail` / `FrameDetailName` (C# `TryParse`), held to
+      `sdk/test-data/trace/frame-details.csv`. `sdk/test-data/trace/example-app.pftrace` is the made-up example with all of it
+      (`synthetic_trace.build_example`, written and checked by `update_trace_test_data.py`). The tools only count it
+      (`TraceInfo.FrameRecordDetails`, `trace-info`); using it is phase B.
     - The tools read it with the SDK's strings (`MB.FramePacing.TraceJoin` references `MB.FramePacing.Trace`; the tools' library
       was renamed to give the SDK the name): `FrameRecordSlice` is a record read from a trace, `TraceReader.FrameRecords` reads
       it from any track with the process of the track.

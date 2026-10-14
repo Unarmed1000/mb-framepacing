@@ -12,6 +12,7 @@
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
 //****************************************************************************************************************************************************
 
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MB.FramePacing.Capture;
@@ -134,6 +135,36 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.That(added!.Value.FirstNs, Is.GreaterThanOrEqualTo(whole.FirstNs).And.LessThan(added.Value.LastNs));
       Assert.That(added.Value.LastNs, Is.LessThanOrEqualTo(whole.LastNs));
       Assert.That(TraceReader.AddedRange(recorded), Is.Null);
+    }
+
+    [Test]
+    public void TheSdksExample_HasTheRecordAndEveryPartOfTheSecond_Counted()
+    {
+      // sdk/test-data/trace/example-app.pftrace: the made-up application's trace with the record and its second part
+      string example = Path.Combine(TraceTestData.Root(), "sdk", "test-data", "trace", "example-app.pftrace");
+      using var trace = TraceProcessor.Start(m_processor, example);
+
+      var info = TraceReader.Inspect(trace);
+
+      Assert.That(info.FrameRecords, Is.EqualTo(387));
+      Assert.That(
+        info.FrameRecordDetails,
+        Is.EqualTo(
+          new Dictionary<string, long>
+          {
+            ["mbfp wait"] = 387,
+            ["mbfp present"] = 387,
+            ["mbfp gpu"] = 387,
+            ["mbfp display"] = 387,
+            ["mbfp environment"] = 1,
+            ["mbfp swap chain recreated"] = 1,
+          }
+        )
+      );
+      Assert.That(info.Errors, Is.Empty);
+      // The made-up traces of the tests have none of it
+      using var plain = TraceProcessor.Start(m_processor, TraceTestData.File(TraceTestData.AppTrace));
+      Assert.That(TraceReader.FrameRecordDetails(plain), Is.Empty);
     }
 
     [Test]

@@ -15,6 +15,8 @@ target_sources(mb_framepacing_trace
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
+      include/mb/framepacing/trace/FrameDetail.hpp
+      include/mb/framepacing/trace/FrameDetailName.hpp
       include/mb/framepacing/trace/FrameRecord.hpp
       include/mb/framepacing/trace/FrameRecordAnnotation.hpp
       include/mb/framepacing/trace/FrameRecordName.hpp
@@ -31,7 +33,7 @@ if(MB_FRAMEPACING_INSTALL)
 endif()
 
 if(MB_FRAMEPACING_BUILD_TESTS)
-  add_executable(mb_framepacing_trace_tests tests/AllocationTests.cpp tests/FrameRecordTests.cpp tests/GoldenTests.cpp)
+  add_executable(mb_framepacing_trace_tests tests/AllocationTests.cpp tests/FrameDetailTests.cpp tests/FrameRecordTests.cpp tests/GoldenTests.cpp)
   target_link_libraries(mb_framepacing_trace_tests PRIVATE mb_framepacing::trace mb_framepacing_test_support GTest::gtest_main)
   target_compile_options(mb_framepacing_trace_tests PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
   # The golden data (test-data/trace) is found above this folder; a copy outside the repository skips those tests

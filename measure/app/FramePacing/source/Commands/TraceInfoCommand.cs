@@ -103,6 +103,11 @@ namespace MB.FramePacing.App.Commands
       AnsiConsole.MarkupLineInterpolated(
         $"The application's frame record (slices named '{FrameRecordText.NamePrefix}<run id> <frame index>'): {info.FrameRecords}"
       );
+      AnsiConsole.MarkupLine("Its second part (optional, not checked against the capture):");
+      foreach (var (detail, count) in info.FrameRecordDetails)
+        AnsiConsole.MarkupLineInterpolated($"  {detail}: {count}");
+      if (info.FrameRecordDetails.Count == 0)
+        AnsiConsole.MarkupLine("  none");
 
       AnsiConsole.MarkupLineInterpolated($"Errors the trace processor counts: {info.Errors.Values.Sum()}");
       foreach (var (error, count) in info.Errors)

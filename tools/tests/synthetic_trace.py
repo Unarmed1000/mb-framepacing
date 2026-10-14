@@ -382,3 +382,149 @@ def write(path: Path, with_service_events: bool = False) -> None:
 
 def write_app(path: Path) -> None:
     _ = path.write_bytes(build_app())
+
+
+# The example's tracks under the application's process (sdk/doc/trace-frame-record.md, part 2), and what the made-up application
+# says of itself
+EXAMPLE_TRACKS = {
+    "mbfp waits": 0x6D62_6670_0000_0010,
+    "mbfp presents": 0x6D62_6670_0000_0011,
+    "mbfp gpu": 0x6D62_6670_0000_0012,
+    "mbfp display": 0x6D62_6670_0000_0013,
+    "mbfp run": 0x6D62_6670_0000_0014,
+}
+EXAMPLE_WAIT_NS = 1_500_000
+EXAMPLE_PRESENT_NS = 200_000
+EXAMPLE_GPU_AFTER_PRESENT_NS = 2_000_000
+EXAMPLE_ENVIRONMENT: dict[str, int | str] = {
+    "graphicsApi": "vulkan",
+    "windowSystem": "android",
+    "presentMode": "queue",
+    "imageCount": 3,
+    "maxFramesInFlight": 2,
+    "variableRefresh": "off",
+    "vsyncSource": "present wait",
+    "pacerTier": "3.1+",
+    "pacerAim": "smoothness",
+    "capabilities": "WaitForPresent, VBlankTimes, DisplayTimes",
+    "activeCapabilities": "WaitForPresent, VBlankTimes, DisplayTimes",
+    "platformFeatures": "VK_KHR_present_wait2, VK_GOOGLE_display_timing",
+}
+
+
+def _event(builder: TraceProtoBuilder, time_ns: int, track: int, kind: TrackEvent.Type, name: str = "", values: dict[str, int | str] | None = None) -> None:
+    """One TrackEvent of the application's own sequence, stamped on CLOCK_MONOTONIC, with its annotations."""
+    packet = builder.add_packet()
+    packet.timestamp = time_ns
+    packet.timestamp_clock_id = CLOCK_MONOTONIC
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    packet.track_event.type = kind
+    packet.track_event.track_uuid = track
+    if kind != TrackEvent.TYPE_SLICE_END:
+        packet.track_event.categories.append(RECORD_CATEGORY)
+        packet.track_event.name = name
+    for key, value in (values or {}).items():
+        annotation = packet.track_event.debug_annotations.add()
+        annotation.name = key
+        if isinstance(value, str):
+            annotation.string_value = value
+        else:
+            annotation.int_value = value
+
+
+def _slice(builder: TraceProtoBuilder, track: int, name: str, begin_ns: int, end_ns: int, values: dict[str, int | str] | None = None) -> None:
+    _event(builder, begin_ns, track, TrackEvent.TYPE_SLICE_BEGIN, name, values)
+    _event(builder, max(end_ns, begin_ns), track, TrackEvent.TYPE_SLICE_END)
+
+
+def build_example() -> bytes:
+    """The SDK's example of the frame record with all of its second part (sdk/test-data/trace/example-app.pftrace): the made-up
+    application's own trace for the golden capture, with the record of every frame that has CPU times and, around each frame, its
+    wait for an earlier present, its present call, the GPU's work on it and the display time the platform reported, then the run's
+    environment, a swap chain made at the start and a moment for every frame index never presented. Made up in every value; its
+    display times are the capture's, put on the application's clock."""
+    from .golden_capture import CAPTURE_MINUS_PACER_NS, PERIOD_NS
+
+    builder = TraceProtoBuilder()
+    worked = [f for f in frames() if f.cpu_start_ns is not None and f.cpu_busy_ns is not None]
+    start = trace_ns(min(f.cpu_start_ns or 0 for f in worked)) - 1_000_000_000
+
+    packet = builder.add_packet()
+    packet.timestamp = start
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    packet.sequence_flags = TracePacket.SEQ_INCREMENTAL_STATE_CLEARED
+    for clock_id, value in ((CLOCK_BOOTTIME, start), (CLOCK_MONOTONIC, start - BOOT_MINUS_MONOTONIC_NS)):
+        clock = packet.clock_snapshot.clocks.add()
+        clock.clock_id = clock_id
+        clock.timestamp = value
+    packet = builder.add_packet()
+    packet.timestamp = start
+    packet.trusted_packet_sequence_id = APP_SEQUENCE
+    packet.track_descriptor.uuid = APP_PROCESS_TRACK
+    packet.track_descriptor.process.pid = APP_PID
+    packet.track_descriptor.process.process_name = APP_NAME
+    for name, uuid in (("mbfp frames", APP_RECORD_TRACK), *EXAMPLE_TRACKS.items()):
+        packet = builder.add_packet()
+        packet.timestamp = start
+        packet.trusted_packet_sequence_id = APP_SEQUENCE
+        packet.track_descriptor.uuid = uuid
+        packet.track_descriptor.parent_uuid = APP_PROCESS_TRACK
+        packet.track_descriptor.name = name
+
+    def app_ns(marker_ns: int) -> int:
+        return marker_ns + APP_CLOCK_OFFSET_NS
+
+    run = EXAMPLE_TRACKS["mbfp run"]
+    first = app_ns(worked[0].cpu_start_ns or 0) - 10_000_000
+    _event(builder, first, run, TrackEvent.TYPE_INSTANT, "mbfp swap chain recreated", {"runId": RUN_ID, "reason": "created"})
+    _event(builder, first + 1, run, TrackEvent.TYPE_INSTANT, "mbfp environment", {"runId": RUN_ID, **EXAMPLE_ENVIRONMENT, "refreshPeriodNs": PERIOD_NS})
+
+    previous_present_end = 0
+    previous_gpu_end = 0
+    for index, frame in enumerate(worked):
+        begin = app_ns(frame.cpu_start_ns or 0)
+        busy = frame.cpu_busy_ns or 0
+        presented = begin + busy
+        ids = f"{RUN_ID} {frame.frame_index}"
+        # Frame indices the run never presented, at the start of the frame after them
+        for skipped in range(frame.frame_index - frame.skipped_before, frame.frame_index):
+            _event(builder, begin, run, TrackEvent.TYPE_INSTANT, f"mbfp not presented {RUN_ID} {skipped}")
+        # The wait for an earlier present, up to the frame's start: never before the previous present returned
+        wait_begin = max(begin - EXAMPLE_WAIT_NS, previous_present_end)
+        _slice(builder, EXAMPLE_TRACKS["mbfp waits"], f"mbfp wait {ids}", wait_begin, begin, {"kind": "present"})
+        # The record
+        values: dict[str, int | str] = {"animationNs": frame.animation_ns}
+        if frame.marker_preferred_ns:
+            values["markerPreferredNs"] = frame.marker_preferred_ns
+        if frame.marker_target_ns:
+            values["markerTargetNs"] = frame.marker_target_ns
+        if frame.intended_display_ns:
+            values["intendedDisplayNs"] = frame.intended_display_ns
+        _slice(builder, APP_RECORD_TRACK, f"mbfp frame {ids}", begin, presented, values)
+        # The present call and the GPU's work, which ends a little after it, before the next frame's begins
+        present_end = presented + EXAMPLE_PRESENT_NS
+        swap_interval = max(1, round((frame.marker_target_ns or PERIOD_NS) / PERIOD_NS))
+        _slice(
+            builder,
+            EXAMPLE_TRACKS["mbfp presents"],
+            f"mbfp present {ids}",
+            presented,
+            present_end,
+            {"swapInterval": swap_interval, "result": "accepted", "framesInFlight": 1 + index % 2},
+        )
+        previous_present_end = present_end
+        gpu_begin = max(begin + busy // 2, previous_gpu_end)
+        following = app_ns(worked[index + 1].cpu_start_ns or 0) + (worked[index + 1].cpu_busy_ns or 0) // 2 if index + 1 < len(worked) else None
+        gpu_end = presented + EXAMPLE_GPU_AFTER_PRESENT_NS
+        if following is not None:
+            gpu_end = min(gpu_end, following)
+        _slice(builder, EXAMPLE_TRACKS["mbfp gpu"], f"mbfp gpu {ids}", gpu_begin, gpu_end)
+        previous_gpu_end = gpu_end
+        # When the platform says it was shown: the capture's display time, on the application's clock
+        shown = app_ns(frame.first_seen_ns - CAPTURE_MINUS_PACER_NS)
+        _event(builder, shown, EXAMPLE_TRACKS["mbfp display"], TrackEvent.TYPE_INSTANT, f"mbfp display {ids}", {"source": "VK_GOOGLE_display_timing"})
+    return builder.serialize()
+
+
+def write_example(path: Path) -> None:
+    _ = path.write_bytes(build_example())
