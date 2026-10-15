@@ -684,7 +684,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
         late verdict's intended period (`IntendedPeriods.Of`, shared with `PacingAnalyzer`: the marker's target frame time first):
         amber beyond the late next frame's period, as the diagrams mean it. A card for a document (`FrameTimelineOptions`,
         `render --timeline` `--title` with `--no-title-range` (also the report card's), `--description` per line in place of the
-        card's own two, `--frame-labels A,B,...` one per frame, `--cpu-row-label`/`--cpu-row-sublabel`, `--refresh-pixels 120` the
+        card's own two, `--frame-labels A,B,...` one per frame, `--cpu-row-label`/`--cpu-row-sublabel`/`--cpu-key`, `--refresh-pixels 120` the
         diagrams' scale, `--no-threshold-in-key` for a card analysed with `--error-threshold-ms 0.001`), and its key wraps on a
         narrow card.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, and the GUI's

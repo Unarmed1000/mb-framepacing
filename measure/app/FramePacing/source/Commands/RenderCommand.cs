@@ -87,6 +87,10 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "With --timeline: the line under the CPU row's label instead of 'start + CPU busy' (e.g. predicted display time).",
       };
+      var cpuKeyOption = new Option<string?>("--cpu-key")
+      {
+        Description = "With --timeline: the key's line for the CPU row's boxes instead of 'CPU: from the CPU start time for CPU busy, ...'.",
+      };
       var noThresholdInKeyOption = new Option<bool>("--no-threshold-in-key")
       {
         Description =
@@ -147,6 +151,7 @@ namespace MB.FramePacing.App.Commands
         noTitleRangeOption,
         cpuRowLabelOption,
         cpuRowSubLabelOption,
+        cpuKeyOption,
         noThresholdInKeyOption,
         stripSecondsOption,
         hideEmptyOption,
@@ -180,6 +185,7 @@ namespace MB.FramePacing.App.Commands
             refreshPixelsOption,
             cpuRowLabelOption,
             cpuRowSubLabelOption,
+            cpuKeyOption,
             noThresholdInKeyOption,
           }
         )
@@ -251,6 +257,7 @@ namespace MB.FramePacing.App.Commands
                 CpuRowLabel = parseResult.GetValue(cpuRowLabelOption),
                 CpuRowSubLabel = parseResult.GetValue(cpuRowSubLabelOption),
                 ThresholdInKey = !parseResult.GetValue(noThresholdInKeyOption),
+                CpuKey = parseResult.GetValue(cpuKeyOption),
               };
               foreach (var file in ReportFiles.WriteTimeline(run.Chart, run.FilePrefix, output, from, to, parseResult.GetValue(pngOption), timeline))
                 AnsiConsole.MarkupLineInterpolated($"[grey]{file}[/]");

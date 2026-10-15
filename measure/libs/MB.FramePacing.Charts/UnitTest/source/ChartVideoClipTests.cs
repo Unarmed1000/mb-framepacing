@@ -560,6 +560,7 @@ namespace MB.FramePacing.Charts.UnitTest
         TitleRange = false,
         CpuRowLabel = "RENDER",
         CpuRowSubLabel = "predicted display time",
+        CpuKey = "render: as wide as the frame takes, labelled with its predicted display time (its animation time)",
         ThresholdInKey = false,
       };
       var drawn = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section, diagram));
@@ -568,6 +569,8 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(words, Has.None.StartsWith("Slow frames, frames"));
       Assert.That(words, Does.Contain("RENDER"));
       Assert.That(words, Does.Contain("predicted display time"));
+      Assert.That(words, Does.Contain("render: as wide as the frame takes, labelled with its predicted display time (its animation time)"));
+      Assert.That(words, Has.None.StartsWith("CPU: from the CPU start time"));
       Assert.That(words, Does.Contain("Animation error = animation time step − display time step: + shown too soon, − shown too late"));
       Assert.That(words, Has.None.Contains("error threshold"));
       double Width(System.Xml.Linq.XDocument d) => double.Parse((string)d.Root!.Attribute("width")!, CultureInfo.InvariantCulture);

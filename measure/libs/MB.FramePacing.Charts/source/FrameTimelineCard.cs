@@ -285,7 +285,7 @@ namespace MB.FramePacing.Charts
           parts.Add(new TextShape(cx, errorY, value, "zero"));
       }
 
-      double keyExtra = Key(parts, used, legendY, width, options.ThresholdInKey ? threshold : null, options.FrameLabels != null);
+      double keyExtra = Key(parts, used, legendY, width, options.ThresholdInKey ? threshold : null, options.FrameLabels != null, options.CpuKey);
       header.Add(new GroupShape(headerExtra, parts));
       return new CardDrawing(title, width, height + headerExtra + keyExtra, header, Array.Empty<CardPlot>());
     }
@@ -331,7 +331,8 @@ namespace MB.FramePacing.Charts
       double legendY,
       double width,
       NanosecondTimeDuration? threshold,
-      bool labelsGiven
+      bool labelsGiven,
+      string? cpuKey
     )
     {
       // An entry's text is about 6.9 pixels a character in the key's font, as the rest of the card reckons it
@@ -343,9 +344,12 @@ namespace MB.FramePacing.Charts
         new TextShape(
           58,
           legendY + 1,
-          labelsGiven
-            ? "CPU: from the CPU start time for CPU busy, labelled with the frame and its animation time"
-            : "CPU: from the CPU start time for CPU busy, labelled with the frame (#last digits of its index) and its animation time",
+          cpuKey
+            ?? (
+              labelsGiven
+                ? "CPU: from the CPU start time for CPU busy, labelled with the frame and its animation time"
+                : "CPU: from the CPU start time for CPU busy, labelled with the frame (#last digits of its index) and its animation time"
+            ),
           "sub",
           "start"
         )

@@ -251,7 +251,7 @@ their intended vsync), otherwise they are placed so that no frame is presented a
 A timeline for a document, in the style of the timing diagrams it comes from, takes its own title (`--title`, with
 `--no-title-range` for none of the section's frames and seconds after it), its own lines under it in place of the card's two
 (`--description`, once per line), a label per frame in place of its index (`--frame-labels A,B,C,...`, one per presented frame of
-the section, in order), its own words for the CPU row (`--cpu-row-label`, `--cpu-row-sublabel`), the diagrams' scale
+the section, in order), its own words for the CPU row and its key line (`--cpu-row-label`, `--cpu-row-sublabel`, `--cpu-key`), the diagrams' scale
 (`--refresh-pixels 120`: a refresh 120 pixels wide, where every CPU box has room for its animation time) and a key without the error
 threshold (`--no-threshold-in-key`, for a card analysed with a threshold that only keeps the times' rounding out, such as
 `analyze --error-threshold-ms 0.001`):

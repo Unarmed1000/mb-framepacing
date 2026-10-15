@@ -30,6 +30,9 @@ namespace MB.FramePacing.Charts
     /// <inheritdoc cref="CpuRowLabel"/>
     public string? CpuRowSubLabel { get; init; }
 
+    /// <summary>The key's line for the CPU row's boxes instead of the card's own ("CPU: from the CPU start time for CPU busy, ..."); null: that.</summary>
+    public string? CpuKey { get; init; }
+
     /// <summary>false: the key's last line without the error threshold (the diagrams' line, for a card whose threshold only keeps the
     /// rounding of the times out).</summary>
     public bool ThresholdInKey { get; init; } = true;
