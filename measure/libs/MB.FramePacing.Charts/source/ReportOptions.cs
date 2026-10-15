@@ -34,8 +34,11 @@ namespace MB.FramePacing.Charts
     /// <summary>The opt-in overlays asked for (<see cref="ReportItem.Overlays"/>), and the auto tiles to show whatever they count.</summary>
     public IReadOnlySet<string> Shown { get; init; } = new HashSet<string>();
 
-    /// <summary>The card's title instead of the run's ("Run 1  'name'"); a section's time range is still added.</summary>
+    /// <summary>The card's title instead of the run's ("Run 1  'name'"); a section's time range is still added unless <see cref="TitleRange"/> is false.</summary>
     public string? Title { get; init; }
+
+    /// <summary>false: the title without a section's time range.</summary>
+    public bool TitleRange { get; init; } = true;
 
     /// <summary>The refresh strip covers only the section's first this many seconds (its own time axis), instead of the whole section.</summary>
     public double? StripSeconds

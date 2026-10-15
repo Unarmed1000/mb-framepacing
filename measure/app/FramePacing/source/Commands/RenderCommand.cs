@@ -75,6 +75,28 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "With --timeline: a label per presented frame of the section, comma separated, in order (e.g. A,B,C), instead of #index.",
       };
+      var noTitleRangeOption = new Option<bool>("--no-title-range")
+      {
+        Description = "Leave the section's range out of the title (with --timeline its frames and seconds, else its seconds).",
+      };
+      var cpuRowLabelOption = new Option<string?>("--cpu-row-label")
+      {
+        Description = "With --timeline: the CPU row's label instead of 'CPU' (e.g. RENDER).",
+      };
+      var cpuRowSubLabelOption = new Option<string?>("--cpu-row-sublabel")
+      {
+        Description = "With --timeline: the line under the CPU row's label instead of 'start + CPU busy' (e.g. predicted display time).",
+      };
+      var noThresholdInKeyOption = new Option<bool>("--no-threshold-in-key")
+      {
+        Description =
+          "With --timeline: leave the error threshold out of the key's last line (for a threshold that only keeps rounding out, e.g. 0.001 ms).",
+      };
+      var refreshPixelsOption = new Option<double?>("--refresh-pixels")
+      {
+        Description =
+          $"With --timeline: how wide a refresh is drawn, in pixels ({FrameTimelineOptions.MinRefreshPixels} to {FrameTimelineOptions.MaxRefreshPixels}; the timing diagrams draw 120). Default: 64 or more.",
+      };
       var stripSecondsOption = new Option<double?>("--strip-seconds")
       {
         Description = "The refresh strip shows only the first this many seconds of the section, with its own time axis (e.g. 1).",
@@ -121,6 +143,11 @@ namespace MB.FramePacing.App.Commands
         titleOption,
         descriptionOption,
         frameLabelsOption,
+        refreshPixelsOption,
+        noTitleRangeOption,
+        cpuRowLabelOption,
+        cpuRowSubLabelOption,
+        noThresholdInKeyOption,
         stripSecondsOption,
         hideEmptyOption,
         noStaticClampOption,
@@ -145,7 +172,17 @@ namespace MB.FramePacing.App.Commands
         // The description lines and the frame labels are the frame timeline's
         if (result.GetValue(timelineOption))
           return;
-        foreach (var option in new Option[] { descriptionOption, frameLabelsOption })
+        foreach (
+          var option in new Option[]
+          {
+            descriptionOption,
+            frameLabelsOption,
+            refreshPixelsOption,
+            cpuRowLabelOption,
+            cpuRowSubLabelOption,
+            noThresholdInKeyOption,
+          }
+        )
         {
           if (result.GetResult(option) is { Implicit: false })
             result.AddError($"{option.Name} goes with --timeline only.");
@@ -209,6 +246,11 @@ namespace MB.FramePacing.App.Commands
                 Title = parseResult.GetValue(titleOption),
                 Description = given is { Length: > 0 } ? given : null,
                 FrameLabels = parseResult.GetValue(frameLabelsOption) is { } labels ? labels.Split(',').Select(l => l.Trim()).ToArray() : null,
+                RefreshPixels = parseResult.GetValue(refreshPixelsOption),
+                TitleRange = !parseResult.GetValue(noTitleRangeOption),
+                CpuRowLabel = parseResult.GetValue(cpuRowLabelOption),
+                CpuRowSubLabel = parseResult.GetValue(cpuRowSubLabelOption),
+                ThresholdInKey = !parseResult.GetValue(noThresholdInKeyOption),
               };
               foreach (var file in ReportFiles.WriteTimeline(run.Chart, run.FilePrefix, output, from, to, parseResult.GetValue(pngOption), timeline))
                 AnsiConsole.MarkupLineInterpolated($"[grey]{file}[/]");

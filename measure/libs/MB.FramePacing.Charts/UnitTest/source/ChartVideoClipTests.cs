@@ -552,6 +552,57 @@ namespace MB.FramePacing.Charts.UnitTest
         () => FrameTimelineCard.Render(section, options with { FrameLabels = labels.Skip(1).ToArray() }),
         Throws.InvalidOperationException.With.Message.Contains("one label per frame")
       );
+
+      // At the diagrams' scale, without the section's range in the title, with their words for the CPU row and no threshold in the key
+      var diagram = options with
+      {
+        RefreshPixels = 120,
+        TitleRange = false,
+        CpuRowLabel = "RENDER",
+        CpuRowSubLabel = "predicted display time",
+        ThresholdInKey = false,
+      };
+      var drawn = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section, diagram));
+      var words = drawn.Descendants().Where(e => e.Name.LocalName == "text").Select(e => e.Value).ToList();
+      Assert.That(words, Does.Contain("Slow frames"));
+      Assert.That(words, Has.None.StartsWith("Slow frames, frames"));
+      Assert.That(words, Does.Contain("RENDER"));
+      Assert.That(words, Does.Contain("predicted display time"));
+      Assert.That(words, Does.Contain("Animation error = animation time step − display time step: + shown too soon, − shown too late"));
+      Assert.That(words, Has.None.Contains("error threshold"));
+      double Width(System.Xml.Linq.XDocument d) => double.Parse((string)d.Root!.Attribute("width")!, CultureInfo.InvariantCulture);
+      Assert.That(Width(drawn), Is.GreaterThan(Width(document)), "a refresh 120 pixels wide makes the card wider");
+      Assert.That(
+        () => FrameTimelineCard.Render(section, options with { RefreshPixels = 4 }),
+        Throws.InvalidOperationException.With.Message.Contains("pixels wide")
+      );
+      // The report card leaves the range out of its title the same way
+      var card = ReportCard.Build(section, ReportOptions.Default with { Title = "Slow frames", TitleRange = false });
+      Assert.That(card.Title, Is.EqualTo("Slow frames"));
+    }
+
+    /// <summary>
+    /// The frame timeline card draws by the late verdict's intended period (the marker's target frame time first), as the timing diagrams
+    /// mean it: a game at a swap interval of one that starts a frame every two refreshes by its own clock has every vsync bright, and the
+    /// frame before a late frame is held longer (amber) from its second refresh on.
+    /// </summary>
+    [Test]
+    public void FrameTimeline_DrawsByTheIntendedPeriod()
+    {
+      var (_, report, _) = Analyze("60-diagram-half-rate-bad-pacing");
+      var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
+      var section = RunSection.Create(chart, 0, 0.25);
+      var frames = section.Section.Run.Frames;
+      Assert.That(frames.All(f => f.MarkerTargetFrameTime.Nanoseconds == 16_666_667), "a swap interval of one in every marker");
+      int late = frames.Skip(1).Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
+      Assert.That(late, Is.GreaterThanOrEqualTo(3));
+      var document = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section));
+      int Count(string cls) => document.Descendants().Count(e => (string?)e.Attribute("class") == cls);
+      // Each late frame's frame before stays three refreshes: two beyond the intended one (the key adds one swatch), none held as intended
+      Assert.That(Count("again") - 1, Is.EqualTo(2 * late));
+      Assert.That(Count("hold"), Is.Zero);
+      // Every vsync inside the frames is one a frame could be aimed at: only the lines before the first frame and after the last are faint
+      Assert.That(Count("vsync-skip"), Is.EqualTo(3), "the key's swatch, the line before the first frame and the one after the last");
     }
 
     /// <summary>

@@ -117,14 +117,8 @@ namespace MB.FramePacing.Analysis
         // between the plan's intended times, else what the application wants or the tools were given, one target per frame the target
         // dropped. The target frame time comes first: a pacer that plans the next frame from where the frame before was shown makes the
         // plan's step a refresh longer after a lost one, and a second lost refresh in a row would not count
-        NanosecondTimeDuration? intendedPeriod =
-          onDemand ? null
-          : markerTarget != NanosecondTimeDuration.Zero
-            ? NanosecondTimeDuration.FromNanoseconds((1 + dropped[i]) * WholeRefreshes(markerTarget, refresh).Nanoseconds)
-          : intendedStep is { } planned ? WholeRefreshes(new NanosecondTimeDuration(planned), refresh)
-          : NanosecondTimeDuration.FromNanoseconds(
-            (1 + dropped[i]) * (markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh) : givenTarget).Nanoseconds
-          );
+        // Without a target frame time that is the frame's target, worked out above in the same order (IntendedPeriods)
+        NanosecondTimeDuration? intendedPeriod = IntendedPeriods.Of(markerTarget, target, dropped[i], refresh);
         // A static step (nothing animated while the frame before was on screen) has no prediction error; its pacing error still counts
         bool animates = (frame.Flags & PresentedFrameFlags.StaticBefore) == 0;
 

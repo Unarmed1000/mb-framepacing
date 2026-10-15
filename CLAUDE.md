@@ -680,9 +680,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
         the card's own. A frame's first refresh is coloured as the report's refresh strip (red only
         for `Late`, yellow for `DeltaTimeJitter`, green otherwise) and its error pill as the error bars (red beyond the threshold,
         yellow for jitter): the user's rule that our charts follow explained's fixed look with our colour rules (2026-10-15, after
-        asking the explained session how its diagrams draw). A card for a document (`FrameTimelineOptions`, `render --timeline`
-        `--title`, `--description` per line in place of the card's own two, `--frame-labels A,B,...` one per frame), and its key
-        wraps on a narrow card.
+        asking the explained session how its diagrams draw). Held refreshes and bright vsyncs follow the
+        late verdict's intended period (`IntendedPeriods.Of`, shared with `PacingAnalyzer`: the marker's target frame time first):
+        amber beyond the late next frame's period, as the diagrams mean it. A card for a document (`FrameTimelineOptions`,
+        `render --timeline` `--title` with `--no-title-range` (also the report card's), `--description` per line in place of the
+        card's own two, `--frame-labels A,B,...` one per frame, `--cpu-row-label`/`--cpu-row-sublabel`, `--refresh-pixels 120` the
+        diagrams' scale, `--no-threshold-in-key` for a card analysed with `--error-threshold-ms 0.001`), and its key wraps on a
+        narrow card.
     - The headline numbers come from `RunHeadline` only: the GUI's tiles and the report card's show the same tiles, and the GUI's
       Display card the report's display box (`RunHeadline.Display`, `DisplaySummary`), so add or change a number there, not in the GUI.
       A tile without a number shows "-" with `HasValue` false.

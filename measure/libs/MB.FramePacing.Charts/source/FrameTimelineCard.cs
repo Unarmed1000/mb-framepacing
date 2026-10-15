@@ -56,6 +56,10 @@ namespace MB.FramePacing.Charts
         throw new InvalidOperationException(
           $"The section has {frames.Count} presented frames; the frame timeline draws at most {MaxFrames}: choose a shorter section (--from, --to)"
         );
+      if (options.RefreshPixels is { } asked && (asked < FrameTimelineOptions.MinRefreshPixels || asked > FrameTimelineOptions.MaxRefreshPixels))
+        throw new InvalidOperationException(
+          $"A refresh {asked} pixels wide: give {FrameTimelineOptions.MinRefreshPixels} to {FrameTimelineOptions.MaxRefreshPixels}"
+        );
       if (options.FrameLabels is { } labels && labels.Count != frames.Count)
         throw new InvalidOperationException(
           $"{labels.Count} frame labels for a section of {frames.Count} presented frames: give one label per frame, in order"
@@ -106,7 +110,8 @@ namespace MB.FramePacing.Charts
       var origin = RefreshAt(startRefresh);
       var end = RefreshAt(endRefresh);
       double refreshMs = refresh.Value.TotalMilliseconds;
-      double scale = Math.Max(1.2, MinRefreshPixels / refreshMs);
+      // Pixels per millisecond: a refresh 64 pixels wide or more, or as wide as the card for a document asks
+      double scale = options.RefreshPixels is { } pixels ? pixels / refreshMs : Math.Max(1.2, MinRefreshPixels / refreshMs);
       double width = Math.Max(MinWidth, Left + ((end - origin).TotalMilliseconds * scale) + Right);
       double XOf(NanosecondTickCount time) => Left + ((time - origin).TotalMilliseconds * scale);
 
@@ -120,8 +125,12 @@ namespace MB.FramePacing.Charts
 
       string title =
         (options.Title ?? RunHeadline.Title(run))
-        + $", frames {frames[0].FrameIndex.ToString(CultureInfo.InvariantCulture)}–{last.FrameIndex.ToString(CultureInfo.InvariantCulture)}"
-        + $" ({N(section.FromSeconds, 2)}–{N(section.ToSeconds, 2)} s)";
+        + (
+          options.TitleRange
+            ? $", frames {frames[0].FrameIndex.ToString(CultureInfo.InvariantCulture)}–{last.FrameIndex.ToString(CultureInfo.InvariantCulture)}"
+              + $" ({N(section.FromSeconds, 2)}–{N(section.ToSeconds, 2)} s)"
+            : string.Empty
+        );
       var description = new List<string>
       {
         $"{frames.Count} presented frames on a {N(1000 / refreshMs, 2)} Hz display ({Ms(refreshMs)} ms per refresh), one capture per refresh.",
@@ -139,13 +148,18 @@ namespace MB.FramePacing.Charts
       var header = Header(title, description);
       var parts = new List<CardShape>();
 
-      // Refresh lines: bright where a frame could be aimed at its target rate (whole targets after the previous frame appeared), faint
-      // where it could not; a vsync where a frame appeared is always bright (a frame shown sooner than its target appears on one its target
+      // Each frame's intended period, as the late verdict measures it (IntendedPeriods: the marker's target frame time
+      // first), from the frames the target dropped before each frame of the whole run
+      var dropped = DroppedFrames.Before(run.Frames);
+      NanosecondTimeDuration? IntendedPeriod(int index) => IntendedPeriods.Of(frames[index], dropped[section.Start + index], refresh);
+
+      // Refresh lines: bright where a frame could be aimed at its intended period (whole periods after the previous frame appeared), faint
+      // where it could not; a vsync where a frame appeared is always bright (a frame shown sooner than its period appears on one the period
       // skips)
       var targetable = new HashSet<int>(shownAt);
       for (int i = 1; i < frames.Count; ++i)
       {
-        int step = Math.Max(1, (int)Math.Round((frames[i].TargetFrameTime ?? refresh).Nanoseconds / (double)refresh.Nanoseconds));
+        int step = Math.Max(1, (int)Math.Round((IntendedPeriod(i) ?? refresh).Nanoseconds / (double)refresh.Nanoseconds));
         for (int at = shownAt[i - 1] + step; at <= shownAt[i]; at += step)
           targetable.Add(at);
       }
@@ -160,8 +174,8 @@ namespace MB.FramePacing.Charts
       }
 
       // Row labels
-      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) - 3, "CPU", "label", "start"));
-      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) + 13, "start + CPU busy", "vsync-n", "start"));
+      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) - 3, options.CpuRowLabel ?? "CPU", "label", "start"));
+      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) + 13, options.CpuRowSubLabel ?? "start + CPU busy", "vsync-n", "start"));
       parts.Add(new TextShape(20, displayY + (DisplayH / 2) + 4, "DISPLAY", "label", "start"));
       string[] rowLabels = { "ANIMATION TIME STEP", "DISPLAY TIME STEP", "ANIMATION ERROR" };
       for (int i = 0; i < rowLabels.Length; ++i)
@@ -201,12 +215,12 @@ namespace MB.FramePacing.Charts
         var frame = frames[i];
         int from = shownAt[i];
         int to = i + 1 < frames.Count ? shownAt[i + 1] : endRefresh;
-        // How long the frame is meant to stay: as long as it does, unless the next frame is late. Then it is the time the next frame was
-        // animated for (its animation time step), and the refreshes beyond that are the ones it was held longer
+        // How long the frame is meant to stay: as long as it does, unless the next frame is late. Then it is the next frame's intended
+        // period (what its lateness is measured against), and the refreshes beyond it are the ones it was held longer
         var next = i + 1 < frames.Count ? frames[i + 1] : null;
         var intendedHold =
-          next != null && (next.Flags & PresentedFrameFlags.Late) != 0 && next.AnimationDelta is { } animated
-            ? animated
+          next != null && (next.Flags & PresentedFrameFlags.Late) != 0 && IntendedPeriod(i + 1) is { } period
+            ? period.Value
             : NanosecondTimeSpan.MaxValue;
         // Nothing animates in a static frame: its refreshes are neither on time nor off, held nor late
         bool isStatic = (frame.Flags & PresentedFrameFlags.StaticAfter) != 0;
@@ -271,7 +285,7 @@ namespace MB.FramePacing.Charts
           parts.Add(new TextShape(cx, errorY, value, "zero"));
       }
 
-      double keyExtra = Key(parts, used, legendY, width, threshold, options.FrameLabels != null);
+      double keyExtra = Key(parts, used, legendY, width, options.ThresholdInKey ? threshold : null, options.FrameLabels != null);
       header.Add(new GroupShape(headerExtra, parts));
       return new CardDrawing(title, width, height + headerExtra + keyExtra, header, Array.Empty<CardPlot>());
     }
@@ -302,7 +316,7 @@ namespace MB.FramePacing.Charts
       ("ok", "the frame's first refresh, neither late nor off by delta time jitter"),
       ("off", "the frame's first refresh, late: longer than animated for and than intended"),
       ("off-jitter", "the frame's first refresh, off by delta time jitter: less than the intended period"),
-      ("hold", "held as the next frame was animated for"),
+      ("hold", "held as intended"),
       ("again", "held longer: the next frame is late"),
       ("strip-static-a", "static: nothing animates"),
     };
@@ -316,7 +330,7 @@ namespace MB.FramePacing.Charts
       HashSet<string> used,
       double legendY,
       double width,
-      NanosecondTimeDuration threshold,
+      NanosecondTimeDuration? threshold,
       bool labelsGiven
     )
     {
@@ -374,9 +388,12 @@ namespace MB.FramePacing.Charts
         x += entry + 28;
       }
       const string error = "Animation error = animation time step − display time step: + shown too soon, − shown too late";
-      string thresholdText = $"error threshold {Ms(threshold.Value.TotalMilliseconds)} ms";
+      // The diagrams' line alone, where the card's threshold is left out of the key
+      string? thresholdText = threshold is { } shown ? $"error threshold {Ms(shown.Value.TotalMilliseconds)} ms" : null;
       double errorY = coloursY + 26;
-      if (20 + ((error.Length + 2 + thresholdText.Length) * CharWidth) <= right)
+      if (thresholdText == null)
+        parts.Add(new TextShape(20, errorY, error, "sub", "start"));
+      else if (20 + ((error.Length + 2 + thresholdText.Length) * CharWidth) <= right)
         parts.Add(new TextShape(20, errorY, $"{error}; {thresholdText}", "sub", "start"));
       else
       {

@@ -103,7 +103,8 @@ namespace MB.FramePacing.Charts
       double pixelsPerFrame = frameCount > 0 ? (plotX1 - PlotX0) * ((to - from) / (viewTo - viewFrom)) / frameCount : double.MaxValue;
       bool perFrame = pixelsPerFrame >= 1;
 
-      string title = (options.Title ?? RunHeadline.Title(run)) + (section.IsWholeRun ? string.Empty : $", {Ms1(from)}–{Ms1(to)} s");
+      string title =
+        (options.Title ?? RunHeadline.Title(run)) + (section.IsWholeRun || !options.TitleRange ? string.Empty : $", {Ms1(from)}–{Ms1(to)} s");
       var description = new List<string>
       {
         (
