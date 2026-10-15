@@ -35,6 +35,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace FP = MB::FramePacing;
@@ -1455,4 +1456,38 @@ TEST(TierPacer, ThePartsThatPlaceFramesFollowTheDisplaysSlipOnlyWithDisplayTimes
   vblank.AddDisplayReport(ShownAfter(vblankFrames[5], Period));
   EXPECT_EQ(grid.DisplaySlipRefreshes(), 1u);
   EXPECT_EQ(vblank.DisplaySlipRefreshes(), 1u);
+}
+
+TEST(TierPacer, EverySetIsPacedAtTheBestTierItReaches)
+{
+  // Every set of the capabilities that place a frame or rank a tier, with a present's swap interval of none, one and up to
+  // four: once a vertical blank was read and the waits run, the pacer paces at the tier the set is rated, the best one it reaches
+  const std::array<PacerCapability, 7> named = {
+    AtTime, AfterDuration, Wait, VBlank, PacerCapability::DisplayTimes, PacerCapability::PresentSkipsOverdue, PacerCapability::WaitForGpuWork};
+  uint32_t sets = 0;
+  for (uint32_t bits = 0; bits < (1u << named.size()); ++bits)
+  {
+    PacerCapability chosen = PacerCapability::NoCapabilities;
+    for (std::size_t index = 0; index < named.size(); ++index)
+    {
+      if ((bits & (1u << index)) != 0)
+      {
+        chosen = chosen | named[index];
+      }
+    }
+    for (const uint32_t maxSwapInterval : {0u, 1u, 4u})
+    {
+      const PacerCapabilities capabilities =
+        maxSwapInterval == 0 ? PacerCapabilities(chosen) : PacerCapabilities(chosen | PacerCapability::PresentSwapInterval, maxSwapInterval);
+      Loop loop(Settings(), capabilities);
+      for (int32_t frame = 0; frame < 3; ++frame)
+      {
+        static_cast<void>(loop.Frame());
+      }
+      EXPECT_EQ(loop.Pacer.WorkingTier(), loop.Pacer.Rating().Tier) << bits << ' ' << maxSwapInterval;
+      EXPECT_EQ(loop.Pacer.ActiveRating().Tier, loop.Pacer.Rating().Tier) << bits << ' ' << maxSwapInterval;
+      ++sets;
+    }
+  }
+  EXPECT_EQ(sets, 384u);
 }
