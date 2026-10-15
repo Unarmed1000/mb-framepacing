@@ -500,7 +500,7 @@ TEST(TierPacer, ADurationOnThePresentIsTheSecondMajorTierWhereThePacerSeesWhereF
   static_cast<void>(timerWait.Frame());
   EXPECT_EQ(timerWait.Pacer.WorkingTier(), PacerTier::AfterDurationTimerWaitForPresent);
 
-  // With display times and no wait: 2.4, and 2.3 with vertical blank times once one was read
+  // With display times and no wait: 2.4, and 2.2 with vertical blank times once one was read
   const PC::TierPacer shown(Settings(), PacerCapabilities(AfterDuration | PacerCapability::DisplayTimes));
   EXPECT_EQ(shown.Rating().Tier, PacerTier::AfterDurationTimerDisplayTimes);
   EXPECT_EQ(shown.WorkingTier(), PacerTier::AfterDurationTimerDisplayTimes);

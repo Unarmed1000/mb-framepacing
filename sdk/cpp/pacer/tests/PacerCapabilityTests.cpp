@@ -17,6 +17,7 @@
 #include <cstring>
 #include <set>
 #include <string_view>
+#include <utility>
 
 namespace PC = MB::FramePacing::Pacer;
 using PC::PacerCapabilities;
@@ -50,12 +51,12 @@ namespace
   }
 
   constexpr std::array<PacerTier, 12> EveryTier = {PacerTier::AtTimeVBlankWaitForPresent,
-                                                   PacerTier::AtTimeTimerWaitForPresent,
                                                    PacerTier::AtTimeVBlankPeriodOnly,
+                                                   PacerTier::AtTimeTimerWaitForPresent,
                                                    PacerTier::AtTimeTimerPeriodOnly,
                                                    PacerTier::AfterDurationVBlankWaitForPresent,
-                                                   PacerTier::AfterDurationTimerWaitForPresent,
                                                    PacerTier::AfterDurationVBlankDisplayTimes,
+                                                   PacerTier::AfterDurationTimerWaitForPresent,
                                                    PacerTier::AfterDurationTimerDisplayTimes,
                                                    PacerTier::VBlankWaitForPresent,
                                                    PacerTier::VBlankPeriodOnly,
@@ -319,13 +320,14 @@ TEST(PacerTier, TheOrderIsWhoPlacesTheFrameThenWhatHoldsTheLoopThenWhereTheRefre
   EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | wait)).Tier, PacerTier::AtTimeTimerWaitForPresent);
   EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | vblank)).Tier, PacerTier::AtTimeVBlankPeriodOnly);
   EXPECT_EQ(Rate(PacerCapabilities(TimedPresent)).Tier, PacerTier::AtTimeTimerPeriodOnly);
-  // A duration on the present comes next, where the set sees where frames were shown: the wait first, then display times
+  // A duration on the present comes next, where the set sees where frames were shown: vertical blank times (with display times)
+  // rank before the wait in every major tier, but a set reaches only one of the two
   EXPECT_EQ(Rate(PacerCapabilities(Duration | wait | vblank)).Tier, PacerTier::AfterDurationVBlankWaitForPresent);
   EXPECT_EQ(Rate(PacerCapabilities(Duration | wait)).Tier, PacerTier::AfterDurationTimerWaitForPresent);
   EXPECT_EQ(Rate(PacerCapabilities(Duration | vblank | shown)).Tier, PacerTier::AfterDurationVBlankDisplayTimes);
   EXPECT_EQ(Rate(PacerCapabilities(Duration | shown)).Tier, PacerTier::AfterDurationTimerDisplayTimes);
   EXPECT_EQ(Rate(PacerCapabilities(Duration | wait | vblank | shown)).Tier, PacerTier::AfterDurationVBlankWaitForPresent);
-  // Without one the vertical blank times come before the wait: they are what makes the loop's placing good
+  // Without one the frame loop places the frames: the vertical blank times rank before the wait, as in every major tier
   EXPECT_EQ(Rate(PacerCapabilities(wait | vblank)).Tier, PacerTier::VBlankWaitForPresent);
   EXPECT_EQ(Rate(PacerCapabilities(vblank)).Tier, PacerTier::VBlankPeriodOnly);
   EXPECT_EQ(Rate(PacerCapabilities(wait)).Tier, PacerTier::TimerWaitForPresent);
@@ -366,13 +368,14 @@ TEST(PacerTier, ATierIsAMajorTierAndASubTier)
   EXPECT_EQ(MajorOf(PacerTier::AtTimeTimerPeriodOnly), PacerMajorTier::DisplayPlacesAtTime);
   EXPECT_EQ(MajorOf(PacerTier::AfterDurationVBlankWaitForPresent), PacerMajorTier::DisplayPlacesAfterDuration);
   EXPECT_EQ(MajorOf(PacerTier::TimerPeriodOnly), PacerMajorTier::LoopPlaces);
-  // The sub tiers of the display's side: the wait first. Of the loop: the vertical blank times first
-  EXPECT_EQ(SubTierOf(PacerTier::AtTimeTimerWaitForPresent), 2u);
-  EXPECT_EQ(SubTierOf(PacerTier::AtTimeVBlankPeriodOnly), 3u);
-  EXPECT_EQ(SubTierOf(PacerTier::AfterDurationTimerWaitForPresent), 2u);
-  EXPECT_EQ(SubTierOf(PacerTier::AfterDurationVBlankDisplayTimes), 3u);
-  EXPECT_EQ(SubTierOf(PacerTier::VBlankPeriodOnly), 2u);
-  EXPECT_EQ(SubTierOf(PacerTier::TimerWaitForPresent), 3u);
+  // The same sub tier in every major tier is the same two capabilities: .2 vertical blank times, .3 a wait for a present
+  for (const auto& [blanks, wait] : {std::pair{PacerTier::AtTimeVBlankPeriodOnly, PacerTier::AtTimeTimerWaitForPresent},
+                                     std::pair{PacerTier::AfterDurationVBlankDisplayTimes, PacerTier::AfterDurationTimerWaitForPresent},
+                                     std::pair{PacerTier::VBlankPeriodOnly, PacerTier::TimerWaitForPresent}})
+  {
+    EXPECT_EQ(SubTierOf(blanks), 2u);
+    EXPECT_EQ(SubTierOf(wait), 3u);
+  }
   // A value that is no tier is taken as the tier next to it
   EXPECT_EQ(MajorOf(static_cast<PacerTier>(0)), PacerMajorTier::DisplayPlacesAtTime);
   EXPECT_EQ(SubTierOf(static_cast<PacerTier>(0)), 1u);

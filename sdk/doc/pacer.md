@@ -112,10 +112,14 @@ three **major tiers**, by who places a frame and with what, each with four **sub
 
 | Sub tier | In major tier 1                  | In major tier 2                  | In major tier 3                  |
 | -------- | -------------------------------- | -------------------------------- | -------------------------------- |
-| .1       | `WaitForPresent` + `VBlankTimes` | `WaitForPresent` + `VBlankTimes` | `VBlankTimes` + `WaitForPresent` |
-| .2       | `WaitForPresent`                 | `WaitForPresent`                 | `VBlankTimes`                    |
-| .3       | `VBlankTimes`                    | `VBlankTimes` + `DisplayTimes`   | `WaitForPresent`                 |
+| .1       | `VBlankTimes` + `WaitForPresent` | `VBlankTimes` + `WaitForPresent` | `VBlankTimes` + `WaitForPresent` |
+| .2       | `VBlankTimes`                    | `VBlankTimes` + `DisplayTimes`   | `VBlankTimes`                    |
+| .3       | `WaitForPresent`                 | `WaitForPresent`                 | `WaitForPresent`                 |
 | .4       | nothing more                     | `DisplayTimes`                   | nothing (the baseline)           |
+
+A sub tier is the same rank in every major tier: vertical blank times before a wait for a present, the order the one
+measurement there is gives (the frame loop's, on one system). Nothing has shown that another order is better where the
+display's side places the frame.
 
 - **A wait for a present** holds the loop until the display took an earlier frame, so the frames that wait to be shown can not
   grow. Without one the loop is held on a timer, and a frame that comes to wait stays.
@@ -128,7 +132,7 @@ three **major tiers**, by who places a frame and with what, each with four **sub
   frame loop's, which stays tied to the clock or the vertical blanks: a late frame costs a second error there, and the latency
   stays where the pacer put it. A swap interval of one places nothing beyond the frame loop's. With the aim of smoothness the
   pacer takes that refresh: the display stays smooth and the frames wait a refresh longer. With low latency a wait for a
-  present (2.1, 2.2) keeps the frames that wait few by itself, and with display times and no wait (2.3, 2.4) the pacer starts
+  present (2.1, 2.3) keeps the frames that wait few by itself, and with display times and no wait (2.2, 2.4) the pacer starts
   the frames later by the refreshes the display slipped (`DisplaySlipRefreshes`); neither moves the animation time.
 - **Every order in the list is a proposal until the tiers have been measured against each other**: major tier 2 against 3.1
   first (the data so far, of one system without a duration on the present, shows nothing ahead of 3.1), and .2 against .3.

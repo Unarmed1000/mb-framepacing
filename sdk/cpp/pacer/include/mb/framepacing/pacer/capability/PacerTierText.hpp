@@ -50,17 +50,17 @@ namespace MB::FramePacing::Pacer::PacerTierText
     {
     case PacerTier::AtTimeVBlankWaitForPresent:
       return "1.1";
-    case PacerTier::AtTimeTimerWaitForPresent:
-      return "1.2";
     case PacerTier::AtTimeVBlankPeriodOnly:
+      return "1.2";
+    case PacerTier::AtTimeTimerWaitForPresent:
       return "1.3";
     case PacerTier::AtTimeTimerPeriodOnly:
       return "1.4";
     case PacerTier::AfterDurationVBlankWaitForPresent:
       return "2.1";
-    case PacerTier::AfterDurationTimerWaitForPresent:
-      return "2.2";
     case PacerTier::AfterDurationVBlankDisplayTimes:
+      return "2.2";
+    case PacerTier::AfterDurationTimerWaitForPresent:
       return "2.3";
     case PacerTier::AfterDurationTimerDisplayTimes:
       return "2.4";

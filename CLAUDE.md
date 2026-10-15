@@ -434,10 +434,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     as a tier of its own since decision 20** (2026-10-15, the simulation only; `HasPacer` true and `PacedAs` the identity
     for every tier, kept for applications): the loop holds no present (`DisplayPlacementUtil::HoldsUpTo`); **smoothness
     takes the hit** of a frame shown late (the user: "taking the hit ... as retiming would cause stutter"), **low latency
-    with display times and no wait** (2.3, 2.4) starts the frames later by the display's slip (`hold/DisplaySlipRule`,
-    `DisplaySlipRefreshes`; never the animation time); still to be measured against 3.1; 3 = the frame loop. Sub tiers from `WaitForPresent` and `VBlankTimes` (major 2:
-    `DisplayTimes` in place of the wait for .3 and .4); the wait first where the display places the frame, the vertical blank
-    times first where the loop does, proposals until measured. **Marks:** "+" display times, **"s"** `PresentSkipsOverdue`
+    with display times and no wait** (2.2, 2.4) starts the frames later by the display's slip (`hold/DisplaySlipRule`,
+    `DisplaySlipRefreshes`; never the animation time); still to be measured against 3.1; 3 = the frame loop. Sub tiers from `WaitForPresent` and `VBlankTimes`, **the same rank in
+    every major tier** (the user, 2026-10-15, decision 21: a different order per major tier only with proof, and there is a
+    measurement for the loop's order only): .1 both, .2 vertical blank times, .3 a wait, .4 neither (major 2: `DisplayTimes`
+    with .2 and .4, which have no wait); proposals until measured. **Marks:** "+" display times, **"s"** `PresentSkipsOverdue`
     (`PacerRating::SkipsOverdue`, `PacerTierText::SkipsOverdueMark`: describes the system, a rating only until a pacer relies
     on it). The GPU wait and GPU work times: capabilities, no tier, no mark. `DisplaySideHolds` stays beside the tier. No
     capability that changes how good the pacing is may hide inside a place. `PacerTierText` has the words and `NumberOf(tier)`; an

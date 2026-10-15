@@ -2349,8 +2349,8 @@ pacing by display times beyond the display's slip in major tier 2 (decision 20);
     - **Smoothness takes the hit.** A frame shown a refresh late moves every frame after it a refresh later: the display
       stays smooth, and the frames wait a refresh longer from then on. Nothing is retimed, so nothing stutters a second time.
       The user's words: "taking the hit and just pace display time correctly as retiming would cause stutter".
-    - **Low latency follows the display's slip** where no wait for a present holds the loop (2.3, 2.4; with a wait, 2.1 and
-      2.2, the wait keeps the frames that wait few by itself): `DisplaySlipRule`, from the display reports, moves the loop's
+    - **Low latency follows the display's slip** where no wait for a present holds the loop (2.2, 2.4; with a wait, 2.1 and
+      2.3, the wait keeps the frames that wait few by itself): `DisplaySlipRule`, from the display reports, moves the loop's
       plan later by the refreshes the display slipped (the grid's origin, or the vertical blanks the frames are counted in),
       so the frames that would wait start that much later and wait no longer. The frames on their way when the plan moved
       are shown late by the move: no stutter, as one of them was waiting already. **The animation time is not moved** and
@@ -2368,9 +2368,21 @@ pacing by display times beyond the display's slip in major tier 2 (decision 20);
     - **Checked** (the simulation only): the slip tests (`DisplaySlipLoopTests`: a display that holds a frame a refresh,
       both aims, the grid and the vertical blanks, one and two refreshes per frame: low latency back to the time from start
       to display it had, a refresh further behind the clock; smoothness a refresh longer for good; the display one frame off
-      its swap interval in both), the rule's own tests, and the golden runs: the eight runs of 2.1 and 2.2 at two refreshes
+      its swap interval in both), the rule's own tests, and the golden runs: the eight runs of 2.1 and 2.3 at two refreshes
       per frame changed (no present held, every frame still on screen its two refreshes; on the grid the time from a frame's
       start to its display went from two refreshes to one, on the vertical blanks it stayed).
+
+21. **The same sub tier ranking in every major tier**: decided on 2026-10-15 (the user's rule, asked by the first integration:
+    the same number meant other capabilities in another major tier, 1.3 and 3.2 being one pair). A sub tier is a rank, and the
+    ranking is the same in every major tier unless a measurement proves it differs. There is one measurement of the order, of
+    the frame loop on one system: from a frame's start to its display 0.68 of a refresh with vertical blank times (3.2) against
+    0.95 with a wait for a present (3.3), in the runs of those two tiers. The order where the display's side places the frame (the wait
+    first) was reasoning only: major tier 1 has run on no system and major tier 2 has not been measured. So every major tier
+    takes the measured order: **.1 vertical blank times and a wait, .2 vertical blank times, .3 a wait, .4 neither** (in major
+    tier 2, .2 and .4 are with display times). Major tier 3 is as before; 1.2 and 1.3, 2.2 and 2.3 swap (`PacerTier`'s values
+    with them; the names are the same). No set is paced differently or rated another way of placing its frames: a set reaches
+    only one of .2 and .3, as it has the vertical blank times or the wait, and with both it reaches .1. Revisit when major
+    tiers 1 or 2 are measured; the numbers in decision 20 are this decision's.
 
 ## What changes for whom
 

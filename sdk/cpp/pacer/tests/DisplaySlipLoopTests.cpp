@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// EXPERIMENTAL. The second major tier with display times and no wait for a present (2.3, 2.4) on the simulation's display: the
+// EXPERIMENTAL. The second major tier with display times and no wait for a present (2.2, 2.4) on the simulation's display: the
 // display's side places a frame after the one before it, and a refresh the display holds a frame for moves every frame after it.
 // With the aim of smoothness the loop takes the hit (the frames wait a refresh longer); with low latency it starts them a refresh
 // later (DisplaySlipRule). The display stays smooth either way. The simulation only: no system has been measured with it.
