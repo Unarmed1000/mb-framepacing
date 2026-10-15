@@ -1,7 +1,7 @@
 {
   "name": "com.manabattery.framepacing",
   "displayName": "MB Frame Pacing",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "unity": "2021.3",
   "description": "Draws the mb-framepacing frame marker (a QR code carrying the frame index and animation time) into every frame, so a capture of the display output can measure animation error. Includes the SDK's general C# core and marker modules (MB.FramePacing, MB.FramePacing.Marker) and Unity helpers.",
   "author": {
