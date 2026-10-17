@@ -5,6 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="NLog" />
     <ProjectReference Include="..\MB.FramePacing.Capture\MB.FramePacing.Capture.csproj" />
     <ProjectReference Include="..\..\..\sdk\csharp\trace\MB.FramePacing.Trace.csproj" />
   </ItemGroup>
