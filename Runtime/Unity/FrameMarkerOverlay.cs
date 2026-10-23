@@ -127,6 +127,14 @@ namespace MB.FramePacing.Marker.Unity
     public Func<NanosecondTimeDuration> PreferredFrameTimeProvider { get; set; }
 
     /// <summary>
+    /// The refresh period of the display the game works with: the tools compare it with the capture's. Null = the period of
+    /// Screen.currentResolution's refresh rate, 0 when Unity does not know it. Return 0 under variable refresh (there is no one period), and
+    /// the XR display's period on XR platforms. A marker carries at most <see cref="Payload.MaxRefreshPeriod"/>: a longer one is held as
+    /// that.
+    /// </summary>
+    public Func<NanosecondTimeDuration> RefreshPeriodProvider { get; set; }
+
+    /// <summary>
     /// True when nothing animates while this frame is on screen, until the next frame (no pending work after it: an idle screen, a paused
     /// menu): the marker's StaticAfter flag. Null = never.
     /// </summary>
@@ -283,6 +291,7 @@ namespace MB.FramePacing.Marker.Unity
         NanosecondTimeSpan.FromSeconds(AnimationTime()),
         preferredFrameTime: PreferredFrameTimeProvider != null ? PreferredFrameTimeProvider() : DefaultTargetFrameTime(),
         targetFrameTime: TargetFrameTimeProvider != null ? TargetFrameTimeProvider() : DefaultTargetFrameTime(),
+        refreshPeriod: RefreshPeriodProvider != null ? RefreshPeriodProvider() : DefaultRefreshPeriod(),
         intendedDisplayTime: IntendedDisplayTimeProvider != null ? IntendedDisplayTimeProvider() : default,
         cpuStartTime: CpuStartTime(),
         cpuBusy: CpuBusyProvider != null ? CpuBusyProvider() : UnityCpuBusy()
@@ -370,11 +379,7 @@ namespace MB.FramePacing.Marker.Unity
     /// </summary>
     private static NanosecondTimeDuration DefaultTargetFrameTime()
     {
-#if UNITY_2022_2_OR_NEWER
-      double refreshHz = Screen.currentResolution.refreshRateRatio.value;
-#else
-      double refreshHz = Screen.currentResolution.refreshRate;
-#endif
+      double refreshHz = RefreshHz();
       int targetFps = Application.targetFrameRate;
       double fps;
       switch (Application.platform)
@@ -398,6 +403,29 @@ namespace MB.FramePacing.Marker.Unity
       // carries, so nothing outside a long is cast and a rate never reads as on demand
       double nanoseconds = Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / fps);
       return nanoseconds < Payload.MaxFrameTime.Nanoseconds ? NanosecondTimeDuration.FromNanoseconds((long)nanoseconds) : Payload.MaxFrameTime;
+    }
+
+    /// <summary>The refresh period of Screen.currentResolution's refresh rate, rounded to the nearest nanosecond; 0 when Unity does not know it.</summary>
+    private static NanosecondTimeDuration DefaultRefreshPeriod()
+    {
+      double refreshHz = RefreshHz();
+      // No rate (0, or one that is no number) is unknown; the payload holds a period too long for a marker as the longest it carries
+      if (!(refreshHz > 0))
+        return NanosecondTimeDuration.Zero;
+      double nanoseconds = Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / refreshHz);
+      return nanoseconds < Payload.MaxRefreshPeriod.Nanoseconds
+        ? NanosecondTimeDuration.FromNanoseconds((long)nanoseconds)
+        : Payload.MaxRefreshPeriod;
+    }
+
+    /// <summary>Screen.currentResolution's refresh rate in Hz: 0 (or no number) when Unity does not know it.</summary>
+    private static double RefreshHz()
+    {
+#if UNITY_2022_2_OR_NEWER
+      return Screen.currentResolution.refreshRateRatio.value;
+#else
+      return Screen.currentResolution.refreshRate;
+#endif
     }
 
     private MarkerKind Kind()

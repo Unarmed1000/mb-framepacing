@@ -2,12 +2,13 @@
 //* File Description
 //* ----------------
 //* The data every marker carries, in the order of the wire format: the marker kind, the test run, the application's frame index, the flags,
-//* its animation time, the preferred frame time, the frame pacer's target frame time and intended display time, the CPU start time and CPU
-//* busy. Every time is in nanoseconds, in the type that says what it is: a span, a point on the pacer's steady clock, or a duration, which
+//* its animation time, the preferred frame time, the frame pacer's target frame time, the display's refresh period, the frame pacer's
+//* intended display time, the CPU start time and CPU busy. Every time is in nanoseconds, in the type that says what it is: a span, a point on the pacer's steady clock, or a duration, which
 //* is never negative.
 //*
-//* The marker holds its three durations in four bytes each, so a payload holds none longer than a marker can carry: the constructor caps a
-//* longer CPU busy at MaxCpuBusy and a longer frame time at MaxFrameTime (never an error: this runs in a frame loop). So every value of a
+//* The marker holds its four durations in four bytes each, so a payload holds none longer than a marker can carry: the constructor caps a
+//* longer CPU busy at MaxCpuBusy, a longer refresh period at MaxRefreshPeriod and a longer frame time at MaxFrameTime (never an error:
+//* this runs in a frame loop). So every value of a
 //* payload is valid on the wire, and a payload decodes to exactly what was encoded. The kind is one of MarkerKind's: the constructor throws
 //* for another. The flags are kept as given, reserved bits included.
 //*
@@ -22,7 +23,7 @@ namespace MB.FramePacing.Marker
   public readonly struct Payload : IEquatable<Payload>
   {
     /// <summary>The most bytes a payload encodes to (a start marker's): the buffer size for <see cref="FrameMarker.EncodePayload"/>.</summary>
-    public const int MaxEncodedByteCount = 81;
+    public const int MaxEncodedByteCount = 85;
 
     /// <summary>
     /// The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for. The
@@ -36,13 +37,17 @@ namespace MB.FramePacing.Marker
     /// </summary>
     public static readonly NanosecondTimeDuration MaxFrameTime = NanosecondTimeDuration.FromNanoseconds(4_294_967_294);
 
+    /// <summary>The longest refresh period a marker carries, 4.294967295 s. A longer one is held as this.</summary>
+    public static readonly NanosecondTimeDuration MaxRefreshPeriod = NanosecondTimeDuration.FromNanoseconds(4_294_967_295);
+
     /// <summary>The longest CPU busy a marker carries, 4.294967295 s. A longer one is held as this.</summary>
     public static readonly NanosecondTimeDuration MaxCpuBusy = NanosecondTimeDuration.FromNanoseconds(4_294_967_295);
 
     /// <summary>
     /// The payload's fields in the order of the wire format (doc/marker-format.md); the timing fields are optional (0 = unknown). A CPU
-    /// busy longer than <see cref="MaxCpuBusy"/> is held as that, and a frame time longer than <see cref="MaxFrameTime"/> as that unless it
-    /// is <see cref="OnDemandFrameTime"/>. Throws ArgumentOutOfRangeException for a kind that is not a <see cref="MarkerKind"/>.
+    /// busy longer than <see cref="MaxCpuBusy"/> is held as that, a refresh period longer than <see cref="MaxRefreshPeriod"/> as that, and a
+    /// frame time longer than <see cref="MaxFrameTime"/> as that unless it is <see cref="OnDemandFrameTime"/>. Throws
+    /// ArgumentOutOfRangeException for a kind that is not a <see cref="MarkerKind"/>.
     /// </summary>
     public Payload(
       MarkerKind kind,
@@ -52,6 +57,7 @@ namespace MB.FramePacing.Marker
       NanosecondTimeSpan animationTime,
       NanosecondTimeDuration preferredFrameTime = default,
       NanosecondTimeDuration targetFrameTime = default,
+      NanosecondTimeDuration refreshPeriod = default,
       NanosecondTickCount intendedDisplayTime = default,
       NanosecondTickCount cpuStartTime = default,
       NanosecondTimeDuration cpuBusy = default
@@ -68,6 +74,7 @@ namespace MB.FramePacing.Marker
       AnimationTime = animationTime;
       PreferredFrameTime = CappedFrameTime(preferredFrameTime);
       TargetFrameTime = CappedFrameTime(targetFrameTime);
+      RefreshPeriod = NanosecondTimeDuration.Min(refreshPeriod, MaxRefreshPeriod);
       IntendedDisplayTime = intendedDisplayTime;
       CpuStartTime = cpuStartTime;
       CpuBusy = NanosecondTimeDuration.Min(cpuBusy, MaxCpuBusy);
@@ -106,6 +113,13 @@ namespace MB.FramePacing.Marker
     public readonly NanosecondTimeDuration TargetFrameTime;
 
     /// <summary>
+    /// The refresh period of the display the application works with: 16 666 667 ns for 60 Hz, what it gives its pacer or what its swap
+    /// chain reports. The tools compare it with the capture's. 0 = unknown (and under variable refresh); at most
+    /// <see cref="MaxRefreshPeriod"/>.
+    /// </summary>
+    public readonly NanosecondTimeDuration RefreshPeriod;
+
+    /// <summary>
     /// When the frame pacer intends this frame to become visible, on its steady clock (any epoch, the same clock for the whole run).
     /// 0 = unknown.
     /// </summary>
@@ -129,7 +143,19 @@ namespace MB.FramePacing.Marker
     /// and frame index.
     /// </summary>
     public Payload WithKind(MarkerKind kind) =>
-      new Payload(kind, RunId, FrameIndex, Flags, AnimationTime, PreferredFrameTime, TargetFrameTime, IntendedDisplayTime, CpuStartTime, CpuBusy);
+      new Payload(
+        kind,
+        RunId,
+        FrameIndex,
+        Flags,
+        AnimationTime,
+        PreferredFrameTime,
+        TargetFrameTime,
+        RefreshPeriod,
+        IntendedDisplayTime,
+        CpuStartTime,
+        CpuBusy
+      );
 
     public bool Equals(Payload other) =>
       Kind == other.Kind
@@ -139,6 +165,7 @@ namespace MB.FramePacing.Marker
       && AnimationTime == other.AnimationTime
       && PreferredFrameTime == other.PreferredFrameTime
       && TargetFrameTime == other.TargetFrameTime
+      && RefreshPeriod == other.RefreshPeriod
       && IntendedDisplayTime == other.IntendedDisplayTime
       && CpuStartTime == other.CpuStartTime
       && CpuBusy == other.CpuBusy;
@@ -147,7 +174,7 @@ namespace MB.FramePacing.Marker
 
     public override int GetHashCode()
     {
-      // Ten fields: more than HashCode.Combine takes
+      // Eleven fields: more than HashCode.Combine takes
       var hash = new HashCode();
       hash.Add(Kind);
       hash.Add(RunId);
@@ -156,6 +183,7 @@ namespace MB.FramePacing.Marker
       hash.Add(AnimationTime);
       hash.Add(PreferredFrameTime);
       hash.Add(TargetFrameTime);
+      hash.Add(RefreshPeriod);
       hash.Add(IntendedDisplayTime);
       hash.Add(CpuStartTime);
       hash.Add(CpuBusy);
@@ -168,7 +196,7 @@ namespace MB.FramePacing.Marker
 
     /// <summary>Every field, each time as its type writes it, in nanoseconds: "animation 16666667 ns".</summary>
     public override string ToString() =>
-      $"{{{Kind}, run {RunId}, frame {FrameIndex}, flags {Flags}, animation {AnimationTime}, preferred {PreferredFrameTime}, target {TargetFrameTime}, intended {IntendedDisplayTime}, cpu start {CpuStartTime}, cpu busy {CpuBusy}}}";
+      $"{{{Kind}, run {RunId}, frame {FrameIndex}, flags {Flags}, animation {AnimationTime}, preferred {PreferredFrameTime}, target {TargetFrameTime}, refresh {RefreshPeriod}, intended {IntendedDisplayTime}, cpu start {CpuStartTime}, cpu busy {CpuBusy}}}";
 
     /// <summary>
     /// A frame time as a marker carries it: on demand as it is, any other one at most MaxFrameTime, so that only on demand reads as on
