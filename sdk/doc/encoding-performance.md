@@ -14,25 +14,27 @@ in C# a port of it), and is 20 to 40 times faster.
 Release builds, one core of a 4.7 GHz desktop CPU. "Original" is qrcodegen (C++) or its module-by-module port (C#), "own" is the
 module's encoder; both encode the same payloads, a new one every iteration, as an application does every frame.
 
-The payload's own bytes, its CRC-32 included, are a small part of that: 0.17 µs for a frame marker, 0.24 µs for a start marker and
-0.06 µs for a sync marker in C++ (0.14, 0.21 and 0.03 µs in C#).
+The payload's own bytes, its CRC-32 included, are a small part of that: 0.20 µs for a frame marker, 0.27 µs for a start marker and
+0.07 µs for a sync marker in C++ (0.18, 0.25 and 0.05 µs in C#).
 
 | What                                     | Language, compiler | Original |     Own | Faster by |
 | ---------------------------------------- | ------------------ | -------: | ------: | --------: |
-| Main marker (frame, 57 bytes)            | C++, MSVC          |   351 µs |  9.2 µs |       38× |
-| Main marker (start, 81 bytes)            | C++, MSVC          |   354 µs |  9.3 µs |       38× |
-| Sync marker (20 bytes)                   | C++, MSVC          |   109 µs |  4.0 µs |       27× |
-| Main marker (frame, 57 bytes)            | C++, Clang         |   213 µs |  8.8 µs |       24× |
-| Main marker (start, 81 bytes)            | C++, Clang         |   213 µs |  8.8 µs |       24× |
-| Sync marker (20 bytes)                   | C++, Clang         |    66 µs |  3.8 µs |       17× |
-| A whole frame: both markers, as geometry | C++, MSVC          |   492 µs |   20 µs |       25× |
-| Main marker (frame, 57 bytes)            | C#, .NET 10        |   309 µs | 12.5 µs |       25× |
-| Main marker (start, 81 bytes)            | C#, .NET 10        |   334 µs | 13.1 µs |       26× |
-| Sync marker (20 bytes)                   | C#, .NET 10        |    98 µs |  5.6 µs |       18× |
-| A whole frame: both markers, as geometry | C#, .NET 10        |   378 µs |   23 µs |       16× |
+| Main marker (frame, 61 bytes)            | C++, MSVC          |   365 µs | 10.1 µs |       36× |
+| Main marker (start, 85 bytes)            | C++, MSVC          |   373 µs |  9.6 µs |       39× |
+| Sync marker (20 bytes)                   | C++, MSVC          |   111 µs |  4.1 µs |       27× |
+| Main marker (frame, 61 bytes)            | C++, Clang         |   210 µs |  8.7 µs |       24× |
+| Main marker (start, 85 bytes)            | C++, Clang         |   210 µs |  8.4 µs |       25× |
+| Sync marker (20 bytes)                   | C++, Clang         |    65 µs |  3.7 µs |       17× |
+| A whole frame: both markers, as geometry | C++, MSVC          |   484 µs |   22 µs |       22× |
+| Main marker (frame, 61 bytes)            | C#, .NET 10        |   312 µs | 12.8 µs |       24× |
+| Main marker (start, 85 bytes)            | C#, .NET 10        |   306 µs | 12.3 µs |       25× |
+| Sync marker (20 bytes)                   | C#, .NET 10        |    96 µs |  5.2 µs |       19× |
+| A whole frame: both markers, as geometry | C#, .NET 10        |   415 µs |   25 µs |       17× |
 
-The numbers move by a few percent from run to run. The C# frame's original time is the sum of its measured parts (the two encodes
-and the drawing); the others are measured as a whole. C# has no bit counting instructions in .NET Standard 2.1 (which Unity needs), so
+The numbers move by a few percent from run to run (measured again on 2026-10-23, when the marker grew by the refresh period; the
+Clang build is Clang 23's GNU-style driver on Windows). A whole frame's original time is the sum of its measured parts (the
+original's two encodes and the drawing), as the original encoder is no longer built into the library; the others are measured as a
+whole. C# has no bit counting instructions in .NET Standard 2.1 (which Unity needs), so
 its encoder counts bits with plain arithmetic.
 
 ## Where the time went
