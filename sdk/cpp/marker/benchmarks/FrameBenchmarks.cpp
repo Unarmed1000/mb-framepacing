@@ -32,7 +32,7 @@ namespace
     std::array<FM::Vertex, FM::MaxTriangleVertexCount()> mainVertices{};
     std::array<FM::Vertex, FM::MaxTriangleVertexCount()> syncVertices{};
     uint64_t frameIndex = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       const FM::Payload payload = BM::FramePayload(frameIndex++);
       bool generated = FM::GenerateModules(payload, main) && FM::GenerateModules(payload.WithKind(FM::MarkerKind::Sync), sync);
@@ -61,7 +61,7 @@ namespace
     std::array<uint32_t, FM::MaxIndexCount()> mainIndices{};
     std::array<uint32_t, FM::MaxIndexCount()> syncIndices{};
     uint64_t frameIndex = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       const FM::Payload payload = BM::FramePayload(frameIndex++);
       bool generated = FM::GenerateModules(payload, main) && FM::GenerateModules(payload.WithKind(FM::MarkerKind::Sync), sync);

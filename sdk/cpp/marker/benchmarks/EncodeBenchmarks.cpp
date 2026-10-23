@@ -27,7 +27,7 @@ namespace
     const FM::StartMetadata metadata = BM::Metadata();
     std::array<uint8_t, FM::Payload::MaxEncodedByteCount> bytes{};
     uint64_t frameIndex = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       std::size_t count = FM::EncodePayload(BM::FramePayload(frameIndex++).WithKind(kind), metadata, bytes);
       benchmark::DoNotOptimize(count);
@@ -43,7 +43,7 @@ namespace
     const FM::StartMetadata metadata = BM::Metadata();
     FM::ModuleMatrix matrix;
     uint64_t frameIndex = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       bool generated = FM::GenerateModules(BM::FramePayload(frameIndex++).WithKind(kind), matrix, metadata);
       benchmark::DoNotOptimize(generated);
@@ -62,7 +62,7 @@ namespace
     std::array<uint8_t, qrcodegen_BUFFER_LEN_FOR_VERSION(6)> dataAndTemp{};
     std::array<uint8_t, qrcodegen_BUFFER_LEN_FOR_VERSION(6)> symbol{};
     uint64_t frameIndex = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       const std::size_t count = FM::EncodePayload(BM::FramePayload(frameIndex++).WithKind(kind), metadata, dataAndTemp);
       bool encoded =

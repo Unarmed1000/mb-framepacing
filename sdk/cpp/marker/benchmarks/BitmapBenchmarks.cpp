@@ -43,7 +43,7 @@ namespace
     const int32_t size = options.MarkerSizePx();
     std::vector<uint8_t> pixels(static_cast<std::size_t>(size) * static_cast<std::size_t>(size) *
                                 static_cast<std::size_t>(FM::PixelFormatUtil::BytesPerPixel(format)));
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       bool drawn = FM::ModulesToBitmap(matrix, options, {0, 0}, pixels, size, size, format);
       benchmark::DoNotOptimize(drawn);

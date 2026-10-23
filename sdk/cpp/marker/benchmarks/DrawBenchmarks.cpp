@@ -31,7 +31,7 @@ namespace
     const FM::Options options;
     std::array<FM::MarkerQuad, FM::MaxQuadCount()> quads{};
     std::size_t count = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       count = FM::ModulesToQuads(matrix, options, Origin, quads);
       benchmark::DoNotOptimize(count);
@@ -49,7 +49,7 @@ namespace
     const FM::Options options;
     std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices{};
     std::size_t count = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       count = FM::ModulesToTriangles(matrix, options, Origin, vertices);
       benchmark::DoNotOptimize(count);
@@ -68,7 +68,7 @@ namespace
     std::array<FM::Vertex, FM::MaxIndexedVertexCount()> vertices{};
     std::array<uint32_t, FM::MaxIndexCount()> indices{};
     FM::IndexedCount count;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       count = FM::ModulesToIndexed(matrix, options, Origin, vertices, indices);
       benchmark::DoNotOptimize(count);
@@ -86,7 +86,7 @@ namespace
     const FM::MarkerKind kind = BM::KindOf(state);
     const FM::Options options;
     std::array<FM::Vertex, FM::MaxGridVertexCount()> vertices{};
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       std::size_t count = FM::GridVertices(kind, options, Origin, vertices);
       benchmark::DoNotOptimize(count);
@@ -102,7 +102,7 @@ namespace
     const FM::ModuleMatrix matrix = BM::Encode(kind);
     std::array<uint32_t, FM::MaxIndexCount()> indices{};
     std::size_t count = 0;
-    for ([[maybe_unused]] auto iteration : state)
+    for ([[maybe_unused]] const auto iteration : state)
     {
       count = FM::ModulesToGridIndices(matrix, indices);
       benchmark::DoNotOptimize(count);
