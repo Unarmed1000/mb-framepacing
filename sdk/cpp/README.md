@@ -112,15 +112,19 @@ faster still.
   an animation clock in seconds). Every time in the payload is in nanoseconds.
 - **Frame pacing (optional):** `PreferredFrameTime` (a `NanosecondTimeDuration`: the interval the application wants to run at; it differs
   from the target only while the pacer runs slower than wanted), `TargetFrameTime` (a `NanosecondTimeDuration`: the interval the pacer aims
-  for, `16'666'667` ns for 60 fps) and `IntendedDisplayTime` (a `NanosecondTickCount`: when the pacer intends the frame to be shown on its
+  for, `16'666'667` ns for 60 fps), `RefreshPeriod` (a `NanosecondTimeDuration`: the refresh period of the display the application works
+  with, what it gives its pacer or what its swap chain reports, `16'666'667` ns for 60 Hz; the tools compare it with the capture's;
+  `0` under variable refresh) and `IntendedDisplayTime` (a `NanosecondTickCount`: when the pacer intends the frame to be shown on its
   steady clock, any epoch; the SDK never reads a clock: `NanosecondTickCount::FromNanoseconds`, `NanosecondTickCount::FromCounter` or
   `core/time/ChronoConversion.hpp` convert yours). `0` = unknown, `Payload::OnDemandFrameTime` = frames only when something changes.
+  The constructor takes them in this order, after the animation time: the refresh period comes after the target frame time, so check
+  the order of a call that passes `{}` for the fields it leaves out.
 - **CPU start time and CPU busy (optional):** `CpuStartTime` (a `NanosecondTickCount`: when the CPU started working on the frame, on the
   same clock, PresentMon's `CPUStartTime`) and `CpuBusy` (a `NanosecondTimeDuration`: how long until Present, PresentMon's `MsCPUBusy`).
   `0` = unknown.
-- **A duration is never negative and never too long for the marker:** the marker carries its three durations in four bytes each, so a
-  payload holds a CPU busy of at most `Payload::MaxCpuBusy` (4.294967295 s) and a frame time of at most `Payload::MaxFrameTime`
-  (4.294967294 s); a longer one is held as that, never an error.
+- **A duration is never negative and never too long for the marker:** the marker carries its four durations in four bytes each, so a
+  payload holds a CPU busy of at most `Payload::MaxCpuBusy` and a refresh period of at most `Payload::MaxRefreshPeriod`
+  (4.294967295 s), and a frame time of at most `Payload::MaxFrameTime` (4.294967294 s); a longer one is held as that, never an error.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind::SequenceStart`, encoded with its metadata
   (`GenerateModules(payload, matrix, {utcTicks, sequenceId})`), and a payload of kind `MarkerKind::SequenceEnd`, each shown for a few
   frames. The start time is the one time that is not in nanoseconds: C# `DateTime` UTC ticks of 100 ns (`ToDateTimeTicks` of
@@ -191,7 +195,7 @@ The times are typed, and every one is in nanoseconds: points in time are `Nanose
 (`IntendedDisplayTime`, `CpuStartTime`). A length of time is a `NanosecondTimeDuration`, which is never negative: a frame's
 `TargetFrameTime`, `PreferredFrameTime` and `FrameTime`, the summary's `CapturePeriod`, `MeasurementResolution` and
 `ErrorThreshold`, a run's pacing `RefreshPeriod` and `TargetFrameTime`, and the marker's own durations (`MarkerTargetFrameTime`,
-`MarkerPreferredFrameTime`, `CpuBusy`: 32 bits in the marker and in the file), as the marker's `Payload` returns them; a frame time
+`MarkerPreferredFrameTime`, `MarkerRefreshPeriod`, `CpuBusy`: 32 bits in the marker and in the file), as the marker's `Payload` returns them; a frame time
 of `Payload::OnDemandFrameTime` is a frame presented on demand. What can go either way is a `NanosecondTimeSpan`: `AnimationTime`,
 `AnimationDelta`, `AnimationError`, `PacingError`, `PredictionError`, `Lateness`, `Drift`, `CpuWait`, a camera capture's
 `ScanoutDelay` (the sync marker can be seen before the main marker decodes), and `DisplayDelta` and `OnScreen` (the display time

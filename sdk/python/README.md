@@ -78,6 +78,7 @@ payload = Payload(
     seconds_to_ns(animation_seconds),
     preferred_frame_ns=16_666_667,  # the application wants 60 fps
     target_frame_ns=33_333_333,  # the pacer runs at 30 fps for now
+    refresh_period_ns=16_666_667,  # the display the application works with: 60 Hz
     intended_display_ns=intended_display_ns,  # the pacer's aim, on time.monotonic_ns()'s clock
     cpu_start_ns=cpu_start_ns,
     cpu_busy_ns=time.monotonic_ns() - cpu_start_ns,
@@ -96,13 +97,16 @@ payload = Payload(
   slower than wanted), the interval the pacer aims for (`16_666_667` for 60 fps) and when it intends the frame to be shown
   (nanoseconds on its steady clock, any epoch). All default to `0` (unknown); `ON_DEMAND_FRAME_NS` = frames only when something
   changes.
+- **Refresh period (optional):** `refresh_period_ns` carries the refresh period of the display the application works with, what it
+  gives its pacer or what its swap chain reports (`16_666_667` for 60 Hz); the tools compare it with the capture's. It defaults to
+  `0` (unknown), which is also what to write under variable refresh.
 - **CPU start time and CPU busy (optional):** `cpu_start_ns` and `cpu_busy_ns` carry when the CPU started working on the frame
   (on the same steady clock as the intended display time, PresentMon's `CPUStartTime`) and how long it worked on it before
   presenting it (from the CPU start time until Present is called, measured as the marker is drawn, PresentMon's `MsCPUBusy`; it
   may span several refreshes and does not include the GPU's work), in nanoseconds. Both default to `0` (unknown).
-- **The longest durations:** the marker holds the two frame times and CPU busy in four bytes each, so a `Payload` holds none
-  longer than a marker can carry: a longer frame time becomes `MAX_FRAME_NS` (4.294967294 s) and a longer CPU busy
-  `MAX_CPU_BUSY_NS` (4.294967295 s), never an error, and a payload decodes to exactly what was encoded. A negative duration, or a
+- **The longest durations:** the marker holds the two frame times, the refresh period and CPU busy in four bytes each, so a
+  `Payload` holds none longer than a marker can carry: a longer frame time becomes `MAX_FRAME_NS` (4.294967294 s), a longer refresh
+  period `MAX_REFRESH_PERIOD_NS` and a longer CPU busy `MAX_CPU_BUSY_NS` (4.294967295 s), never an error, and a payload decodes to exactly what was encoded. A negative duration, or a
   time outside signed 64 bits, is a `ValueError` when the payload is encoded.
 - **Start and end:** bracket the part to measure with a payload of kind `MarkerKind.SEQUENCE_START`, encoded with its metadata
   (`generate_modules(payload, StartMetadata(utc_ticks, sequence_id))`), and a payload of kind `MarkerKind.SEQUENCE_END`, each shown

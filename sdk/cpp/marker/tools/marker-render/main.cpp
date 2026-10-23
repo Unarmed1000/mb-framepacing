@@ -5,7 +5,7 @@
 // Used to produce the golden images the C# decoder tests consume (test-data/markers).
 //
 //   marker-render --frame <u64> --animation-ns <i64> [--run <u32>] [--kind frame|start|end|sync] [--intended-ns <i64>]
-//                 [--target-ns <u32>] [--cpu-start-ns <i64>] [--cpu-busy-ns <u32>] [--preferred-ns <u32>]
+//                 [--target-ns <u32>] [--refresh-ns <u32>] [--cpu-start-ns <i64>] [--cpu-busy-ns <u32>] [--preferred-ns <u32>]
 //                 [--flags <0-255>] [--utc-ticks <i64>]
 //                 [--sequence-id <text> | --sequence-id-hex <hex>] [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]
 //                 [--background <0-255>] -o <file.pgm>
@@ -192,8 +192,8 @@ namespace
   //! text, empty and all 0xFF sequence ids; both symbol versions use every mask). Other implementations of the marker (C#, Python) must
   //! reproduce every row exactly.
   //! Columns, the payload's in the order of the wire format: kind, run id, frame index, flags (the byte, reserved bits included),
-  //! animation ticks, preferred frame ticks, target frame ticks, intended display ticks, CPU start ticks, CPU busy ticks; then start UTC
-  //! ticks, sequence id (32 hex digits, start markers only), symbol size, modules (hex): row major, one bit per module (1 = dark), most
+  //! animation ticks, preferred frame ticks, target frame ticks, refresh period ticks, intended display ticks, CPU start ticks, CPU busy ticks; then
+  //! start UTC ticks, sequence id (32 hex digits, start markers only), symbol size, modules (hex): row major, one bit per module (1 = dark), most
   //! significant bit first, the last byte zero padded.
   void WriteModuleDigest(const std::filesystem::path& directory)
   {
@@ -204,8 +204,8 @@ namespace
       throw std::runtime_error("Failed to create modules.csv in '" + directory.string() + "'");
     }
     // The payload's columns in the order of the wire format
-    digest << "kind,runId,frameIndex,flags,animationNs,preferredFrameNs,targetFrameNs,intendedDisplayNs,cpuStartNs,cpuBusyNs,"
-              "startUtcTicks,sequenceIdHex,size,modulesHex\n";
+    digest << "kind,runId,frameIndex,flags,animationNs,preferredFrameNs,targetFrameNs,refreshPeriodNs,intendedDisplayNs,cpuStartNs,"
+              "cpuBusyNs,startUtcTicks,sequenceIdHex,size,modulesHex\n";
 
     // "mb-frame": with it both symbol versions (2 and 6) use all eight masks in these rows. Check that again when the payload's bytes
     // change (the mask is in a symbol's format bits), and take the next seed that does when it no longer holds
@@ -224,8 +224,10 @@ namespace
       const FP::NanosecondTimeDuration preferredFrameTime =
         FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu));
       const auto flags = static_cast<FM::MarkerFlags>(NextRandom(state) & 0xFFu);
-      const FM::Payload payload(kind, runId, frameIndex, flags, animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime,
-                                cpuBusy);
+      const FP::NanosecondTimeDuration refreshPeriod =
+        FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(NextRandom(state) & 0xFFFFFFFFu));
+      const FM::Payload payload(kind, runId, frameIndex, flags, animationTime, preferredFrameTime, targetFrameTime, refreshPeriod,
+                                intendedDisplayTime, cpuStartTime, cpuBusy);
       FM::StartMetadata start;
       if (payload.Kind() == FM::MarkerKind::SequenceStart)
       {
@@ -266,8 +268,9 @@ namespace
       digest << static_cast<uint32_t>(payload.Kind()) << ',' << payload.RunId() << ',' << payload.FrameIndex() << ','
              << static_cast<uint32_t>(payload.Flags()) << ',' << payload.AnimationTime().Nanoseconds() << ','
              << payload.PreferredFrameTime().Nanoseconds() << ',' << payload.TargetFrameTime().Nanoseconds() << ','
-             << payload.IntendedDisplayTime().Nanoseconds() << ',' << payload.CpuStartTime().Nanoseconds() << ',' << payload.CpuBusy().Nanoseconds()
-             << ',' << start.UtcTicks << ',' << SequenceIdHex(payload.Kind(), start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
+             << payload.RefreshPeriod().Nanoseconds() << ',' << payload.IntendedDisplayTime().Nanoseconds() << ','
+             << payload.CpuStartTime().Nanoseconds() << ',' << payload.CpuBusy().Nanoseconds() << ',' << start.UtcTicks << ','
+             << SequenceIdHex(payload.Kind(), start.Id) << ',' << matrix.Size() << ',' << ToHex(bits) << '\n';
     }
   }
 
@@ -290,33 +293,36 @@ namespace
       {{FM::MarkerKind::Frame, 1u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{16'666'667}}, {}},
       {{FM::MarkerKind::Frame, 1u, 123'456'789u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{3'600'000'000'000},
         FP::NanosecondTimeDuration::FromNanoseconds(16'666'667), FP::NanosecondTimeDuration::FromNanoseconds(33'333'333),
-        FP::NanosecondTickCount{98'765'432'100'000}, FP::NanosecondTickCount{98'765'398'766'667},
-        FP::NanosecondTimeDuration::FromNanoseconds(12'345'678)},
+        FP::NanosecondTimeDuration::FromNanoseconds(16'666'667), FP::NanosecondTickCount{98'765'432'100'000},
+        FP::NanosecondTickCount{98'765'398'766'667}, FP::NanosecondTimeDuration::FromNanoseconds(12'345'678)},
        {}},
       {{FM::MarkerKind::Frame, 2u, 42u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{-1}}, {}},
       {{FM::MarkerKind::Frame, 3u, 7u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{std::numeric_limits<int64_t>::min()}}, {}},
       {{FM::MarkerKind::Frame, std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint64_t>::max(), static_cast<FM::MarkerFlags>(0xFFu),
         FP::NanosecondTimeSpan{std::numeric_limits<int64_t>::max()}, FM::Payload::OnDemandFrameTime, FM::Payload::OnDemandFrameTime,
-        FP::NanosecondTickCount{std::numeric_limits<int64_t>::min()}, FP::NanosecondTickCount{std::numeric_limits<int64_t>::max()},
-        FM::Payload::MaxCpuBusy},
+        FM::Payload::MaxRefreshPeriod, FP::NanosecondTickCount{std::numeric_limits<int64_t>::min()},
+        FP::NanosecondTickCount{std::numeric_limits<int64_t>::max()}, FM::Payload::MaxCpuBusy},
        {}},
       {{FM::MarkerKind::Frame, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{0x1112131415161718},
         FP::NanosecondTimeDuration::FromNanoseconds(0x71727374), FP::NanosecondTimeDuration::FromNanoseconds(0x41424344),
-        FP::NanosecondTickCount{0x3132333435363738}, FP::NanosecondTickCount{0x5152535455565758},
-        FP::NanosecondTimeDuration::FromNanoseconds(0x61626364)},
+        FP::NanosecondTimeDuration::FromNanoseconds(0x81828384), FP::NanosecondTickCount{0x3132333435363738},
+        FP::NanosecondTickCount{0x5152535455565758}, FP::NanosecondTimeDuration::FromNanoseconds(0x61626364)},
        {}},
       // Start and end markers carry the frame's values too
       {{FM::MarkerKind::SequenceStart, 5u, 600u, FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{10'000'000'000},
-        FP::NanosecondTimeDuration::FromNanoseconds(1'000'000'000), FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTickCount{0},
-        FP::NanosecondTickCount{0}, FP::NanosecondTimeDuration::FromNanoseconds(8'000'000)},
+        FP::NanosecondTimeDuration::FromNanoseconds(1'000'000'000), FP::NanosecondTimeDuration::FromNanoseconds(0),
+        FP::NanosecondTimeDuration::FromNanoseconds(16'666'667), FP::NanosecondTickCount{0}, FP::NanosecondTickCount{0},
+        FP::NanosecondTimeDuration::FromNanoseconds(8'000'000)},
        {0, TextSequenceId("golden-run")}},
       {{FM::MarkerKind::SequenceStart, 6u, 601u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{10'016'666'667},
-        FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTickCount{0},
-        FP::NanosecondTickCount{0}, FP::NanosecondTimeDuration::FromNanoseconds(12'000'000)},
+        FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTimeDuration::FromNanoseconds(0),
+        FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTickCount{0}, FP::NanosecondTickCount{0},
+        FP::NanosecondTimeDuration::FromNanoseconds(12'000'000)},
        {GoldenStartUtcTicks, GoldenBytesId}},
       {{FM::MarkerKind::SequenceEnd, 5u, 900u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{15'000'000'000},
-        FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTickCount{0},
-        FP::NanosecondTickCount{0}, FP::NanosecondTimeDuration::FromNanoseconds(8'000'000)},
+        FP::NanosecondTimeDuration::FromNanoseconds(0), FP::NanosecondTimeDuration::FromNanoseconds(0),
+        FP::NanosecondTimeDuration::FromNanoseconds(16'666'667), FP::NanosecondTickCount{0}, FP::NanosecondTickCount{0},
+        FP::NanosecondTimeDuration::FromNanoseconds(8'000'000)},
        {}},
       {{FM::MarkerKind::Sync, 0x21222324u, 0x0102030405060708u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}}, {}},
     }};
@@ -328,7 +334,7 @@ namespace
       throw std::runtime_error("Failed to create manifest in '" + directory.string() + "'");
     }
     // The payload's columns in the order of the wire format
-    manifest << "file,kind,runId,frameIndex,flags,animationNs,preferredFrameNs,targetFrameNs,intendedDisplayNs,cpuStartNs,"
+    manifest << "file,kind,runId,frameIndex,flags,animationNs,preferredFrameNs,targetFrameNs,refreshPeriodNs,intendedDisplayNs,cpuStartNs,"
                 "cpuBusyNs,startUtcTicks,sequenceIdHex,moduleSizePx,quietZoneModules,originX,originY,width,height\n";
 
     for (std::size_t payloadIndex = 0; payloadIndex < Cases.size(); ++payloadIndex)
@@ -355,9 +361,10 @@ namespace
         manifest << fileName << ',' << static_cast<uint32_t>(request.Payload.Kind()) << ',' << request.Payload.RunId() << ','
                  << request.Payload.FrameIndex() << ',' << static_cast<uint32_t>(request.Payload.Flags()) << ','
                  << request.Payload.AnimationTime().Nanoseconds() << ',' << request.Payload.PreferredFrameTime().Nanoseconds() << ','
-                 << request.Payload.TargetFrameTime().Nanoseconds() << ',' << request.Payload.IntendedDisplayTime().Nanoseconds() << ','
-                 << request.Payload.CpuStartTime().Nanoseconds() << ',' << request.Payload.CpuBusy().Nanoseconds() << ',' << request.Start.UtcTicks
-                 << ',' << SequenceIdHex(request.Payload.Kind(), request.Start.Id) << ',' << request.Options.ModuleSizePx() << ','
+                 << request.Payload.TargetFrameTime().Nanoseconds() << ',' << request.Payload.RefreshPeriod().Nanoseconds() << ','
+                 << request.Payload.IntendedDisplayTime().Nanoseconds() << ',' << request.Payload.CpuStartTime().Nanoseconds() << ','
+                 << request.Payload.CpuBusy().Nanoseconds() << ',' << request.Start.UtcTicks << ','
+                 << SequenceIdHex(request.Payload.Kind(), request.Start.Id) << ',' << request.Options.ModuleSizePx() << ','
                  << request.Options.QuietZoneModules() << ',' << request.Origin.X << ',' << request.Origin.Y << ',' << image.Width << ','
                  << image.Height << '\n';
       }
@@ -369,7 +376,7 @@ namespace
     std::cout << "Usage:\n"
                  "  marker-render --frame <u64> --animation-ns <i64> [--run <u32>] [--kind frame|start|end|sync]\n"
                  "                [--intended-ns <i64>] [--target-ns <u32>] [--cpu-start-ns <i64>] [--cpu-busy-ns <u32>]\n"
-                 "                [--preferred-ns <u32>] [--flags <0-255>]\n"
+                 "                [--refresh-ns <u32>] [--preferred-ns <u32>] [--flags <0-255>]\n"
                  "                [--utc-ticks <i64>] [--sequence-id <text, 1-16 printable ASCII> | --sequence-id-hex <32 hex digits>]\n"
                  "                [--module <px>] [--quiet <modules>] [--canvas <W>x<H>] [--origin <X>,<Y>]\n"
                  "                [--background <0-255>] -o <file.pgm>\n"
@@ -395,6 +402,7 @@ int main(int argc, char* argv[])
     FP::NanosecondTimeSpan animationTime;
     FP::NanosecondTimeDuration preferredFrameTime;
     FP::NanosecondTimeDuration targetFrameTime;
+    FP::NanosecondTimeDuration refreshPeriod;
     FP::NanosecondTickCount intendedDisplayTime;
     FP::NanosecondTickCount cpuStartTime;
     FP::NanosecondTimeDuration cpuBusy;
@@ -432,6 +440,10 @@ int main(int argc, char* argv[])
       else if (arg == "--target-ns")
       {
         targetFrameTime = FP::NanosecondTimeDuration::FromNanoseconds(ParseNumber<uint32_t>(next(), arg));
+      }
+      else if (arg == "--refresh-ns")
+      {
+        refreshPeriod = FP::NanosecondTimeDuration::FromNanoseconds(ParseNumber<uint32_t>(next(), arg));
       }
       else if (arg == "--cpu-start-ns")
       {
@@ -542,8 +554,8 @@ int main(int argc, char* argv[])
     {
       throw std::invalid_argument("Invalid module size or quiet zone");
     }
-    request.Payload =
-      FM::Payload(kind, runId, frameIndex, flags, animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime, cpuBusy);
+    request.Payload = FM::Payload(kind, runId, frameIndex, flags, animationTime, preferredFrameTime, targetFrameTime, refreshPeriod,
+                                  intendedDisplayTime, cpuStartTime, cpuBusy);
     request.Options = FM::Options(moduleSize, quietZone);
     WritePgm(outputPath, Render(request));
     return 0;

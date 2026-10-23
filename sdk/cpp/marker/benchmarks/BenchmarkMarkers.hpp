@@ -37,6 +37,7 @@ namespace MB::FramePacing::Marker::BenchmarkMarkers
             NanosecondTimeSpan(offset),
             FrameTime,
             FrameTime,
+            FrameTime,
             NanosecondTickCount(3'600'000'000'000 + offset),
             NanosecondTickCount(3'599'990'000'000 + offset),
             NanosecondTimeDuration::FromNanoseconds(8'000'000)};

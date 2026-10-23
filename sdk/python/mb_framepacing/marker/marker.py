@@ -45,8 +45,8 @@ from .structures import (
 from .third_party.qrcodegen import encode as _encode_qr
 
 # Grouped: the format, which run and frame, what the frame shows, the frame pacing, the CPU's work. Every time is in nanoseconds: the
-# animation, intended display and CPU start time eight bytes (signed), the two frame times and CPU busy four (unsigned)
-_HEADER = struct.Struct("<2sBBIQBqIIqqI")
+# animation, intended display and CPU start time eight bytes (signed), the two frame times, the refresh period and CPU busy four (unsigned)
+_HEADER = struct.Struct("<2sBBIQBqIIIqqI")
 _SYNC = struct.Struct("<2sBBIQ")
 _START_FIELDS = struct.Struct(f"<q{SEQUENCE_ID_BYTE_COUNT}s")
 _CRC = struct.Struct("<I")
@@ -94,6 +94,7 @@ def encode_payload(payload: Payload, metadata: StartMetadata | None = None) -> b
             payload.animation_ns,
             payload.preferred_frame_ns,
             payload.target_frame_ns,
+            payload.refresh_period_ns,
             payload.intended_display_ns,
             payload.cpu_start_ns,
             payload.cpu_busy_ns,
@@ -126,8 +127,8 @@ def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | No
         return None
     if kind == MarkerKind.SYNC:
         return Payload(MarkerKind.SYNC, run_id, frame_index, MarkerFlags.NO_FLAGS, 0), None
-    fields = cast(tuple[bytes, int, int, int, int, int, int, int, int, int, int, int], _HEADER.unpack_from(data))
-    _, _, _, _, _, flags, animation_ns, preferred_frame_ns, target_frame_ns, intended_display_ns, cpu_start_ns, cpu_busy_ns = fields
+    fields = cast(tuple[bytes, int, int, int, int, int, int, int, int, int, int, int, int], _HEADER.unpack_from(data))
+    _, _, _, _, _, flags, animation_ns, preferred_frame_ns, target_frame_ns, refresh_period_ns, intended_display_ns, cpu_start_ns, cpu_busy_ns = fields
     payload = Payload(
         MarkerKind(kind),
         run_id,
@@ -137,6 +138,7 @@ def try_decode_payload(data: bytes) -> tuple[Payload, StartMetadata | None] | No
         animation_ns,
         preferred_frame_ns=preferred_frame_ns,
         target_frame_ns=target_frame_ns,
+        refresh_period_ns=refresh_period_ns,
         intended_display_ns=intended_display_ns,
         cpu_start_ns=cpu_start_ns,
         cpu_busy_ns=cpu_busy_ns,

@@ -137,7 +137,16 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.That((check.ClockOffsetNs, check.StartDifferentFrames, check.BusyDifferentFrames), Is.EqualTo((offset, 0, 0)));
       Assert.That(
         check.Annotations,
-        Is.EqualTo(new[] { ("animationNs", 379, 4), ("markerPreferredNs", 194, 0), ("markerTargetNs", 194, 0), ("intendedDisplayNs", 379, 0) })
+        Is.EqualTo(
+          new[]
+          {
+            ("animationNs", 379, 4),
+            ("markerPreferredNs", 194, 0),
+            ("markerTargetNs", 194, 0),
+            ("markerRefreshPeriodNs", 194, 0),
+            ("intendedDisplayNs", 379, 0),
+          }
+        )
       );
 
       // What a trace has to go by says whether it has the record

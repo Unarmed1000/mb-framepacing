@@ -233,6 +233,7 @@ namespace
       {"targetNs", [](const FD::FrameRow& r) { return Nanoseconds(r.TargetFrameTime); }},
       {"markerPreferredNs", [](const FD::FrameRow& r) { return Nanoseconds(r.MarkerPreferredFrameTime); }},
       {"preferredNs", [](const FD::FrameRow& r) { return Nanoseconds(r.PreferredFrameTime); }},
+      {"markerRefreshPeriodNs", [](const FD::FrameRow& r) { return Nanoseconds(r.MarkerRefreshPeriod); }},
       {"pacingErrorNs", [](const FD::FrameRow& r) { return Nanoseconds(r.PacingError); }},
       {"predictionErrorNs", [](const FD::FrameRow& r) { return Nanoseconds(r.PredictionError); }},
       {"latenessNs", [](const FD::FrameRow& r) { return Nanoseconds(r.Lateness); }},

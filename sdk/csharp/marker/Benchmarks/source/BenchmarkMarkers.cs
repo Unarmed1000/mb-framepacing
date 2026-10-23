@@ -39,6 +39,7 @@ namespace MB.FramePacing.Marker.Benchmarks
         new NanosecondTimeSpan(offset),
         g_frameTime,
         g_frameTime,
+        g_frameTime,
         new NanosecondTickCount(3_600_000_000_000 + offset),
         new NanosecondTickCount(3_599_990_000_000 + offset),
         NanosecondTimeDuration.FromNanoseconds(8_000_000)

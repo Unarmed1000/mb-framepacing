@@ -10,7 +10,8 @@ frame until the markers are located, then the locked decoder), so they give the 
 
 All numbers are little endian. Times are whole nanoseconds. A file from before the nanoseconds counted its times in ticks of 100 ns
 in the same bytes and under the same format version: it reads without an error and a hundred times too small, and the markers in
-its records are in ticks too. Record such a capture again.
+its records are in ticks too. Record such a capture again. So too a capture whose markers are from before the refresh period
+([marker format](marker-format.md)): their bytes have a length the decoders refuse.
 
 The SDK's data modules ([the SDK](../README.md#the-data-module)) read this file in C#, Python and C++; the C# module also writes it, and the tools
 write through it.
@@ -60,7 +61,7 @@ marker, and with a region given as one rectangle, there is one region and the se
 | 144    | 112  | The second marker's encoded bytes (the sync marker, or a camera's second zone), then 0s                       |
 
 The two slots are equal, and each holds any payload a main marker's QR code can carry (106 bytes; the longest today, a start
-marker, is 81), so a field added to the markers does not change the records. A reader refuses a file whose header gives another
+marker, is 85), so a field added to the markers does not change the records. A reader refuses a file whose header gives another
 record size.
 
 The first 28 bytes have the layout of a `frames.mbfc` record header, so a record's capture part is the same in both files. A capture

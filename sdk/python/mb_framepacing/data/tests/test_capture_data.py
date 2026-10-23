@@ -129,7 +129,7 @@ class CaptureDataTests(unittest.TestCase):
     def test_a_records_markers_decode(self) -> None:
         main = encode_payload(Payload(MarkerKind.SEQUENCE_START, 7, 12, MarkerFlags.STATIC_AFTER, 34), StartMetadata(5, SequenceId.from_text("run 7")))
         sync = encode_payload(Payload(MarkerKind.SYNC, 7, 11, MarkerFlags.NO_FLAGS, 0))
-        self.assertEqual((len(main), len(sync)), (81, 20), "the longest and the shortest marker")
+        self.assertEqual((len(main), len(sync)), (85, 20), "the longest and the shortest marker")
         record = CaptureDataRecord.parse(record_bytes(5, DEVICE_NS, 2, main, sync))
         decoded = record.try_decode_main()
         assert decoded is not None

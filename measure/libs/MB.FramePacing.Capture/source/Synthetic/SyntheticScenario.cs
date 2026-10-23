@@ -146,7 +146,7 @@ namespace MB.FramePacing.Capture.Synthetic
           : displayTime < runEnd ? MarkerKind.Frame
           : MarkerKind.SequenceEnd;
         // The pacer's clock has its own epoch: intended display times never start at 0 (which means unknown). The game aims for one frame
-        // per refresh, and that is also the rate it prefers
+        // per refresh, and that is also the rate it prefers; it knows the display's refresh period
         var payload = o.PacingInformation
           ? new MarkerPayload(
             kind,
@@ -156,6 +156,7 @@ namespace MB.FramePacing.Capture.Synthetic
             animationTime,
             PreferredFrameTime: refresh,
             TargetFrameTime: refresh,
+            RefreshPeriod: refresh,
             IntendedDisplayTime: intendedDisplayTime,
             CpuStartTime: cpuStartTime,
             CpuBusy: cpuBusy

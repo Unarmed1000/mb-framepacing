@@ -18,13 +18,12 @@ namespace MB::FramePacing::Data
   //! nanoseconds: points in time are NanosecondTickCounts, on the capture's clock (FirstSeenTime, LastSeenTime,
   //! MainMarkerFirstSeenTime) or the frame pacer's (IntendedDisplayTime, CpuStartTime). A length of time is a NanosecondTimeDuration,
   //! which is never negative: TargetFrameTime, PreferredFrameTime and FrameTime, and the marker's own durations (MarkerTargetFrameTime,
-  //! MarkerPreferredFrameTime, CpuBusy: 32 bits in the marker and in the file), as the marker library's Payload returns them. What can
-  //! go either way is a NanosecondTimeSpan: AnimationTime, AnimationDelta, AnimationError, Drift, PacingError, PredictionError,
-  //! Lateness, CpuWait and ScanoutDelay (the sync marker can be seen before the main marker decodes), and OnScreen and DisplayDelta,
-  //! which are the difference of two sightings: a camera can time a frame after the next one's sighting, and the steps then still add
-  //! up to the time that passed. FirstSeenTime is the display time, DisplayDelta the display time step, AnimationError the animation
-  //! time step minus the display time step. The pacing and CPU fields come from the markers; the last two are EXPERIMENTAL camera
-  //! captures' only.
+  //! MarkerPreferredFrameTime, MarkerRefreshPeriod, CpuBusy: 32 bits in the marker and in the file), as the marker library's Payload returns them.
+  //! What can go either way is a NanosecondTimeSpan: AnimationTime, AnimationDelta, AnimationError, Drift, PacingError, PredictionError, Lateness,
+  //! CpuWait and ScanoutDelay (the sync marker can be seen before the main marker decodes), and OnScreen and DisplayDelta, which are the difference
+  //! of two sightings: a camera can time a frame after the next one's sighting, and the steps then still add up to the time that passed.
+  //! FirstSeenTime is the display time, DisplayDelta the display time step, AnimationError the animation time step minus the display time step. The
+  //! pacing and CPU fields come from the markers; the last two are EXPERIMENTAL camera captures' only.
   struct FrameRow
   {
     int32_t Segment{0};
@@ -50,6 +49,8 @@ namespace MB::FramePacing::Data
     std::optional<NanosecondTimeDuration> MarkerPreferredFrameTime;
     //! The preferred frame time the late share is measured against, in whole refreshes; empty on demand.
     std::optional<NanosecondTimeDuration> PreferredFrameTime;
+    //! The refresh period of the display the application works with, from the marker.
+    std::optional<NanosecondTimeDuration> MarkerRefreshPeriod;
     std::optional<NanosecondTimeSpan> PacingError;
     std::optional<NanosecondTimeSpan> PredictionError;
     std::optional<NanosecondTimeSpan> Lateness;

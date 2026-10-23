@@ -44,7 +44,7 @@ namespace MB::FramePacing::Marker
       return static_cast<uint32_t>(duration.UnsignedNanoseconds());
     }
 
-    //! The 53 byte header every kind starts with (a sync marker has its first 16 bytes: which run and frame).
+    //! The 57 byte header every kind starts with (a sync marker has its first 16 bytes: which run and frame).
     std::array<uint8_t, WireFormat::HeaderByteCount> EncodeHeader(const Payload& payload) noexcept
     {
       std::array<uint8_t, WireFormat::HeaderByteCount> bytes{};
@@ -59,6 +59,7 @@ namespace MB::FramePacing::Marker
       ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetAnimationTime, payload.AnimationTime().Nanoseconds());
       ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetPreferredFrameTime, DurationField(payload.PreferredFrameTime()));
       ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetTargetFrameTime, DurationField(payload.TargetFrameTime()));
+      ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetRefreshPeriod, DurationField(payload.RefreshPeriod()));
       ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetIntendedDisplayTime, payload.IntendedDisplayTime().UnsignedNanoseconds());
       ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuStartTime, payload.CpuStartTime().UnsignedNanoseconds());
       ByteSpanUtil::WriteLE(bytes, WireFormat::OffsetCpuBusy, DurationField(payload.CpuBusy()));
@@ -331,6 +332,7 @@ namespace MB::FramePacing::Marker
                        NanosecondTimeSpan(ByteSpanUtil::ReadLE<int64_t>(bytes, WireFormat::OffsetAnimationTime)),
                        NanosecondTimeDuration::FromNanoseconds(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetPreferredFrameTime)),
                        NanosecondTimeDuration::FromNanoseconds(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetTargetFrameTime)),
+                       NanosecondTimeDuration::FromNanoseconds(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetRefreshPeriod)),
                        NanosecondTickCount::FromUnsignedNanoseconds(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetIntendedDisplayTime)),
                        NanosecondTickCount::FromUnsignedNanoseconds(ByteSpanUtil::ReadLE<uint64_t>(bytes, WireFormat::OffsetCpuStartTime)),
                        NanosecondTimeDuration::FromNanoseconds(ByteSpanUtil::ReadLE<uint32_t>(bytes, WireFormat::OffsetCpuBusy))};

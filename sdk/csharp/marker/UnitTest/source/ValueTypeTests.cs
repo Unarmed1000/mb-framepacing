@@ -24,6 +24,7 @@ namespace MB.FramePacing.Marker.UnitTest
       new NanosecondTimeSpan(3),
       NanosecondTimeDuration.FromNanoseconds(4),
       NanosecondTimeDuration.FromNanoseconds(5),
+      NanosecondTimeDuration.FromNanoseconds(10),
       new NanosecondTickCount(6),
       new NanosecondTickCount(7),
       NanosecondTimeDuration.FromNanoseconds(8)
@@ -60,6 +61,7 @@ namespace MB.FramePacing.Marker.UnitTest
             new NanosecondTimeSpan(3),
             NanosecondTimeDuration.FromNanoseconds(4),
             NanosecondTimeDuration.FromNanoseconds(5),
+            NanosecondTimeDuration.FromNanoseconds(10),
             new NanosecondTickCount(6),
             new NanosecondTickCount(7),
             NanosecondTimeDuration.FromNanoseconds(8)
@@ -99,6 +101,7 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(Payload.OnDemandFrameTime.Nanoseconds, Is.EqualTo(uint.MaxValue));
       Assert.That(Payload.MaxFrameTime.Nanoseconds, Is.EqualTo(uint.MaxValue - 1));
       Assert.That(Payload.MaxCpuBusy.Nanoseconds, Is.EqualTo(uint.MaxValue));
+      Assert.That(Payload.MaxRefreshPeriod.Nanoseconds, Is.EqualTo(uint.MaxValue));
       Assert.That(Payload.MaxEncodedByteCount, Is.EqualTo(WireFormat.StartPayloadByteCount));
       Assert.That(Payload.MaxEncodedByteCount, Is.LessThanOrEqualTo(WireFormat.QrCapacityBytes));
       Assert.That(WireFormat.SyncPayloadByteCount, Is.LessThanOrEqualTo(WireFormat.SyncQrCapacityBytes));
@@ -125,6 +128,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,
+          p.RefreshPeriod,
           p.IntendedDisplayTime,
           p.CpuStartTime,
           p.CpuBusy
@@ -137,6 +141,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,
+          p.RefreshPeriod,
           p.IntendedDisplayTime,
           p.CpuStartTime,
           p.CpuBusy
@@ -149,6 +154,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,
+          p.RefreshPeriod,
           p.IntendedDisplayTime,
           p.CpuStartTime,
           p.CpuBusy
@@ -161,6 +167,7 @@ namespace MB.FramePacing.Marker.UnitTest
           new NanosecondTimeSpan(9),
           p.PreferredFrameTime,
           p.TargetFrameTime,
+          p.RefreshPeriod,
           p.IntendedDisplayTime,
           p.CpuStartTime,
           p.CpuBusy
@@ -173,6 +180,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           NanosecondTimeDuration.FromNanoseconds(9),
           p.TargetFrameTime,
+          p.RefreshPeriod,
           p.IntendedDisplayTime,
           p.CpuStartTime,
           p.CpuBusy
@@ -184,6 +192,20 @@ namespace MB.FramePacing.Marker.UnitTest
           p.Flags,
           p.AnimationTime,
           p.PreferredFrameTime,
+          NanosecondTimeDuration.FromNanoseconds(9),
+          p.RefreshPeriod,
+          p.IntendedDisplayTime,
+          p.CpuStartTime,
+          p.CpuBusy
+        ),
+        new Payload(
+          p.Kind,
+          p.RunId,
+          p.FrameIndex,
+          p.Flags,
+          p.AnimationTime,
+          p.PreferredFrameTime,
+          p.TargetFrameTime,
           NanosecondTimeDuration.FromNanoseconds(9),
           p.IntendedDisplayTime,
           p.CpuStartTime,
@@ -197,6 +219,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,
+          p.RefreshPeriod,
           new NanosecondTickCount(9),
           p.CpuStartTime,
           p.CpuBusy
@@ -209,6 +232,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,
+          p.RefreshPeriod,
           p.IntendedDisplayTime,
           new NanosecondTickCount(9),
           p.CpuBusy
@@ -221,6 +245,7 @@ namespace MB.FramePacing.Marker.UnitTest
           p.AnimationTime,
           p.PreferredFrameTime,
           p.TargetFrameTime,
+          p.RefreshPeriod,
           p.IntendedDisplayTime,
           p.CpuStartTime,
           NanosecondTimeDuration.FromNanoseconds(9)
@@ -240,7 +265,7 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(
         g_payload.ToString(),
         Is.EqualTo(
-          "{Frame, run 1, frame 2, flags StaticAfter, animation 3 ns, preferred 4 ns, target 5 ns, intended 6 ns, cpu start 7 ns, cpu busy 8 ns}"
+          "{Frame, run 1, frame 2, flags StaticAfter, animation 3 ns, preferred 4 ns, target 5 ns, refresh 10 ns, intended 6 ns, cpu start 7 ns, cpu busy 8 ns}"
         )
       );
     }

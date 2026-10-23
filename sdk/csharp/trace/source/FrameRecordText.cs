@@ -32,6 +32,9 @@ namespace MB.FramePacing.Trace
     /// <summary>The annotation with the marker's target frame time, in nanoseconds: left out when the marker's is 0.</summary>
     public const string MarkerTargetNs = "markerTargetNs";
 
+    /// <summary>The annotation with the marker's refresh period, in nanoseconds: left out when the marker's is 0.</summary>
+    public const string MarkerRefreshPeriodNs = "markerRefreshPeriodNs";
+
     /// <summary>The annotation with the marker's intended display time, in nanoseconds: left out when the marker's is 0.</summary>
     public const string IntendedDisplayNs = "intendedDisplayNs";
 

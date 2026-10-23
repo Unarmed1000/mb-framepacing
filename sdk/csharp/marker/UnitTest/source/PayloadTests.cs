@@ -37,6 +37,7 @@ namespace MB.FramePacing.Marker.UnitTest
           new NanosecondTimeSpan(0x1112131415161718),
           preferredFrameTime: NanosecondTimeDuration.FromNanoseconds(0x71727374),
           targetFrameTime: NanosecondTimeDuration.FromNanoseconds(0x41424344),
+          refreshPeriod: NanosecondTimeDuration.FromNanoseconds(0x81828384),
           intendedDisplayTime: new NanosecondTickCount(0x3132333435363738),
           cpuStartTime: new NanosecondTickCount(0x5152535455565758),
           cpuBusy: NanosecondTimeDuration.FromNanoseconds(0x61626364)
@@ -86,6 +87,11 @@ namespace MB.FramePacing.Marker.UnitTest
         0x43,
         0x42,
         0x41,
+        // refresh period
+        0x84,
+        0x83,
+        0x82,
+        0x81,
         // intended display time
         0x38,
         0x37,
@@ -109,13 +115,13 @@ namespace MB.FramePacing.Marker.UnitTest
         0x63,
         0x62,
         0x61,
-        // CRC (0x7ED16A3D: what Python's binascii.crc32 gives for the 53 bytes before it)
-        0x3D,
-        0x6A,
-        0xD1,
-        0x7E,
+        // CRC (0x4DA7B73B: what Python's binascii.crc32 gives for the 57 bytes before it)
+        0x3B,
+        0xB7,
+        0xA7,
+        0x4D,
       };
-      Assert.That(count, Is.EqualTo(57));
+      Assert.That(count, Is.EqualTo(61));
       Assert.That(bytes.AsSpan(0, count).ToArray(), Is.EqualTo(expected));
     }
 
@@ -205,8 +211,9 @@ namespace MB.FramePacing.Marker.UnitTest
     [Test]
     public void ADurationLongerThanItsFourBytes_IsHeldAsTheLongestAMarkerCarries()
     {
-      // The marker's three durations are four unsigned bytes of nanoseconds each: 4.294967295 s at most
+      // The marker's four durations are four unsigned bytes of nanoseconds each: 4.294967295 s at most
       Assert.That(Payload.MaxCpuBusy.Nanoseconds, Is.EqualTo(0xFFFFFFFF));
+      Assert.That(Payload.MaxRefreshPeriod.Nanoseconds, Is.EqualTo(0xFFFFFFFF));
       Assert.That(Payload.OnDemandFrameTime.Nanoseconds, Is.EqualTo(0xFFFFFFFF));
       Assert.That(Payload.MaxFrameTime.Nanoseconds, Is.EqualTo(0xFFFFFFFE));
       var tenSeconds = NanosecondTimeDuration.FromNanoseconds(10_000_000_000);
@@ -221,10 +228,13 @@ namespace MB.FramePacing.Marker.UnitTest
         new NanosecondTimeSpan(3),
         preferredFrameTime: tenSeconds,
         targetFrameTime: longest,
+        refreshPeriod: longest,
         cpuBusy: tenSeconds
       );
       Assert.That(capped.PreferredFrameTime, Is.EqualTo(Payload.MaxFrameTime));
       Assert.That(capped.TargetFrameTime, Is.EqualTo(Payload.MaxFrameTime));
+      Assert.That(capped.RefreshPeriod, Is.EqualTo(Payload.MaxRefreshPeriod));
+      Assert.That(capped.WithKind(MarkerKind.SequenceEnd).RefreshPeriod.Nanoseconds, Is.EqualTo(4_294_967_295));
       Assert.That(capped.CpuBusy, Is.EqualTo(Payload.MaxCpuBusy));
       Assert.That(capped.CpuBusy.Nanoseconds, Is.EqualTo(4_294_967_295));
       Assert.That(
@@ -241,8 +251,10 @@ namespace MB.FramePacing.Marker.UnitTest
         new NanosecondTimeSpan(3),
         preferredFrameTime: Payload.MaxFrameTime,
         targetFrameTime: Payload.OnDemandFrameTime,
+        refreshPeriod: Payload.MaxRefreshPeriod,
         cpuBusy: Payload.MaxCpuBusy
       );
+      Assert.That(kept.RefreshPeriod, Is.EqualTo(Payload.MaxRefreshPeriod));
       Assert.That(kept.PreferredFrameTime, Is.EqualTo(Payload.MaxFrameTime));
       Assert.That(kept.TargetFrameTime, Is.EqualTo(Payload.OnDemandFrameTime));
       Assert.That(kept.CpuBusy, Is.EqualTo(Payload.MaxCpuBusy));
@@ -260,19 +272,21 @@ namespace MB.FramePacing.Marker.UnitTest
       Assert.That(capped.WithKind(MarkerKind.SequenceStart).TargetFrameTime, Is.EqualTo(Payload.MaxFrameTime));
       Assert.That(kept.WithKind(MarkerKind.SequenceEnd).TargetFrameTime, Is.EqualTo(Payload.OnDemandFrameTime));
 
-      // On the wire: 0xFFFFFFFE for a capped frame time, 0xFFFFFFFF for on demand and for a capped CPU busy
+      // On the wire: 0xFFFFFFFE for a capped frame time, 0xFFFFFFFF for on demand and for a capped refresh period and CPU busy
       var oneBelow = new byte[] { 0xFE, 0xFF, 0xFF, 0xFF };
       var largest = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF };
       var cappedBytes = new byte[WireFormat.PayloadByteCount];
       Assert.That(FrameMarker.EncodePayload(capped, default, cappedBytes), Is.EqualTo(WireFormat.PayloadByteCount));
       Assert.That(cappedBytes.AsSpan(25, 4).ToArray(), Is.EqualTo(oneBelow));
       Assert.That(cappedBytes.AsSpan(29, 4).ToArray(), Is.EqualTo(oneBelow));
-      Assert.That(cappedBytes.AsSpan(49, 4).ToArray(), Is.EqualTo(largest));
+      Assert.That(cappedBytes.AsSpan(33, 4).ToArray(), Is.EqualTo(largest));
+      Assert.That(cappedBytes.AsSpan(53, 4).ToArray(), Is.EqualTo(largest));
       var keptBytes = new byte[WireFormat.PayloadByteCount];
       Assert.That(FrameMarker.EncodePayload(kept, default, keptBytes), Is.EqualTo(WireFormat.PayloadByteCount));
       Assert.That(keptBytes.AsSpan(25, 4).ToArray(), Is.EqualTo(oneBelow));
       Assert.That(keptBytes.AsSpan(29, 4).ToArray(), Is.EqualTo(largest));
-      Assert.That(keptBytes.AsSpan(49, 4).ToArray(), Is.EqualTo(largest));
+      Assert.That(keptBytes.AsSpan(33, 4).ToArray(), Is.EqualTo(largest));
+      Assert.That(keptBytes.AsSpan(53, 4).ToArray(), Is.EqualTo(largest));
 
       // So a payload decodes to exactly what was encoded, a capped one too
       Assert.That(FrameMarker.TryDecodePayload(cappedBytes, out var decoded, out _), Is.True);
@@ -312,10 +326,11 @@ namespace MB.FramePacing.Marker.UnitTest
     {
       var bytes = new byte[Payload.MaxEncodedByteCount + 1];
       int count = FrameMarker.EncodePayload(new Payload(MarkerKind.Frame, 3, 1, MarkerFlags.NoFlags, new NanosecondTimeSpan(2)), default, bytes);
-      Assert.That(count, Is.EqualTo(57));
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 56), out _, out _), Is.False);
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 58), out _, out _), Is.False);
-      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 53), out _, out _), Is.False, "the header alone, as it was before the CRC");
+      Assert.That(count, Is.EqualTo(61));
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 60), out _, out _), Is.False);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 62), out _, out _), Is.False);
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 57), out _, out _), Is.False, "the header alone, as it was before the CRC");
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 53), out _, out _), Is.False, "the header before the refresh period");
       Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, 48), out _, out _), Is.False, "the older 48 byte header");
     }
 
@@ -361,6 +376,7 @@ namespace MB.FramePacing.Marker.UnitTest
         MarkerFlags.NoFlags,
         new NanosecondTimeSpan(20),
         targetFrameTime: NanosecondTimeDuration.FromNanoseconds(50),
+        refreshPeriod: NanosecondTimeDuration.FromNanoseconds(25),
         intendedDisplayTime: new NanosecondTickCount(40),
         cpuStartTime: new NanosecondTickCount(60),
         cpuBusy: NanosecondTimeDuration.FromNanoseconds(70)
@@ -368,10 +384,10 @@ namespace MB.FramePacing.Marker.UnitTest
       var id = new SequenceId(0x0011_2233_4455_6677, 0x8899_AABB_CCDD_EEFF);
       int count = FrameMarker.EncodePayload(payload, new StartMetadata(638_000_000_000_000_000, id), bytes.AsSpan(5));
       Assert.That(count, Is.EqualTo(WireFormat.StartPayloadByteCount));
-      Assert.That(count, Is.EqualTo(81));
-      // The sequence id's 16 bytes as they are, at offset 61
+      Assert.That(count, Is.EqualTo(85));
+      // The sequence id's 16 bytes as they are, at offset 65
       Assert.That(
-        bytes.AsSpan(5 + 61, 16).ToArray(),
+        bytes.AsSpan(5 + 65, 16).ToArray(),
         Is.EqualTo(new byte[] { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF })
       );
 

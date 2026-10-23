@@ -25,13 +25,14 @@ class FrameRow:
     """One presented frame. first_seen_ns is its display time (the capture's clock), display_delta_ns the display time step,
     animation_error_ns the animation time step minus the display time step (None for a step from a static frame). flags holds
     SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep, StaticAssumed or DeltaTimeJitter. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
-    frametime and CPU wait as PresentMon names them); marker_target_ns and marker_preferred_ns are ON_DEMAND_FRAME_NS on demand,
+    frametime and CPU wait as PresentMon names them, and marker_refresh_period_ns, the refresh period of the display the application
+    works with); marker_target_ns and marker_preferred_ns are ON_DEMAND_FRAME_NS on demand,
     target_ns and preferred_ns (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL
     camera captures' only. older_frames are the captures that showed an older frame out of order while this frame was the newest:
     (frame index, capture nanoseconds) in capture order.
 
     A length of time is never negative: target_ns, preferred_ns and frame_time_ns, and the marker's own marker_target_ns,
-    marker_preferred_ns and cpu_busy_ns. What can go either way can be: animation_ns, animation_delta_ns, animation_error_ns,
+    marker_preferred_ns, marker_refresh_period_ns and cpu_busy_ns. What can go either way can be: animation_ns, animation_delta_ns, animation_error_ns,
     drift_ns, pacing_error_ns, prediction_error_ns, lateness_ns, cpu_wait_ns and scanout_delay_ns (the sync marker can be seen before
     the main marker decodes), and on_screen_ns and display_delta_ns, which are the difference of two sightings: a camera can time a
     frame after the next one's sighting, and the steps then still add up to the time that passed."""
@@ -54,6 +55,7 @@ class FrameRow:
     target_ns: int | None
     marker_preferred_ns: int | None
     preferred_ns: int | None
+    marker_refresh_period_ns: int | None
     pacing_error_ns: int | None
     prediction_error_ns: int | None
     lateness_ns: int | None
@@ -201,6 +203,7 @@ def _frame(table: _Table, row: list[str]) -> FrameRow:
         target_ns=table.optional_duration_ns(row, "targetNs"),
         marker_preferred_ns=table.optional_ns32(row, "markerPreferredNs"),
         preferred_ns=table.optional_duration_ns(row, "preferredNs"),
+        marker_refresh_period_ns=table.optional_ns32(row, "markerRefreshPeriodNs"),
         pacing_error_ns=table.optional_ns(row, "pacingErrorNs"),
         prediction_error_ns=table.optional_ns(row, "predictionErrorNs"),
         lateness_ns=table.optional_ns(row, "latenessNs"),

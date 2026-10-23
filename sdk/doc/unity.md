@@ -85,6 +85,7 @@ overlay.StaticAfterProvider = () => nothingPending; // optional: nothing animate
 overlay.StaticBeforeProvider = () => wokeFromIdle; // optional: nothing animated while the previous frame was
 overlay.PreferredFrameTimeProvider = () => pacer.PreferredFrameTime; // a NanosecondTimeDuration: the rate the game wants; default: as the target
 overlay.TargetFrameTimeProvider = () => pacer.TargetFrameTime; // a NanosecondTimeDuration: the interval it aims for now; default: Unity's settings (below)
+overlay.RefreshPeriodProvider = () => pacer.RefreshPeriod; // a NanosecondTimeDuration: the display's refresh period; default: Unity's screen (below)
 overlay.IntendedDisplayTimeProvider = () => pacer.IntendedDisplayTime; // a NanosecondTickCount on the pacer's steady clock
 overlay.CpuStartTimeProvider = () => pacer.CpuStartTime; // a NanosecondTickCount on the same clock
 overlay.CpuBusyProvider = () => pacer.CpuBusy; // optional, a NanosecondTimeDuration
@@ -96,7 +97,9 @@ The **target frame time** without a provider is what Unity's settings aim for: o
 else on the web the refresh rate, else unknown (0). XR platforms ignore both settings: give the XR display's rate as a provider. The
 **preferred frame time** is the rate the game wants to run at. Without a provider it is the same default, which Unity does not lower
 on its own; a pacer that runs the game slower than it wants gives its preferred rate here. `Payload.OnDemandFrameTime` says the game
-presents only when something changes. What each field means, and what to write for typical frame pacers, is in
+presents only when something changes. The **refresh period** without a provider is the refresh rate of
+`Screen.currentResolution.refreshRateRatio`; a game that gives its pacer another period gives that one here, and under variable
+refresh a provider that returns zero (unknown), as there is no one period. What each field means, and what to write for typical frame pacers, is in
 [Filling the marker fields](marker-fields.md).
 
 With only an `IntendedDisplayTimeProvider`, the CPU start time is left unknown (0) rather than mixing two clocks; CPU busy still

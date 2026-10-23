@@ -44,6 +44,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
             new NanosecondTimeSpan(long.Parse(Field("animationNs"), CultureInfo.InvariantCulture)),
             preferredFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(Field("preferredFrameNs"), CultureInfo.InvariantCulture)),
             targetFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(Field("targetFrameNs"), CultureInfo.InvariantCulture)),
+            refreshPeriod: NanosecondTimeDuration.FromNanoseconds(uint.Parse(Field("refreshPeriodNs"), CultureInfo.InvariantCulture)),
             intendedDisplayTime: new NanosecondTickCount(long.Parse(Field("intendedDisplayNs"), CultureInfo.InvariantCulture)),
             cpuStartTime: new NanosecondTickCount(long.Parse(Field("cpuStartNs"), CultureInfo.InvariantCulture)),
             cpuBusy: NanosecondTimeDuration.FromNanoseconds(uint.Parse(Field("cpuBusyNs"), CultureInfo.InvariantCulture))

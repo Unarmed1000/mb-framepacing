@@ -71,6 +71,7 @@ def _payload(row: dict[str, str]) -> Payload:
         int(row["animationNs"]),
         preferred_frame_ns=int(row["preferredFrameNs"]),
         target_frame_ns=int(row["targetFrameNs"]),
+        refresh_period_ns=int(row["refreshPeriodNs"]),
         intended_display_ns=int(row["intendedDisplayNs"]),
         cpu_start_ns=int(row["cpuStartNs"]),
         cpu_busy_ns=int(row["cpuBusyNs"]),

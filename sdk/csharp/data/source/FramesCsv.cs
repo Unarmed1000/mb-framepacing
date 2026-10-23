@@ -20,7 +20,7 @@ namespace MB.FramePacing.Data
   {
     public const string Header =
       "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,displayDeltaNs,animationDeltaNs,animationErrorNs,driftNs,flags,"
-      + "intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,preferredNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,cpuWaitNs,olderFrames";
+      + "intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,preferredNs,markerRefreshPeriodNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,cpuWaitNs,olderFrames";
 
     /// <summary>The columns an EXPERIMENTAL camera capture adds.</summary>
     public const string CameraColumns = ",mainMarkerFirstSeenNs,scanoutDelayNs";
@@ -62,6 +62,7 @@ namespace MB.FramePacing.Data
         line.Add(row.TargetFrameTime?.Nanoseconds);
         line.Add(MarkerNanoseconds(row.MarkerPreferredFrameTime, "markerPreferredNs"));
         line.Add(row.PreferredFrameTime?.Nanoseconds);
+        line.Add(MarkerNanoseconds(row.MarkerRefreshPeriod, "markerRefreshPeriodNs"));
         line.Add(row.PacingError?.Nanoseconds);
         line.Add(row.PredictionError?.Nanoseconds);
         line.Add(row.Lateness?.Nanoseconds);
@@ -121,6 +122,7 @@ namespace MB.FramePacing.Data
       int target = Column("targetNs");
       int markerPreferred = Column("markerPreferredNs");
       int preferred = Column("preferredNs");
+      int markerRefresh = Column("markerRefreshPeriodNs");
       int pacing = Column("pacingErrorNs");
       int prediction = Column("predictionErrorNs");
       int lateness = Column("latenessNs");
@@ -169,6 +171,7 @@ namespace MB.FramePacing.Data
               row.Duration(target),
               row.MarkerDuration(markerPreferred),
               row.Duration(preferred),
+              row.MarkerDuration(markerRefresh),
               row.Span(pacing),
               row.Span(prediction),
               row.Span(lateness),

@@ -152,6 +152,8 @@ namespace MB.FramePacing.Analysis.UnitTest
           new NanosecondTimeSpan(RenderedAnimationNs[frame] + (loop * DurationNs)),
           MarkerFrameTime(RenderedPreferredInterval[frame]),
           MarkerFrameTime(RenderedSwapInterval[frame]),
+          // The display's refresh period: one refresh, rounded as the frame times are
+          NanosecondTimeDuration.FromNanoseconds(MarkerRefreshNs(1)),
           new NanosecondTickCount(MarkerRefreshNs(intendedRefresh)),
           new NanosecondTickCount(RenderedCpuStartNs[frame] + (loop * DurationNs)),
           NanosecondTimeDuration.FromNanoseconds(RenderedCpuBusyNs[frame])

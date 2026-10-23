@@ -18,8 +18,9 @@ namespace MB::FramePacing::Marker
   //! flags and animation time are required; the timing fields are optional (0 = unknown). Every time is in nanoseconds, in the type that
   //! says what it is: a span, a point on the pacer's steady clock, or a duration, which is never negative.
   //!
-  //! The marker holds its three durations in four bytes each, so a payload holds none longer than a marker can carry: the constructor caps
-  //! a longer CPU busy at MaxCpuBusy and a longer frame time at MaxFrameTime (never an error: this runs in a frame loop). So every value
+  //! The marker holds its four durations in four bytes each, so a payload holds none longer than a marker can carry: the constructor caps
+  //! a longer CPU busy at MaxCpuBusy, a longer refresh period at MaxRefreshPeriod and a longer frame time at MaxFrameTime (never an
+  //! error: this runs in a frame loop). So every value
   //! of a payload is valid on the wire, and a payload decodes to exactly what was encoded. The kind must be one of MarkerKind's: the
   //! constructor asserts it, and EncodePayload refuses a payload without one. The flags are kept as given, reserved bits included.
   //! Trivially copyable and standard layout.
@@ -27,13 +28,15 @@ namespace MB::FramePacing::Marker
   {
   public:
     //! The most bytes a payload encodes to (a start marker's): EncodePayload's buffer size.
-    static constexpr std::size_t MaxEncodedByteCount = 81;
+    static constexpr std::size_t MaxEncodedByteCount = 85;
     //! The target and preferred frame time of a renderer that presents only when something changes: there is no interval to aim for.
     //! The largest value the field's four bytes hold (0xFFFFFFFF), so no frame time is that long: see MaxFrameTime.
     static constexpr NanosecondTimeDuration OnDemandFrameTime = NanosecondTimeDuration::FromNanoseconds(4'294'967'295);
     //! The longest target and preferred frame time a marker carries, 4.294967294 s (slower than 0.233 fps): one below OnDemandFrameTime.
     //! A longer one is held as this.
     static constexpr NanosecondTimeDuration MaxFrameTime = NanosecondTimeDuration::FromNanoseconds(4'294'967'294);
+    //! The longest refresh period a marker carries, 4.294967295 s. A longer one is held as this.
+    static constexpr NanosecondTimeDuration MaxRefreshPeriod = NanosecondTimeDuration::FromNanoseconds(4'294'967'295);
     //! The longest CPU busy a marker carries, 4.294967295 s. A longer one is held as this.
     static constexpr NanosecondTimeDuration MaxCpuBusy = NanosecondTimeDuration::FromNanoseconds(4'294'967'295);
 
@@ -42,8 +45,9 @@ namespace MB::FramePacing::Marker
 
     constexpr Payload(const MarkerKind kind, const uint32_t runId, const uint64_t frameIndex, const MarkerFlags flags,
                       const NanosecondTimeSpan animationTime, const NanosecondTimeDuration preferredFrameTime = {},
-                      const NanosecondTimeDuration targetFrameTime = {}, const NanosecondTickCount intendedDisplayTime = {},
-                      const NanosecondTickCount cpuStartTime = {}, const NanosecondTimeDuration cpuBusy = {}) noexcept
+                      const NanosecondTimeDuration targetFrameTime = {}, const NanosecondTimeDuration refreshPeriod = {},
+                      const NanosecondTickCount intendedDisplayTime = {}, const NanosecondTickCount cpuStartTime = {},
+                      const NanosecondTimeDuration cpuBusy = {}) noexcept
       : m_kind(kind)
       , m_runId(runId)
       , m_frameIndex(frameIndex)
@@ -51,6 +55,7 @@ namespace MB::FramePacing::Marker
       , m_animationTime(animationTime)
       , m_preferredFrameTime(CappedFrameTime(preferredFrameTime))
       , m_targetFrameTime(CappedFrameTime(targetFrameTime))
+      , m_refreshPeriod(NanosecondTimeDuration::Min(refreshPeriod, MaxRefreshPeriod))
       , m_intendedDisplayTime(intendedDisplayTime)
       , m_cpuStartTime(cpuStartTime)
       , m_cpuBusy(NanosecondTimeDuration::Min(cpuBusy, MaxCpuBusy))
@@ -62,8 +67,17 @@ namespace MB::FramePacing::Marker
     //! and frame index.
     [[nodiscard]] constexpr Payload WithKind(const MarkerKind kind) const noexcept
     {
-      return {kind,           m_runId,  m_frameIndex, m_flags, m_animationTime, m_preferredFrameTime, m_targetFrameTime, m_intendedDisplayTime,
-              m_cpuStartTime, m_cpuBusy};
+      return {kind,
+              m_runId,
+              m_frameIndex,
+              m_flags,
+              m_animationTime,
+              m_preferredFrameTime,
+              m_targetFrameTime,
+              m_refreshPeriod,
+              m_intendedDisplayTime,
+              m_cpuStartTime,
+              m_cpuBusy};
     }
 
     [[nodiscard]] constexpr MarkerKind Kind() const noexcept
@@ -113,6 +127,13 @@ namespace MB::FramePacing::Marker
       return m_targetFrameTime;
     }
 
+    //! The refresh period of the display the application works with: 16'666'667 ns for 60 Hz, what it gives its pacer or what its swap
+    //! chain reports. The tools compare it with the capture's. 0 = unknown (and under variable refresh); at most MaxRefreshPeriod.
+    [[nodiscard]] constexpr NanosecondTimeDuration RefreshPeriod() const noexcept
+    {
+      return m_refreshPeriod;
+    }
+
     //! When the frame pacer intends this frame to become visible, on its steady clock (any epoch, the same clock for the whole run).
     //! 0 = unknown.
     [[nodiscard]] constexpr NanosecondTickCount IntendedDisplayTime() const noexcept
@@ -152,6 +173,7 @@ namespace MB::FramePacing::Marker
     NanosecondTimeSpan m_animationTime;
     NanosecondTimeDuration m_preferredFrameTime;
     NanosecondTimeDuration m_targetFrameTime;
+    NanosecondTimeDuration m_refreshPeriod;
     NanosecondTickCount m_intendedDisplayTime;
     NanosecondTickCount m_cpuStartTime;
     NanosecondTimeDuration m_cpuBusy;

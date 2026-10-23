@@ -36,6 +36,10 @@ namespace MB.FramePacing.Analysis
   /// The frame time the application wants, in whole refreshes: the marker's preferred frame time, else the target frame rate given to the
   /// tools, else one refresh (<see cref="RunPacing"/>). Null when the application presents on demand.
   /// </param>
+  /// <param name="MarkerRefreshPeriod">
+  /// From the marker: the refresh period of the display the application works with, 0 = unknown. Compared with the capture's, never used
+  /// as the refresh.
+  /// </param>
   /// <param name="OlderFrames">
   /// The captures that showed an older frame out of order while this frame was the newest (before the next presented frame), in capture
   /// order; null when none did.
@@ -68,6 +72,7 @@ namespace MB.FramePacing.Analysis
     NanosecondTimeSpan? CpuWait = null,
     NanosecondTimeDuration MarkerPreferredFrameTime = default,
     NanosecondTimeDuration? PreferredFrameTime = null,
+    NanosecondTimeDuration MarkerRefreshPeriod = default,
     System.Collections.Generic.IReadOnlyList<OlderFrameCapture>? OlderFrames = null
   );
 }

@@ -35,14 +35,14 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostNsSum": 127590824000,
+    "hostNsSum": 129893784100,
     "deviceNsCount": 486,
     "deviceNsSum": 1964250000000,
     "sourceDropsSum": 0,
     "statusCounts": {
       "Decoded": 486
     },
-    "mainByteCount": 27774,
+    "mainByteCount": 29718,
     "secondByteCount": 0,
     "decodedMainPayloads": 486,
     "frameIndexSum": 280133,
@@ -157,6 +157,10 @@
           "count": 388,
           "sum": 6466666796
         },
+        "markerRefreshPeriodNs": {
+          "count": 388,
+          "sum": 6466666796
+        },
         "pacingErrorNs": {
           "count": 386,
           "sum": 0
@@ -217,11 +221,11 @@
     },
     "captureNsSum": 1964250000000,
     "frameIndexSum": 280133,
-    "hostNsSum": 127590824000,
+    "hostNsSum": 129893784100,
     "sourceDropsSum": 0,
     "missedSum": 0,
     "syncCount": 0,
     "syncFrameIndexSum": 0,
-    "payloadByteCount": 27774
+    "payloadByteCount": 29718
   }
 }

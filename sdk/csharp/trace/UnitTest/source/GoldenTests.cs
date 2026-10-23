@@ -23,7 +23,7 @@ namespace MB.FramePacing.Trace.UnitTest
   public class GoldenTests
   {
     private const string Header =
-      "kind,runId,frameIndex,animationNs,preferredNs,targetNs,intendedDisplayNs,cpuStartNs,cpuBusyNs,name,startNs,durationNs,annotations";
+      "kind,runId,frameIndex,animationNs,preferredNs,targetNs,refreshPeriodNs,intendedDisplayNs,cpuStartNs,cpuBusyNs,name,startNs,durationNs,annotations";
 
     private static string GoldenFile()
     {
@@ -56,7 +56,7 @@ namespace MB.FramePacing.Trace.UnitTest
       {
         ++rows;
         string row = string.Join(',', cells);
-        Assert.That(cells.Length, Is.EqualTo(13), row);
+        Assert.That(cells.Length, Is.EqualTo(14), row);
         var payload = new Payload(
           Enum.Parse<MarkerKind>(cells[0]),
           uint.Parse(cells[1], CultureInfo.InvariantCulture),
@@ -65,27 +65,28 @@ namespace MB.FramePacing.Trace.UnitTest
           NanosecondTimeSpan.FromNanoseconds(Whole(cells[3])),
           NanosecondTimeDuration.FromNanoseconds(Whole(cells[4])),
           NanosecondTimeDuration.FromNanoseconds(Whole(cells[5])),
-          NanosecondTickCount.FromNanoseconds(Whole(cells[6])),
+          NanosecondTimeDuration.FromNanoseconds(Whole(cells[6])),
           NanosecondTickCount.FromNanoseconds(Whole(cells[7])),
-          NanosecondTimeDuration.FromNanoseconds(Whole(cells[8]))
+          NanosecondTickCount.FromNanoseconds(Whole(cells[8])),
+          NanosecondTimeDuration.FromNanoseconds(Whole(cells[9]))
         );
 
         bool has = FrameRecord.TryCreate(payload, out var record);
 
-        Assert.That(has, Is.EqualTo(cells[9].Length > 0), row);
+        Assert.That(has, Is.EqualTo(cells[10].Length > 0), row);
         if (!has)
         {
           Assert.That(record, Is.EqualTo(default(FrameRecord)), row);
           continue;
         }
         ++records;
-        Assert.That(record.Name, Is.EqualTo(cells[9]), row);
-        Assert.That(record.StartTime.Nanoseconds, Is.EqualTo(Whole(cells[10])), row);
-        Assert.That(record.Duration.Nanoseconds, Is.EqualTo(Whole(cells[11])), row);
+        Assert.That(record.Name, Is.EqualTo(cells[10]), row);
+        Assert.That(record.StartTime.Nanoseconds, Is.EqualTo(Whole(cells[11])), row);
+        Assert.That(record.Duration.Nanoseconds, Is.EqualTo(Whole(cells[12])), row);
         var annotations = Enumerable.Range(0, record.AnnotationCount).Select(index => record.GetAnnotation(index).ToString());
-        Assert.That(string.Join(';', annotations), Is.EqualTo(cells[12]), row);
+        Assert.That(string.Join(';', annotations), Is.EqualTo(cells[13]), row);
         // A reader gets the marker's ids back from the name
-        Assert.That(FrameRecordName.TryParse(cells[9], out uint runId, out ulong frameIndex), Is.True, row);
+        Assert.That(FrameRecordName.TryParse(cells[10], out uint runId, out ulong frameIndex), Is.True, row);
         Assert.That((runId, frameIndex), Is.EqualTo((payload.RunId, payload.FrameIndex)), row);
       }
       Assert.That(rows, Is.GreaterThanOrEqualTo(9));

@@ -84,19 +84,20 @@ public static class FrameMarkerUnityCheck
         new NanosecondTimeSpan(long.Parse(f[4], CultureInfo.InvariantCulture)),
         preferredFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(f[5], CultureInfo.InvariantCulture)),
         targetFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(f[6], CultureInfo.InvariantCulture)),
-        intendedDisplayTime: new NanosecondTickCount(long.Parse(f[7], CultureInfo.InvariantCulture)),
-        cpuStartTime: new NanosecondTickCount(long.Parse(f[8], CultureInfo.InvariantCulture)),
-        cpuBusy: NanosecondTimeDuration.FromNanoseconds(uint.Parse(f[9], CultureInfo.InvariantCulture))
+        refreshPeriod: NanosecondTimeDuration.FromNanoseconds(uint.Parse(f[7], CultureInfo.InvariantCulture)),
+        intendedDisplayTime: new NanosecondTickCount(long.Parse(f[8], CultureInfo.InvariantCulture)),
+        cpuStartTime: new NanosecondTickCount(long.Parse(f[9], CultureInfo.InvariantCulture)),
+        cpuBusy: NanosecondTimeDuration.FromNanoseconds(uint.Parse(f[10], CultureInfo.InvariantCulture))
       );
       // Columns (the payload's in the order of the wire format): kind, runId, frameIndex, flags, animationNs, preferredFrameNs,
-      // targetFrameNs, intendedDisplayNs, cpuStartNs, cpuBusyNs, startUtcTicks, sequenceIdHex (empty for other kinds), size,
-      // modulesHex
-      var sequenceId = f[11].Length > 0 ? SequenceId.FromBytes(FromHex(f[11])) : default;
-      var start = new StartMetadata(long.Parse(f[10], CultureInfo.InvariantCulture), sequenceId);
+      // targetFrameNs, refreshPeriodNs, intendedDisplayNs, cpuStartNs, cpuBusyNs, startUtcTicks, sequenceIdHex (empty for other kinds),
+      // size, modulesHex
+      var sequenceId = f[12].Length > 0 ? SequenceId.FromBytes(FromHex(f[12])) : default;
+      var start = new StartMetadata(long.Parse(f[11], CultureInfo.InvariantCulture), sequenceId);
       if (
         !generator.TryGenerateModules(payload, start, bits, out var matrix)
-        || matrix.Size != int.Parse(f[12], CultureInfo.InvariantCulture)
-        || Hex(matrix.Bits) != f[13]
+        || matrix.Size != int.Parse(f[13], CultureInfo.InvariantCulture)
+        || Hex(matrix.Bits) != f[14]
       )
       {
         if (++mismatches <= 5)

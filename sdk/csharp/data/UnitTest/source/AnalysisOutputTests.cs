@@ -398,6 +398,7 @@ namespace MB.FramePacing.Data.UnitTest
         TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(33_333_400),
         MarkerPreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(1),
         PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(16_666_700),
+        MarkerRefreshPeriod: NanosecondTimeDuration.FromNanoseconds(uint.MaxValue - 1),
         PacingError: new NanosecondTimeSpan(3),
         PredictionError: new NanosecondTimeSpan(-3),
         Lateness: new NanosecondTimeSpan(8_333_300),
@@ -423,7 +424,7 @@ namespace MB.FramePacing.Data.UnitTest
         lines[1],
         Is.EqualTo(
           "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,16666700,1,0,16666600,9223372036854775807,-1,-7,Late,"
-            + "-9223372036854775808,4294967295,33333400,1,16666700,3,-3,8333300,1234567890123456789,-1234567890123456789,12006000,16666800,4660800,"
+            + "-9223372036854775808,4294967295,33333400,1,16666700,4294967294,3,-3,8333300,1234567890123456789,-1234567890123456789,12006000,16666800,4660800,"
             + "41@1234567890123456790|40@-5,9007199254740993,-9007199254740993"
         )
       );
@@ -448,6 +449,10 @@ namespace MB.FramePacing.Data.UnitTest
           },
           row with
           {
+            MarkerRefreshPeriod = beyond,
+          },
+          row with
+          {
             CpuBusy = beyond,
           },
         }
@@ -463,7 +468,7 @@ namespace MB.FramePacing.Data.UnitTest
         Is.EqualTo(
           "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,displayDeltaNs,"
             + "animationDeltaNs,animationErrorNs,driftNs,flags,intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,"
-            + "preferredNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,"
+            + "preferredNs,markerRefreshPeriodNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,"
             + "cpuWaitNs,olderFrames"
         )
       );

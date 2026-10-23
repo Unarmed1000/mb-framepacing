@@ -56,7 +56,8 @@ What goes wrong otherwise:
 - 59.94 Hz and 60 Hz are different rates. Use the display's exact one.
 
 Give the analysis the rate you expect (`--display-hz`, the GUI's **Display refresh rate**): it warns when the recording runs at
-another one.
+another one. When the application writes its display's refresh period into the markers, the analysis compares that with the
+recording too, with or without `--display-hz` (below).
 
 ### OBS settings
 
@@ -87,6 +88,12 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
 
 - `--display-hz 60`: the display's refresh rate. A recording that runs at another rate (by more than 1 %) gets a warning: "The capture
   runs at 30 fps, but a 60 Hz display was expected".
+- Without an option: when frames carry a refresh period in their markers (the display the application works with) more than 1 %
+  away from the recording's period, the analysis warns with each such rate, how many frames carry it, and the recording's rate:
+  "The markers say the application works with a 144 Hz display (1200 frames), but the capture runs at 60 fps. A capture card must
+  capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application
+  writes." It says that the two disagree, not which one is wrong, and it changes no number: the refresh period the analysis
+  measures with stays the recording's.
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
 

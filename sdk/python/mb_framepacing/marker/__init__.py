@@ -70,6 +70,7 @@ from .options import Options
 from .structures import (
     MAX_CPU_BUSY_NS,
     MAX_FRAME_NS,
+    MAX_REFRESH_PERIOD_NS,
     ON_DEMAND_FRAME_NS,
     SEQUENCE_ID_BYTE_COUNT,
     MarkerFlags,
@@ -96,6 +97,7 @@ __all__ = [
     "MAX_PACKED_MODULE_BYTE_COUNT",
     "MAX_QUAD_COUNT",
     "MAX_QUIET_ZONE_MODULES",
+    "MAX_REFRESH_PERIOD_NS",
     "MIN_MODULE_SIZE_PX",
     "NS_PER_SECOND",
     "ON_DEMAND_FRAME_NS",

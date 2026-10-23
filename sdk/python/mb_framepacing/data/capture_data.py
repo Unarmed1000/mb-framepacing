@@ -27,7 +27,7 @@ UNKNOWN_NS = -(2**63)
 """A device timestamp the capture source did not give (i64 minimum)."""
 
 MAIN_CAPACITY = 112
-"""Two equal slots: either can hold any payload a main marker's QR code can carry (106 bytes; the longest today, a start marker, is 81),
+"""Two equal slots: either can hold any payload a main marker's QR code can carry (106 bytes; the longest today, a start marker, is 85),
 so a field added to the markers does not change the records."""
 SECOND_CAPACITY = RECORD_SIZE - 32 - MAIN_CAPACITY
 

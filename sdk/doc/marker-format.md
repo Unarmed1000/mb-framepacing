@@ -2,7 +2,8 @@
 
 The frame marker is a QR code that the application under test draws into every frame. It carries the application's **frame
 index**, the **animation time** the frame was rendered for, a **run id**, when the application paces its frames **when it intends
-the frame to be shown**, its **target frame time** and the **preferred frame time** it wants to run at, and optionally the frame's
+the frame to be shown**, its **target frame time** and the **preferred frame time** it wants to run at, the **refresh period** of the
+display it works with, and optionally the frame's
 **CPU start time** and **CPU busy**: when the CPU started working on the frame and how long it worked on it before presenting it. A
 **flags** byte says when nothing animates: **static after** while this frame is on screen, **static before** while the frame before it was;
 on a start marker it can also say that the application logs each frame to a trace of its own (**frame record logged**). `mb-framepacing` captures the display output with an
@@ -23,9 +24,9 @@ what the analysis does with it, with examples for typical frame pacers.
 
 ## Payload
 
-Frame, start and end markers start with the same 53 byte header, little endian. Its fields are grouped: the format, which run and
-which frame, what the frame shows, the frame pacing (what the application wants, what the pacer aims for now, when this frame should
-show) and the CPU's work:
+Frame, start and end markers start with the same 57 byte header, little endian. Its fields are grouped: the format, which run and
+which frame, what the frame shows, the frame pacing (what the application wants, what the pacer aims for now, the display's refresh
+period, when this frame should show) and the CPU's work:
 
 | Offset | Size | Field                 | Notes                                                                                                                                                                                                                                                               |
 | ------ | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -38,9 +39,10 @@ show) and the CPU's work:
 | 17     | 8    | Animation time        | `i64` two's complement, nanoseconds. The time the frame's animation was evaluated for.                                                                                                                                                                              |
 | 25     | 4    | Preferred frame time  | `u32` nanoseconds, `0` = unknown, `0xFFFFFFFF` = on demand. The interval the application wants to run at: `16'666'667` for 60 fps, also while the pacer runs slower (see below).                                                                                    |
 | 29     | 4    | Target frame time     | `u32` nanoseconds, `0` = unknown. The interval the pacer aims for between the previous frame and this one: `16'666'667` for 60 fps, `33'333'333` for 30 fps.                                                                                                        |
-| 33     | 8    | Intended display time | `i64` nanoseconds on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below).                                                                                  |
-| 41     | 8    | CPU start time        | `i64` nanoseconds on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                                                                                                     |
-| 49     | 4    | CPU busy              | `u32` nanoseconds, `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                                                                                      |
+| 33     | 4    | Refresh period        | `u32` nanoseconds, `0` = unknown. The refresh period of the display the application works with: `16'666'667` for 60 Hz, `16'683'333` for 59.94 Hz, `6'944'444` for 144 Hz (see below).                                                                              |
+| 37     | 8    | Intended display time | `i64` nanoseconds on the frame pacer's steady clock (any epoch, the same clock for the whole run), `0` = unknown. When the pacer intends this frame to become visible (see below).                                                                                  |
+| 45     | 8    | CPU start time        | `i64` nanoseconds on the same steady clock as the intended display time, `0` = unknown. When the CPU started working on this frame (see below).                                                                                                                     |
+| 53     | 4    | CPU busy              | `u32` nanoseconds, `0` = unknown. How long the CPU worked on this frame before presenting it: from the CPU start time until Present is called.                                                                                                                      |
 
 **Every time is a whole number of nanoseconds**, so a platform that counts in nanoseconds (Vulkan and EGL present times,
 `CLOCK_MONOTONIC`) writes its values as they are, and one that counts in ticks of 100 ns multiplies by 100:
@@ -48,23 +50,26 @@ show) and the CPU's work:
 - **The three `i64` times** reach about 292 years either way. A steady clock counted from its own epoch fits; a clock whose epoch is
   further away than that does not, and its count wraps. The libraries hold a point on a clock as a `NanosecondTickCount`, which still
   compares and subtracts correctly across the wrap while two times are less than 292 years apart.
-- **The three `u32` durations** hold up to 4.294967295 s. The libraries take and return them as a 64-bit duration that is never
+- **The four `u32` durations** hold up to 4.294967295 s. The libraries take and return them as a 64-bit duration that is never
   negative (`NanosecondTimeDuration`), and a payload holds a longer one as the longest its field carries, never as an error:
-  `0xFFFFFFFF` for CPU busy (`Payload.MaxCpuBusy`), and `0xFFFFFFFE` (4.294967294 s, slower than 0.233 fps: `Payload.MaxFrameTime`)
-  for the two frame times, where `0xFFFFFFFF` means on demand. So a payload decodes to exactly what was encoded.
+  `0xFFFFFFFF` for CPU busy (`Payload.MaxCpuBusy`) and the refresh period (`Payload.MaxRefreshPeriod`), where it has no special
+  meaning, and `0xFFFFFFFE` (4.294967294 s, slower than 0.233 fps: `Payload.MaxFrameTime`) for the two frame times, where
+  `0xFFFFFFFF` means on demand. So a payload decodes to exactly what was encoded.
 - **A marker written by a library from before this change** counted in ticks of 100 ns in the same bytes, under the same format
   version. A recording of one reads without an error and every time in it is a hundred times too small: record it again with the
   current library.
+- **A marker written by a library from before the refresh period** (a 57 byte frame or end marker, an 81 byte start marker) has
+  the wrong length for its kind under the same format version, and decoders refuse it: record it again with the current library.
 
 Start and end markers carry the values of the frame that shows them: they are frames too, and a sync marker drawn next to them
-carries the same frame index. A frame or end marker is these 53 bytes and the CRC (below), 57 bytes. A **start marker** appends
-its metadata before the CRC, 81 bytes in all:
+carries the same frame index. A frame or end marker is these 57 bytes and the CRC (below), 61 bytes. A **start marker** appends
+its metadata before the CRC, 85 bytes in all:
 
 | Offset | Size | Field       | Notes                                                                                                                                                                                                                                            |
 | ------ | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 53     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. The one time that is not in nanoseconds: a calendar time does not fit 64 bits of them. |
-| 61     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).                                                                                          |
-| 77     | 4    | CRC         | `u32`, the CRC-32 of the 77 bytes before it (see below).                                                                                                                                                                                         |
+| 57     | 8    | Start time  | `i64` C# `DateTime` UTC ticks (100 ns since 0001-01-01), `0` = unknown. `MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now())` produces it. The one time that is not in nanoseconds: a calendar time does not fit 64 bits of them. |
+| 65     | 16   | Sequence id | 16 opaque bytes that identify the capture sequence: any content, as long as it is unique to it (a UUID's bytes, or a short text tag padded with zeros).                                                                                          |
+| 81     | 4    | CRC         | `u32`, the CRC-32 of the 81 bytes before it (see below).                                                                                                                                                                                         |
 
 The tools show a sequence id as text when it is printable ASCII (its trailing zero bytes left out), otherwise as 32 hex digits in the
 8-4-4-4-12 form of a UUID.
@@ -83,8 +88,8 @@ identifies the frame: the header's first 16 bytes, and the CRC, 20 bytes in all.
 
 A sync marker belongs to the main marker with the same run id and frame index.
 
-**Every payload ends with a CRC-32** of all the bytes before it, a `u32`, little endian like the other fields: at offset 53 of a
-frame or end marker, 77 of a start marker and 16 of a sync marker. It is the CRC-32 of zlib, PNG and Ethernet: the polynomial
+**Every payload ends with a CRC-32** of all the bytes before it, a `u32`, little endian like the other fields: at offset 57 of a
+frame or end marker, 81 of a start marker and 16 of a sync marker. It is the CRC-32 of zlib, PNG and Ethernet: the polynomial
 `0x04C11DB7` with the bits reflected in and out, the start value and the final XOR `0xFFFFFFFF` (Python's `zlib.crc32`). Its check
 value, the CRC of the ASCII text `123456789`, is `0xCBF43926`. A field added to a payload later goes before the CRC, which stays
 last.
@@ -130,6 +135,11 @@ pacing fields tell the analysis:
     no wait for the next frame is off a target. The value is allowed in the target frame time too.
   - With variable refresh (VRR) the rates need not be whole refreshes: a pacer on a 144 Hz display can drop from 60 to 48 fps
     (`20'833'333`) or cap at 117 fps. The fields are intervals, so nothing changes.
+- **Refresh period:** the refresh period of the display the application works with: the one it gives its pacer, or the one its swap
+  chain or platform reports. It is the application's word about the display, not a measurement. A capture card captures at the
+  display's refresh rate, so the analysis takes the capture period as the refresh period; when frames carry a refresh period more
+  than 1 % away from it, the analysis warns that the markers and the capture disagree. It does not say which one is wrong. With
+  variable refresh there is no one period: write `0`.
 - Without a target frame time the analysis measures each frame against the preferred frame time: a game that writes only that it
   wants 30 fps on a 60 Hz display is measured against two refreshes, not one.
 - Leave the fields `0` when the application does not pace its frames. The analysis then measures against a target frame rate given
@@ -189,7 +199,7 @@ where the next frame index was captured too. Leave the fields `0` when the appli
   (ISO/IEC 18004), the lowest numbered one when masks score the same. Every implementation must pick the same mask, since the modules
   must match; how the libraries find it quickly is in [encoding-performance.md](encoding-performance.md).
 - **Every main marker is version 6** (41×41 modules): frame, start and end markers have the same size, so the marker never changes
-  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 57 of them and a start marker 81, which leaves room
+  size between frames. Version 6-M holds 106 bytes: a frame or end marker uses 61 of them and a start marker 85, which leaves room
   for future fields.
 - **Sync markers are version 2** (25×25 modules). Version 2-M holds 26 bytes; the sync payload uses 20.
 - **Two integrity checks.** The QR code's Reed-Solomon error correction repairs a damaged symbol, and the payload's CRC-32 then
@@ -376,15 +386,16 @@ FM::ModuleMatrix matrix;
 std::array<FM::Vertex, FM::MaxTriangleVertexCount()> vertices;
 
 // Every frame, after all post-processing and UI
-// Pacing: when the pacer intends this frame to be shown (steady clock nanoseconds), its target frame time and the frame time the
-// application wants to run at. When the CPU started this frame (the same clock) and how long it has worked on it until now (the
+// Pacing: when the pacer intends this frame to be shown (steady clock nanoseconds), its target frame time, the frame time the
+// application wants to run at and the refresh period of the display it works with. When the CPU started this frame (the same clock) and how long it has worked on it until now (the
 // marker is drawn last, just before Present). 0 = unknown. MarkerFlags::StaticAfter when nothing animates while this frame is
 // on screen, MarkerFlags::StaticBefore when the application only now knows nothing animated while the previous frame was
-// The fields in the order of the wire format
-// The animation time is an FP::NanosecondTimeSpan, the frame times and CPU busy FP::NanosecondTimeDuration, the intended display and
-// CPU start time FP::NanosecondTickCount
+// The fields in the order of the wire format: the refresh period comes after the target frame time, so check the order of a call
+// that passes the optional fields by position
+// The animation time is an FP::NanosecondTimeSpan, the frame times, the refresh period and CPU busy FP::NanosecondTimeDuration, the
+// intended display and CPU start time FP::NanosecondTickCount
 const FM::Payload payload(kind, runId, frameIndex, FM::MarkerFlags::NoFlags, animationTime, preferredFrameTime, targetFrameTime,
-                          intendedDisplayTime, cpuStartTime, cpuBusy);
+                          refreshPeriod, intendedDisplayTime, cpuStartTime, cpuBusy);
 // A start marker carries the run's metadata, captured once when the run started: startUtcTicks =
 // MB::FramePacing::ToDateTimeTicks(std::chrono::system_clock::now()), and a sequence id unique to the run (a UUID's 16 bytes, or a text tag:
 // FM::SequenceId::TryFromText("menu-scroll", sequenceId)). Other kinds ignore it.

@@ -17,6 +17,7 @@ from .. import (
     MAX_CPU_BUSY_NS,
     MAX_ENCODED_PAYLOAD_BYTE_COUNT,
     MAX_FRAME_NS,
+    MAX_REFRESH_PERIOD_NS,
     NS_PER_SECOND,
     ON_DEMAND_FRAME_NS,
     PAYLOAD_BYTE_COUNT,
@@ -47,13 +48,14 @@ def with_crc(fields: bytes | bytearray) -> bytes:
 
 class PayloadTests(unittest.TestCase):
     def test_sizes(self) -> None:
-        self.assertEqual(HEADER_BYTE_COUNT, 53)
+        self.assertEqual(HEADER_BYTE_COUNT, 57)
         self.assertEqual(CRC_BYTE_COUNT, 4)
-        self.assertEqual(PAYLOAD_BYTE_COUNT, 57)
+        self.assertEqual(PAYLOAD_BYTE_COUNT, 61)
         self.assertEqual(SEQUENCE_ID_BYTE_COUNT, 16)
-        self.assertEqual(START_PAYLOAD_BYTE_COUNT, 81)
+        self.assertEqual(START_PAYLOAD_BYTE_COUNT, 85)
         self.assertEqual(ON_DEMAND_FRAME_NS, U32_MAX)
         self.assertEqual(MAX_FRAME_NS, U32_MAX - 1)
+        self.assertEqual(MAX_REFRESH_PERIOD_NS, U32_MAX)
         self.assertEqual(MAX_CPU_BUSY_NS, U32_MAX)
         self.assertEqual(NS_PER_SECOND, 1_000_000_000)
         self.assertEqual(MAX_ENCODED_PAYLOAD_BYTE_COUNT, START_PAYLOAD_BYTE_COUNT)
@@ -68,6 +70,7 @@ class PayloadTests(unittest.TestCase):
             0x1112131415161718,
             preferred_frame_ns=0x71727374,
             target_frame_ns=0x41424344,
+            refresh_period_ns=0x81828384,
             intended_display_ns=0x3132333435363738,
             cpu_start_ns=0x5152535455565758,
             cpu_busy_ns=0x61626364,
@@ -81,10 +84,11 @@ class PayloadTests(unittest.TestCase):
             + bytes([0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11])  # animation time
             + bytes([0x74, 0x73, 0x72, 0x71])  # preferred frame time
             + bytes([0x44, 0x43, 0x42, 0x41])  # target frame time
+            + bytes([0x84, 0x83, 0x82, 0x81])  # refresh period
             + bytes([0x38, 0x37, 0x36, 0x35, 0x34, 0x33, 0x32, 0x31])  # intended display time
             + bytes([0x58, 0x57, 0x56, 0x55, 0x54, 0x53, 0x52, 0x51])  # CPU start time
             + bytes([0x64, 0x63, 0x62, 0x61])  # CPU busy
-            + bytes([0x3D, 0x6A, 0xD1, 0x7E])  # CRC: 0x7ED16A3D, the same bytes the C++ and C# tests expect
+            + bytes([0x3B, 0xB7, 0xA7, 0x4D])  # CRC: 0x4DA7B73B, the same bytes the C++ and C# tests expect
         )
         self.assertEqual(data, expected)
         self.assertEqual(len(data), PAYLOAD_BYTE_COUNT)
@@ -98,6 +102,7 @@ class PayloadTests(unittest.TestCase):
             2,
             preferred_frame_ns=9,
             target_frame_ns=5,
+            refresh_period_ns=10,
             intended_display_ns=4,
             cpu_start_ns=6,
             cpu_busy_ns=7,
@@ -105,23 +110,24 @@ class PayloadTests(unittest.TestCase):
         sequence_id = SequenceId(bytes(range(0xA0, 0xB0)))
         data = encode_payload(payload, StartMetadata(0x0102030405060708, sequence_id))
         self.assertEqual(len(data), START_PAYLOAD_BYTE_COUNT)
-        # The same 53 byte header as the other kinds, then the start time and the sequence id, and the CRC of all of it
+        # The same 57 byte header as the other kinds, then the start time and the sequence id, and the CRC of all of it
         end_header = encode_payload(payload.with_kind(MarkerKind.SEQUENCE_END))
         self.assertEqual(data[:3] + data[4:HEADER_BYTE_COUNT], end_header[:3] + end_header[4:HEADER_BYTE_COUNT])
         self.assertEqual(data[3], MarkerKind.SEQUENCE_START)
         self.assertEqual(data[16], 1)
         self.assertEqual(data[25:29], bytes([9, 0, 0, 0]))
-        self.assertEqual(data[41:49], bytes([6, 0, 0, 0, 0, 0, 0, 0]))
-        self.assertEqual(data[49:53], bytes([7, 0, 0, 0]))
-        self.assertEqual(data[53:61], bytes([8, 7, 6, 5, 4, 3, 2, 1]))
+        self.assertEqual(data[33:37], bytes([10, 0, 0, 0]))
+        self.assertEqual(data[45:53], bytes([6, 0, 0, 0, 0, 0, 0, 0]))
+        self.assertEqual(data[53:57], bytes([7, 0, 0, 0]))
+        self.assertEqual(data[57:65], bytes([8, 7, 6, 5, 4, 3, 2, 1]))
         # The sequence id is stored as its bytes, in order
-        self.assertEqual(data[61:77], bytes(range(0xA0, 0xB0)))
-        self.assertEqual(data[77:], struct.pack("<I", binascii.crc32(data[:77])))
+        self.assertEqual(data[65:81], bytes(range(0xA0, 0xB0)))
+        self.assertEqual(data[81:], struct.pack("<I", binascii.crc32(data[:81])))
 
     def test_a_negative_time_is_stored_as_twos_complement(self) -> None:
         self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, -1))[17:25], b"\xff" * 8)
-        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ns=-2))[33:41], b"\xfe" + (b"\xff" * 7))
-        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ns=-3))[41:49], b"\xfd" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, intended_display_ns=-2))[37:45], b"\xfe" + (b"\xff" * 7))
+        self.assertEqual(encode_payload(Payload(MarkerKind.FRAME, 0, 0, MarkerFlags.NO_FLAGS, 0, cpu_start_ns=-3))[45:53], b"\xfd" + (b"\xff" * 7))
 
     def test_the_optional_fields_default_to_unknown(self) -> None:
         payload = Payload(MarkerKind.SEQUENCE_END, 3, 1, MarkerFlags.NO_FLAGS, 2)
@@ -132,11 +138,12 @@ class PayloadTests(unittest.TestCase):
                 payload.cpu_start_ns,
                 payload.cpu_busy_ns,
                 payload.preferred_frame_ns,
+                payload.refresh_period_ns,
                 payload.flags,
             ),
-            (0, 0, 0, 0, 0, MarkerFlags.NO_FLAGS),
+            (0, 0, 0, 0, 0, 0, MarkerFlags.NO_FLAGS),
         )
-        self.assertEqual(encode_payload(payload)[24:HEADER_BYTE_COUNT], bytes(29))
+        self.assertEqual(encode_payload(payload)[24:HEADER_BYTE_COUNT], bytes(33))
         self.assertEqual(StartMetadata(), StartMetadata(0, SequenceId(bytes(16))))
 
     def test_round_trips(self) -> None:
@@ -308,21 +315,40 @@ class PayloadTests(unittest.TestCase):
                     self.assertEqual(decoded[0], payload)
 
     def test_a_duration_longer_than_its_four_bytes_is_held_as_the_longest_a_marker_carries(self) -> None:
-        # The marker's three durations are four unsigned bytes of nanoseconds each: 4.294967295 s at most
-        self.assertEqual((MAX_CPU_BUSY_NS, ON_DEMAND_FRAME_NS, MAX_FRAME_NS), (0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFE))
+        # The marker's four durations are four unsigned bytes of nanoseconds each: 4.294967295 s at most
+        self.assertEqual((MAX_CPU_BUSY_NS, MAX_REFRESH_PERIOD_NS, ON_DEMAND_FRAME_NS, MAX_FRAME_NS), (0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFE))
         ten_seconds = 10 * NS_PER_SECOND
         longest = I64_MAX  # the longest duration the C++ and C# libraries hold
 
         # A longer one is capped where the payload is made (never an error: this runs in a frame loop), so a payload holds what a marker can
-        capped = Payload(MarkerKind.FRAME, 1, 2, MarkerFlags.NO_FLAGS, 3, preferred_frame_ns=ten_seconds, target_frame_ns=longest, cpu_busy_ns=ten_seconds)
+        capped = Payload(
+            MarkerKind.FRAME,
+            1,
+            2,
+            MarkerFlags.NO_FLAGS,
+            3,
+            preferred_frame_ns=ten_seconds,
+            target_frame_ns=longest,
+            refresh_period_ns=longest,
+            cpu_busy_ns=ten_seconds,
+        )
         self.assertEqual((capped.preferred_frame_ns, capped.target_frame_ns, capped.cpu_busy_ns), (MAX_FRAME_NS, MAX_FRAME_NS, MAX_CPU_BUSY_NS))
+        self.assertEqual(capped.refresh_period_ns, MAX_REFRESH_PERIOD_NS)
         self.assertEqual(capped.cpu_busy_ns, 4_294_967_295)
         self.assertEqual((capped.kind, capped.run_id, capped.frame_index, capped.animation_ns), (MarkerKind.FRAME, 1, 2, 3), "nothing else changes")
         self.assertEqual((capped.intended_display_ns, capped.cpu_start_ns), (0, 0))
 
         # The longest that fit are kept, and so is on demand: only on demand reads as on demand
         kept = Payload(
-            MarkerKind.FRAME, 1, 2, MarkerFlags.NO_FLAGS, 3, preferred_frame_ns=MAX_FRAME_NS, target_frame_ns=ON_DEMAND_FRAME_NS, cpu_busy_ns=MAX_CPU_BUSY_NS
+            MarkerKind.FRAME,
+            1,
+            2,
+            MarkerFlags.NO_FLAGS,
+            3,
+            preferred_frame_ns=MAX_FRAME_NS,
+            target_frame_ns=ON_DEMAND_FRAME_NS,
+            refresh_period_ns=MAX_REFRESH_PERIOD_NS,
+            cpu_busy_ns=MAX_CPU_BUSY_NS,
         )
         self.assertEqual((kept.preferred_frame_ns, kept.target_frame_ns, kept.cpu_busy_ns), (MAX_FRAME_NS, ON_DEMAND_FRAME_NS, MAX_CPU_BUSY_NS))
         # One nanosecond past on demand is a frame time again, and too long
@@ -330,17 +356,25 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(past_on_demand.preferred_frame_ns, MAX_FRAME_NS)
         # Another kind of the same payload holds the same values
         end = Payload(
-            MarkerKind.SEQUENCE_END, 1, 2, MarkerFlags.NO_FLAGS, 3, preferred_frame_ns=MAX_FRAME_NS, target_frame_ns=MAX_FRAME_NS, cpu_busy_ns=MAX_CPU_BUSY_NS
+            MarkerKind.SEQUENCE_END,
+            1,
+            2,
+            MarkerFlags.NO_FLAGS,
+            3,
+            preferred_frame_ns=MAX_FRAME_NS,
+            target_frame_ns=MAX_FRAME_NS,
+            refresh_period_ns=MAX_REFRESH_PERIOD_NS,
+            cpu_busy_ns=MAX_CPU_BUSY_NS,
         )
         self.assertEqual(capped.with_kind(MarkerKind.SEQUENCE_END), end)
 
-        # On the wire: 0xFFFFFFFE for a capped frame time, 0xFFFFFFFF for on demand and for a capped CPU busy
+        # On the wire: 0xFFFFFFFE for a capped frame time, 0xFFFFFFFF for on demand and for a capped refresh period and CPU busy
         one_below = bytes([0xFE, 0xFF, 0xFF, 0xFF])
         largest = bytes([0xFF, 0xFF, 0xFF, 0xFF])
         capped_bytes = encode_payload(capped)
-        self.assertEqual((capped_bytes[25:29], capped_bytes[29:33], capped_bytes[49:53]), (one_below, one_below, largest))
+        self.assertEqual((capped_bytes[25:29], capped_bytes[29:33], capped_bytes[33:37], capped_bytes[53:57]), (one_below, one_below, largest, largest))
         kept_bytes = encode_payload(kept)
-        self.assertEqual((kept_bytes[25:29], kept_bytes[29:33], kept_bytes[49:53]), (one_below, largest, largest))
+        self.assertEqual((kept_bytes[25:29], kept_bytes[29:33], kept_bytes[33:37], kept_bytes[53:57]), (one_below, largest, largest, largest))
 
         # So a payload decodes to exactly what was encoded, a capped one too
         self.assertEqual(try_decode_payload(capped_bytes), (capped, None))
@@ -348,12 +382,13 @@ class PayloadTests(unittest.TestCase):
 
     def test_try_decode_rejects_bad_input(self) -> None:
         payload = encode_payload(Payload(MarkerKind.FRAME, 0, 1, MarkerFlags.NO_FLAGS, 2))
-        self.assertEqual(len(payload), 57)
-        self.assertIsNone(try_decode_payload(payload[:-1]), "short: 56 bytes")
+        self.assertEqual(len(payload), 61)
+        self.assertIsNone(try_decode_payload(payload[:-1]), "short: 60 bytes")
         self.assertIsNone(try_decode_payload(payload[:HEADER_BYTE_COUNT]), "the header alone, as it was before the CRC")
+        self.assertIsNone(try_decode_payload(payload[:57]), "57 bytes, as a frame marker was before the refresh period")
         self.assertIsNone(try_decode_payload(payload[:44]), "an older 44 byte header")
         self.assertIsNone(try_decode_payload(payload[:48]), "an older 48 byte header")
-        self.assertIsNone(try_decode_payload(payload + b"\x00"), "long: 58 bytes")
+        self.assertIsNone(try_decode_payload(payload + b"\x00"), "long: 62 bytes")
         # Each with the CRC put right, so it is the magic, the format version and the kind that are refused
         data = bytearray(payload[:HEADER_BYTE_COUNT])
         data[0] = ord("X")
@@ -370,9 +405,9 @@ class PayloadTests(unittest.TestCase):
         self.assertIsNotNone(try_decode_payload(with_crc(data)))
         self.assertEqual(with_crc(data), payload)
 
-        # A start marker must be exactly 81 bytes: without its metadata, truncated or longer is rejected
+        # A start marker must be exactly 85 bytes: without its metadata, truncated or longer is rejected
         start = encode_payload(Payload(MarkerKind.SEQUENCE_START, 3, 1, MarkerFlags.NO_FLAGS, 2), StartMetadata(5, SequenceId.from_text("run")))
-        self.assertEqual(len(start), 81)
+        self.assertEqual(len(start), 85)
         self.assertIsNotNone(try_decode_payload(start))
         for length in (HEADER_BYTE_COUNT, PAYLOAD_BYTE_COUNT, PAYLOAD_BYTE_COUNT + 9, START_PAYLOAD_BYTE_COUNT - CRC_BYTE_COUNT, START_PAYLOAD_BYTE_COUNT - 1):
             with self.subTest(length):
@@ -400,6 +435,7 @@ class PayloadTests(unittest.TestCase):
             0x1112131415161718,
             preferred_frame_ns=0x71727374,
             target_frame_ns=0x41424344,
+            refresh_period_ns=0x81828384,
             intended_display_ns=0x3132333435363738,
             cpu_start_ns=0x5152535455565758,
             cpu_busy_ns=0x61626364,

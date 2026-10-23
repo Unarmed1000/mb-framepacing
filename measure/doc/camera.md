@@ -195,6 +195,10 @@ The analysis adds, per run (`summary.json` → `runs[].camera`) and per frame (`
   before the rig's calibration, and the calculated rate is compared with it: the Analyze page shows "Display refresh 59.99 Hz
   (calculated from the camera frames), expected 60 Hz: matches", and a difference above 1 % is a warning
   (`runs[].pacing.expectedRefreshHz`, `refreshDeviation`, `matchesExpectedRefresh`).
+- **The refresh period in the markers** (the display the application works with, when it writes one): without `--display-hz`,
+  the markers' most common refresh period settles an ambiguous estimate in its place, still before the rig's calibration, and the
+  calculated rate is compared with it: a difference above 1 % is a warning. It is the application's word about its display, not a
+  measurement: the warning says the two disagree, not which one is wrong.
 - The animation error threshold (the dashed band, "frames visibly off") is the same as for every capture source: 1 ms unless
   `analyze --error-threshold-ms` changes it. A camera's animation error carries noise of about one camera period (two first-seen
   times), so when the camera period is longer than the threshold the report warns and suggests the camera period as the threshold.

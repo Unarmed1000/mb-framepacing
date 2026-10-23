@@ -222,6 +222,7 @@ namespace MB.FramePacing.Marker.UnitTest
               new NanosecondTimeSpan(running ? time : time / 4),
               NanosecondTimeDuration.FromNanoseconds(running ? 16_666_667u : (uint)random.Next()),
               NanosecondTimeDuration.FromNanoseconds(running ? 16_666_667u : (uint)random.Next()),
+              NanosecondTimeDuration.FromNanoseconds(running ? 16_666_667u : (uint)random.Next()),
               new NanosecondTickCount(running ? 3_600_000_000_000 + time : time),
               new NanosecondTickCount(running ? 3_599_990_000_000 + time : time / 2),
               NanosecondTimeDuration.FromNanoseconds((uint)random.Below(40_000_000))

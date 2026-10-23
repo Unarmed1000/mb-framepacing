@@ -41,6 +41,7 @@ FRAME_COLUMNS: list[tuple[str, Callable[[FrameRow], int | None]]] = [
     ("targetNs", lambda r: r.target_ns),
     ("markerPreferredNs", lambda r: r.marker_preferred_ns),
     ("preferredNs", lambda r: r.preferred_ns),
+    ("markerRefreshPeriodNs", lambda r: r.marker_refresh_period_ns),
     ("pacingErrorNs", lambda r: r.pacing_error_ns),
     ("predictionErrorNs", lambda r: r.prediction_error_ns),
     ("latenessNs", lambda r: r.lateness_ns),

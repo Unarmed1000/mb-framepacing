@@ -255,7 +255,8 @@ period is the capture period, and display time steps are whole refreshes, measur
 time step against the display time step) is then exact too, to the nanosecond. The report's animation error panel marks every
 whole refresh an error reaches with a dashed amber line (±16.7 ms at 60 Hz, ±20 ms at 50 Hz): an error that size is a frame shown a
 whole refresh early or late. The display rate you expect (`--display-hz`, **Display refresh rate**) is checked against the
-capture's rate.
+capture's rate, and so is the refresh period the application writes into its markers: when they disagree by more than 1 %, the
+analysis says so (it does not say which one is wrong).
 
 **Late frames** are shown later than they were animated for and than intended: a frame is late when its display time step (how
 long the frame before it stayed on screen) is longer than both its animation time step and its **intended period**, each by half a

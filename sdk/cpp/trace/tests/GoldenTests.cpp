@@ -34,8 +34,9 @@ namespace
   constexpr std::string_view FileName = "frame-records.csv";
   //! The file's columns: the payload constructor's arguments in the order of the wire format (without the flags), then the record
   constexpr std::string_view Header =
-    "kind,runId,frameIndex,animationNs,preferredNs,targetNs,intendedDisplayNs,cpuStartNs,cpuBusyNs,name,startNs,durationNs,annotations";
-  constexpr std::size_t ColumnCount = 13;
+    "kind,runId,frameIndex,animationNs,preferredNs,targetNs,refreshPeriodNs,intendedDisplayNs,cpuStartNs,cpuBusyNs,name,startNs,durationNs,"
+    "annotations";
+  constexpr std::size_t ColumnCount = 14;
   //! The rows the file has at the least: a row for each rule of the record
   constexpr uint32_t MinRowCount = 9;
 
@@ -97,7 +98,7 @@ namespace
     return std::nullopt;
   }
 
-  //! The payload of a row: its first nine cells, given to the constructor as they are
+  //! The payload of a row: its first ten cells, given to the constructor as they are
   FM::Payload PayloadOf(const FM::MarkerKind kind, const std::vector<std::string>& cells)
   {
     const unsigned long long runId = std::stoull(cells[1]);
@@ -109,9 +110,10 @@ namespace
             FP::NanosecondTimeSpan(std::stoll(cells[3])),
             FP::NanosecondTimeDuration::FromNanoseconds(std::stoll(cells[4])),
             FP::NanosecondTimeDuration::FromNanoseconds(std::stoll(cells[5])),
-            FP::NanosecondTickCount(std::stoll(cells[6])),
+            FP::NanosecondTimeDuration::FromNanoseconds(std::stoll(cells[6])),
             FP::NanosecondTickCount(std::stoll(cells[7])),
-            FP::NanosecondTimeDuration::FromNanoseconds(std::stoll(cells[8]))};
+            FP::NanosecondTickCount(std::stoll(cells[8])),
+            FP::NanosecondTimeDuration::FromNanoseconds(std::stoll(cells[9]))};
   }
 }
 
@@ -154,11 +156,11 @@ TEST(Golden, EveryPayloadGivesTheRecordOfItsRow)
     record.AnnotationCount = 1;
     const bool created = TR::FrameRecordUtil::TryCreate(PayloadOf(kind.value(), cells), record);
 
-    const std::string& expectedName = cells[9];
+    const std::string& expectedName = cells[10];
     if (expectedName.empty())
     {
       // No record: the row has nothing else of one either
-      EXPECT_TRUE(cells[10].empty() && cells[11].empty() && cells[12].empty());
+      EXPECT_TRUE(cells[11].empty() && cells[12].empty() && cells[13].empty());
       EXPECT_FALSE(created);
       EXPECT_TRUE(record.Name.View().empty());
       EXPECT_EQ(record.StartTime, FP::NanosecondTickCount());
@@ -171,9 +173,9 @@ TEST(Golden, EveryPayloadGivesTheRecordOfItsRow)
     ASSERT_TRUE(created);
     EXPECT_EQ(record.Name.View(), expectedName);
     EXPECT_STREQ(record.Name.CStr(), expectedName.c_str());
-    EXPECT_EQ(record.StartTime.Nanoseconds(), std::stoll(cells[10]));
-    EXPECT_EQ(record.Duration.Nanoseconds(), std::stoll(cells[11]));
-    const std::vector<std::string> expected = cells[12].empty() ? std::vector<std::string>() : Split(cells[12], ';');
+    EXPECT_EQ(record.StartTime.Nanoseconds(), std::stoll(cells[11]));
+    EXPECT_EQ(record.Duration.Nanoseconds(), std::stoll(cells[12]));
+    const std::vector<std::string> expected = cells[13].empty() ? std::vector<std::string>() : Split(cells[13], ';');
     const std::span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
     ASSERT_EQ(annotations.size(), expected.size());
     for (std::size_t index = 0; index < expected.size(); ++index)

@@ -561,10 +561,10 @@ TEST(AnalysisOutput, EveryTimeIsReadAsTheNanosecondsItIs)
   const auto rows = ReadFrames(
     "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,displayDeltaNs,"
     "animationDeltaNs,animationErrorNs,driftNs,flags,intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,"
-    "preferredNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,cpuWaitNs,"
+    "preferredNs,markerRefreshPeriodNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,cpuWaitNs,"
     "olderFrames,mainMarkerFirstSeenNs,scanoutDelayNs\n"
     "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,16666667,1,0,16666666,9223372036854775807,-1,-7,Late,"
-    "-9223372036854775808,4294967295,33333334,1,16666667,3,-3,8333333,1234567890123456789,-1234567890123456789,12006000,16666800,4660800,"
+    "-9223372036854775808,4294967295,33333334,1,16666667,4294967294,3,-3,8333333,1234567890123456789,-1234567890123456789,12006000,16666800,4660800,"
     "41@1234567890123456790|40@-5,9007199254740993,-9007199254740993\n");
   ASSERT_EQ(rows.size(), 1u);
   const FD::FrameRow& row = rows[0];
@@ -582,6 +582,7 @@ TEST(AnalysisOutput, EveryTimeIsReadAsTheNanosecondsItIs)
   EXPECT_EQ(row.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(33'333'334));
   EXPECT_EQ(row.MarkerPreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(1));
   EXPECT_EQ(row.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
+  EXPECT_EQ(row.MarkerRefreshPeriod, FP::NanosecondTimeDuration::FromNanoseconds(4'294'967'294));
   EXPECT_EQ(row.PacingError, FP::NanosecondTimeSpan(3));
   EXPECT_EQ(row.PredictionError, FP::NanosecondTimeSpan(-3));
   EXPECT_EQ(row.Lateness, FP::NanosecondTimeSpan(8'333'333));
@@ -624,7 +625,9 @@ TEST(AnalysisOutput, TheMarkersDurationsMustFit32Bits)
   EXPECT_EQ(read("markerPreferredNs", "4294967295").MarkerPreferredFrameTime, FM::Payload::OnDemandFrameTime) << "on demand";
   EXPECT_EQ(read("markerPreferredNs", "16666667").MarkerPreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
   EXPECT_FALSE(read("markerPreferredNs", "").MarkerPreferredFrameTime.has_value()) << "an empty cell";
-  for (const std::string_view column : {"cpuBusyNs", "markerTargetNs", "markerPreferredNs"})
+  EXPECT_EQ(read("markerRefreshPeriodNs", "4294967295").MarkerRefreshPeriod, FM::Payload::MaxRefreshPeriod) << "the largest: 4.29 s";
+  EXPECT_EQ(read("markerRefreshPeriodNs", "16666667").MarkerRefreshPeriod, FP::NanosecondTimeDuration::FromNanoseconds(16'666'667));
+  for (const std::string_view column : {"cpuBusyNs", "markerTargetNs", "markerPreferredNs", "markerRefreshPeriodNs"})
   {
     EXPECT_THROW((void)read(column, "4294967296"), FD::DataFormatError) << column << ": one beyond 32 bits";
     EXPECT_THROW((void)read(column, "9223372036854775807"), FD::DataFormatError) << column << ": what the type itself would hold";

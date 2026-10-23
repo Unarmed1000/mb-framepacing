@@ -23,7 +23,7 @@ namespace MB::FramePacing::Trace
   struct FrameRecord
   {
     //! The most annotations a record has.
-    static constexpr std::size_t MaxAnnotationCount = 4;
+    static constexpr std::size_t MaxAnnotationCount = 5;
 
     //! The slice's name.
     FrameRecordName Name;

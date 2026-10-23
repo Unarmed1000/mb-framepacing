@@ -3,7 +3,7 @@
 //* ----------------
 //* Internal to the marker module: the CRC-32 every payload ends with (doc/marker-format.md; the C++ library's Crc32). It is the CRC-32 of
 //* zlib, PNG and Ethernet: the polynomial 0x04C11DB7 bit reversed (0xEDB88320), the register started at and XORed at the end with
-//* 0xFFFFFFFF. Half a byte per step, so the table is 16 entries: a payload is at most 81 bytes, once a frame. .NET Standard 2.1 (and so
+//* 0xFFFFFFFF. Half a byte per step, so the table is 16 entries: a payload is at most 85 bytes, once a frame. .NET Standard 2.1 (and so
 //* Unity) has no System.IO.Hashing.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS

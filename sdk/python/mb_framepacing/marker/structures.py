@@ -23,6 +23,8 @@ largest value the field's four bytes hold, so no frame time is that long: see MA
 MAX_FRAME_NS = 0xFFFF_FFFE
 """The longest target and preferred frame time a marker carries, 4.294967294 s (slower than 0.233 fps): one below ON_DEMAND_FRAME_NS. A
 longer one is held as this."""
+MAX_REFRESH_PERIOD_NS = 0xFFFF_FFFF
+"""The longest refresh period a marker carries, 4.294967295 s. A longer one is held as this."""
 MAX_CPU_BUSY_NS = 0xFFFF_FFFF
 """The longest CPU busy a marker carries, 4.294967295 s. A longer one is held as this."""
 
@@ -59,11 +61,12 @@ class Payload:
     """The data every marker carries, its fields in the order of the wire format (doc/marker-format.md). The kind, run id (u32), frame
     index (u64), flags and animation time are required; the timing fields are optional (0 = unknown). Every time is a whole number of
     nanoseconds, an int: a span (the animation time, i64), a point on the frame pacer's steady clock (the intended display and CPU start
-    time, i64) or a duration, which is never negative (the preferred and target frame time and CPU busy, u32). A sync marker only carries
+    time, i64) or a duration, which is never negative (the preferred and target frame time, the refresh period and CPU busy, u32). A sync marker only carries
     the kind, run id and frame index.
 
-    The marker holds its three durations in four bytes each, so a payload holds none longer than a marker can carry: making one caps a
-    longer CPU busy at MAX_CPU_BUSY_NS and a longer frame time at MAX_FRAME_NS (never an error: this runs in a frame loop). So a payload
+    The marker holds its four durations in four bytes each, so a payload holds none longer than a marker can carry: making one caps a
+    longer CPU busy at MAX_CPU_BUSY_NS, a longer refresh period at MAX_REFRESH_PERIOD_NS and a longer frame time at MAX_FRAME_NS (never
+    an error: this runs in a frame loop). So a payload
     decodes to exactly what was encoded. Nothing else is checked here: encode_payload raises ValueError for a negative duration and for
     any other field outside its range. The flags are kept as given, reserved bits included."""
 
@@ -85,6 +88,10 @@ class Payload:
     target_frame_ns: int = 0
     """The interval the frame pacer aims for between the previous frame and this one, in nanoseconds: 16_666_667 for 60 fps. 0 = unknown,
     ON_DEMAND_FRAME_NS = frames only when something changes; at most MAX_FRAME_NS otherwise."""
+    refresh_period_ns: int = 0
+    """The refresh period of the display the application works with, in nanoseconds: 16_666_667 for 60 Hz, what it gives its pacer or
+    what its swap chain reports. The tools compare it with the capture's. 0 = unknown (and under variable refresh); at most
+    MAX_REFRESH_PERIOD_NS."""
     intended_display_ns: int = 0
     """When the frame pacer intends this frame to become visible, in nanoseconds on its steady clock (any epoch, the same clock for the
     whole run). 0 = unknown."""
@@ -102,6 +109,8 @@ class Payload:
             object.__setattr__(self, "preferred_frame_ns", MAX_FRAME_NS)
         if self.target_frame_ns > MAX_FRAME_NS and self.target_frame_ns != ON_DEMAND_FRAME_NS:
             object.__setattr__(self, "target_frame_ns", MAX_FRAME_NS)
+        if self.refresh_period_ns > MAX_REFRESH_PERIOD_NS:
+            object.__setattr__(self, "refresh_period_ns", MAX_REFRESH_PERIOD_NS)
         if self.cpu_busy_ns > MAX_CPU_BUSY_NS:
             object.__setattr__(self, "cpu_busy_ns", MAX_CPU_BUSY_NS)
 

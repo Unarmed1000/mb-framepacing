@@ -87,7 +87,8 @@ namespace MB.FramePacing.TraceJoin
         Compare(ref annotations[0], record.AnimationNs, frame.AnimationTime.Nanoseconds);
         Compare(ref annotations[1], record.MarkerPreferredNs, frame.MarkerPreferredFrameTime?.Nanoseconds ?? 0);
         Compare(ref annotations[2], record.MarkerTargetNs, frame.MarkerTargetFrameTime?.Nanoseconds ?? 0);
-        Compare(ref annotations[3], record.IntendedDisplayNs, frame.IntendedDisplayNs() ?? 0);
+        Compare(ref annotations[3], record.MarkerRefreshPeriodNs, frame.MarkerRefreshPeriod?.Nanoseconds ?? 0);
+        Compare(ref annotations[4], record.IntendedDisplayNs, frame.IntendedDisplayNs() ?? 0);
       }
       starts.Sort();
       busyDifferences.Sort();

@@ -22,17 +22,17 @@ u32 | frame index u64 | CRC u32."""
 SYNC_QR_MODULE_COUNT = (4 * SYNC_QR_VERSION) + 17
 SYNC_PAYLOAD_BYTE_COUNT = 16 + CRC_BYTE_COUNT
 
-HEADER_BYTE_COUNT = 53
+HEADER_BYTE_COUNT = 57
 """Payload header, shared by every marker kind (little endian), grouped: magic "MF" | format version | kind | run id u32 | frame index
-u64 | flags u8 | animation time i64 | preferred frame time u32 | target frame time u32 | intended display time i64 | CPU start time i64 |
-CPU busy u32. Every time is in nanoseconds. Start and end markers carry the values of the frame that shows them."""
+u64 | flags u8 | animation time i64 | preferred frame time u32 | target frame time u32 | refresh period u32 | intended display time i64 |
+CPU start time i64 | CPU busy u32. Every time is in nanoseconds. Start and end markers carry the values of the frame that shows them."""
 PAYLOAD_BYTE_COUNT = HEADER_BYTE_COUNT + CRC_BYTE_COUNT
 """A frame or end marker's payload: header | CRC u32."""
 PAYLOAD_MAGIC = b"MF"
 PAYLOAD_FORMAT_VERSION = 1
 
-# The largest values of the three u32 durations (ON_DEMAND_FRAME_NS, MAX_FRAME_NS, MAX_CPU_BUSY_NS) are next to Payload, which holds
-# nothing longer: structures.py, which this module imports
+# The largest values of the four u32 durations (ON_DEMAND_FRAME_NS, MAX_FRAME_NS, MAX_REFRESH_PERIOD_NS, MAX_CPU_BUSY_NS) are next to
+# Payload, which holds nothing longer: structures.py, which this module imports
 
 START_PAYLOAD_BYTE_COUNT = HEADER_BYTE_COUNT + 8 + SEQUENCE_ID_BYTE_COUNT + CRC_BYTE_COUNT
 """Start marker payload: header | start time UTC i64 (DateTime ticks, the one time that is not in nanoseconds) | sequence id (16 bytes) |

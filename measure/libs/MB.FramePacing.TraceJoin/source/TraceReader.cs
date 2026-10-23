@@ -239,8 +239,9 @@ namespace MB.FramePacing.TraceJoin
             AnimationNs = rows.WholeOrNull(row, 3),
             MarkerPreferredNs = rows.WholeOrNull(row, 4),
             MarkerTargetNs = rows.WholeOrNull(row, 5),
-            IntendedDisplayNs = rows.WholeOrNull(row, 6),
-            Process = rows.TextOrNull(row, 7),
+            MarkerRefreshPeriodNs = rows.WholeOrNull(row, 6),
+            IntendedDisplayNs = rows.WholeOrNull(row, 7),
+            Process = rows.TextOrNull(row, 8),
           }
         );
       }

@@ -60,6 +60,7 @@ namespace MB.FramePacing.Analysis
         frame.TargetFrameTime,
         Known(frame.MarkerPreferredFrameTime),
         frame.PreferredFrameTime,
+        Known(frame.MarkerRefreshPeriod),
         frame.PacingError,
         frame.PredictionError,
         frame.Lateness,
@@ -138,6 +139,7 @@ namespace MB.FramePacing.Analysis
         row.CpuWait,
         row.MarkerPreferredFrameTime ?? default,
         row.PreferredFrameTime,
+        row.MarkerRefreshPeriod ?? default,
         row.OlderFrames.Count > 0 ? row.OlderFrames.Select(o => new OlderFrameCapture(o.CaptureTime, o.FrameIndex)).ToArray() : null
       );
 

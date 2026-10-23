@@ -267,6 +267,8 @@ namespace MB::FramePacing::Pacer
     {
       schedule = m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
     }
+    // The display's period is known whether the frame is paced or not
+    schedule.RefreshPeriod = NanosecondTimeDuration(Refresh().ToNanosecondTimeSpan());
     // Kept for the display report that comes for it later, with the period the frame's marker says was intended, as the tools
     // read it: the target frame time (its swap interval) while pacing, else the preferred frame time
     const uint32_t intendedRefreshes = m_isPacing ? schedule.SwapInterval : Rule().PreferredSwapInterval();

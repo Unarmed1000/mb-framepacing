@@ -220,7 +220,9 @@ the static frame, so an animation clock that pauses while idle does not look lik
 the game wants to run at, its target frame time, and the time it intends the frame to become visible (steady clock nanoseconds, any epoch). The analysis then measures every display time step against your plan, separates pacing errors from animation timing errors,
 does not count a rate you chose (30 fps for a busy stretch) as off its target, and shows where the game ran slower than it wanted: a 30 fps
 lock prefers 30 fps, a pacer that drops from 60 to 30 keeps preferring 60, and a device idle at 1 fps prefers 1 fps. A renderer that
-presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. The SDK's own
+presents only when something changes writes `FM::Payload::OnDemandFrameTime` for both frame times. Write the **refresh period**
+of the display you work with too (what you give your pacer, or what your swap chain or platform reports; `0` under variable
+refresh): the analysis compares it with the capture and warns when the two disagree by more than 1 %. The SDK's own
 [frame pacer](pacer.md) (`mb_framepacing::pacer`), which paces every frame from what your platform can do (a steady clock and the
 refresh period at the least) and hands you these values and an animation time in whole refreshes, is experimental and off by default.
 
@@ -230,12 +232,14 @@ application side, including frames that took several refreshes or overlap the ne
 in the order of the wire format: the kind, run id, frame index, flags and animation time, then the optional timing fields:
 
 ```cpp
-// Kind, run id, frame index, flags, animation time; then preferred and target frame time, intended display time, CPU start and busy
-// Every time is in nanoseconds: the animation time is an FP::NanosecondTimeSpan, the frame times and CPU busy an
+// Kind, run id, frame index, flags, animation time; then preferred and target frame time, refresh period, intended display time,
+// CPU start and busy. The refresh period comes after the target frame time: check the order of a call that passes `{}` for the
+// fields it leaves out.
+// Every time is in nanoseconds: the animation time is an FP::NanosecondTimeSpan, the frame times, the refresh period and CPU busy an
 // FP::NanosecondTimeDuration (never negative; the payload holds at most the 4.29 s a marker carries), the intended display and CPU
 // start time an FP::NanosecondTickCount (FromCounter, or ToNanosecondTickCount of core/time/ChronoConversion.hpp, from your clock)
 const FM::Payload payload(FM::MarkerKind::Frame, runId, frameIndex, nothingPending ? FM::MarkerFlags::StaticAfter : FM::MarkerFlags::NoFlags,
-                          animationTime, preferredFrameTime, targetFrameTime, intendedDisplayTime, cpuStartTime, cpuBusy);
+                          animationTime, preferredFrameTime, targetFrameTime, refreshPeriod, intendedDisplayTime, cpuStartTime, cpuBusy);
 ```
 
 What to write in each field, for typical frame pacers, is in [Filling the marker fields](marker-fields.md).

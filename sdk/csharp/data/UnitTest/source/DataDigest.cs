@@ -39,6 +39,7 @@ namespace MB.FramePacing.Data.UnitTest
       ("targetNs", r => r.TargetFrameTime?.Nanoseconds),
       ("markerPreferredNs", r => r.MarkerPreferredFrameTime?.Nanoseconds),
       ("preferredNs", r => r.PreferredFrameTime?.Nanoseconds),
+      ("markerRefreshPeriodNs", r => r.MarkerRefreshPeriod?.Nanoseconds),
       ("pacingErrorNs", r => r.PacingError?.Nanoseconds),
       ("predictionErrorNs", r => r.PredictionError?.Nanoseconds),
       ("latenessNs", r => r.Lateness?.Nanoseconds),

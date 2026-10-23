@@ -224,7 +224,7 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
     `mbfp frame <run id> <frame index>`, from the marker's CPU start time for its CPU busy time as the payload carries them, on
     `CLOCK_MONOTONIC`, in the category `mbfp`, on a track named `mbfp frames` under the application's process (or the thread's
     own track for a writer that can only begin and end a section there); annotations in the order of the marker's fields,
-    `animationNs` always and `markerPreferredNs`, `markerTargetNs`, `intendedDisplayNs` unless 0.
+    `animationNs` always and `markerPreferredNs`, `markerTargetNs`, `markerRefreshPeriodNs`, `intendedDisplayNs` unless 0.
     - **The SDK says what to log and the application logs it** (the user: the app logs it "so it gets correctly sandwiched
       with the perfetto trace of the app"; shown the sketch of the Perfetto calls: "this is fine"). No trace writer and no
       tracing API in the SDK; an optional header that makes one library's calls is a roadmap option, not built.
@@ -349,7 +349,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `ChartRun`): every time is a whole number of nanoseconds. Points in time are `NanosecondTickCount` (named `…Time`:
     `FirstSeenTime`, `HostTime`, `DeviceTime`, empty when unknown). **A length of time is `NanosecondTimeDuration`**, which is never
     negative (the user's rule), named for what it is: in a frame's row `FrameTime`, `TargetFrameTime`, `PreferredFrameTime` and the
-    marker's own `MarkerTargetFrameTime`, `MarkerPreferredFrameTime` and `CpuBusy`; in the summary `CapturePeriod`,
+    marker's own `MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `MarkerRefreshPeriod` and `CpuBusy`; in the summary `CapturePeriod`,
     `MeasurementResolution` and `ErrorThreshold`; in a run's pacing `RefreshPeriod` and `TargetFrameTime`. The signed
     `NanosecondTimeSpan` is only for what can go either way by meaning: the animation time and step (`AnimationTime`,
     `AnimationDelta`), the three errors (`AnimationError`, `PacingError`, `PredictionError`), `Lateness`, `Drift`, `CpuWait`,
@@ -397,7 +397,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     pixels: ffmpeg's showinfo lines, resolved by the recorder through `IDeviceTimestampSource`). Pending exists only between a source and
     the recorder; files hold a time or unknown, and everything after the recorder has a `NanosecondTickCount?`.
   - **Analysis times** (`PresentedFrame`, `CaptureRow`): the marker's own values keep the marker's 0 = unknown (`IntendedDisplayTime`,
-    `CpuStartTime`, `MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`); what the analysis works out is nullable
+    `CpuStartTime`, `MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `MarkerRefreshPeriod`, `CpuBusy`); what the analysis works out is nullable
     (`DisplayDelta`, `TargetFrameTime`, `Lateness`). `IntendedDisplayTime` and `CpuStartTime` are on the pacer's clock, `FirstSeenTime`
     on the capture's: `PacingAnalyzer.CaptureMinusPacer` is where the analysis subtracts them. Milliseconds are
     `NanosecondTimeSpan.TotalMilliseconds` (a duration's through its `Value`), one division of the nanosecond count (for a value of whole ticks, the same double as ticks / 10000.0).
@@ -783,13 +783,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       refresh (the native rate). Without a schedule, a frame after frames the target dropped (`DroppedFrames`) is due one target per
       frame later (1 + dropped): dropped, not off its target. The synthetic game writes a schedule; its prediction error is 0 by
       construction.
-- **Markers (format version 1, `sdk/doc/marker-format.md`):** a 53 byte header shared by frame, start and end, its fields grouped by
+- **Markers (format version 1, `sdk/doc/marker-format.md`):** a 57 byte header shared by frame, start and end, its fields grouped by
   category: format (magic, version, kind), which run and frame (run id, frame index), what the frame shows (flags, animation time),
-  pacing (preferred frame time, target frame time, intended display time), the CPU's work (CPU start time and CPU busy, named as
+  pacing (preferred frame time, target frame time, refresh period, intended display time), the CPU's work (CPU start time and CPU busy, named as
   PresentMon's CPUStartTime and MsCPUBusy). Start/end carry the values of the frame that shows them, and the tearing check compares
   their run id and frame index with the sync marker's. Every main marker (frame, start, end) is QR version 6 (41×41), so it never changes size and has room for future fields.
   - **CRC** (agreed with the user): every payload ends with the CRC-32 of zlib and Ethernet over all the bytes before it, little
-    endian: a frame or end marker is 57 bytes, a start marker 81, a sync marker 20, and a field added later goes before the CRC. A
+    endian: a frame or end marker is 61 bytes, a start marker 85, a sync marker 20, and a field added later goes before the CRC. A
     payload whose CRC does not match is not decoded (`TryDecodePayload` false: `MarkerDecodeStatus.InvalidPayload`, the capture
     `Undecodable`): the QR code's Reed-Solomon code repairs, the CRC refuses what it repaired into other bytes. In C++ it is the
     core's `Crc32Util` (`core/Crc32Util.hpp`: a 16-entry table, for the executable size; its 256-entry form with the same result is for
@@ -797,19 +797,24 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     CRC bytes come from Python's `binascii`, never from our own code.
   - **Times are nanoseconds** (the user, 2026-10-07 and 08; the bytes did not move, the unit did): the animation time an `i64`
     (`NanosecondTimeSpan`), the intended display and CPU start time points on the pacer's clock (`NanosecondTickCount`), the two frame
-    times and CPU busy four unsigned bytes each. **A length of time is the duration type**, never negative by construction
+    times, the refresh period and CPU busy four unsigned bytes each. **A length of time is the duration type**, never negative by construction
     (`NanosecondTimeDuration`, 64-bit: what the code computes with and what a decoded payload returns), never a signed span and
     never a 32-bit time type (the four bytes are the marker's business).
     `Payload` caps a duration that is too long for its four bytes where it is made, never an error (it runs in a frame loop): CPU
-    busy at `Payload::MaxCpuBusy` (`0xFFFFFFFF`, 4.294967295 s), a frame time at `Payload::MaxFrameTime` (`0xFFFFFFFE`), since
+    busy at `Payload::MaxCpuBusy` and a refresh period at `Payload::MaxRefreshPeriod` (`0xFFFFFFFF`, 4.294967295 s), a frame time at `Payload::MaxFrameTime` (`0xFFFFFFFE`), since
     `0xFFFFFFFF` there is `Payload::OnDemandFrameTime`, a duration of exactly 4294967295 ns. So every payload is valid on the wire
     and decodes to exactly what was encoded. Python keeps plain `int`s named `*_ns` (`ON_DEMAND_FRAME_NS`, `MAX_FRAME_NS`,
-    `MAX_CPU_BUSY_NS`, `seconds_to_ns`). The start marker's start time stays C# `DateTime` UTC ticks: a calendar time does not fit
+    `MAX_REFRESH_PERIOD_NS`, `MAX_CPU_BUSY_NS`, `seconds_to_ns`). The start marker's start time stays C# `DateTime` UTC ticks: a calendar time does not fit
     64 bits of nanoseconds. The format version stayed 1 (changed in place): a marker from before reads without an error and a
     hundred times too small, and every recording and capture from before is invalid (the user's decision: no migration).
   - **Pacing terms:** the intended display time is the pacer's aim; the animation time is the predicted display time the game
     animated for (`sdk/doc/vocabulary.md`). The target frame time is what the pacer aims for now, the **preferred frame time** what the
-    application wants (it differs only while the pacer runs slower); `0xFFFFFFFF` in both = on demand. Never call the preferred frame
+    application wants (it differs only while the pacer runs slower); `0xFFFFFFFF` in both = on demand. The **refresh period**
+    (the user, 2026-10-23: optional, `0` = unknown, offset 33 in the pacing group, named as the pacer's `RefreshPeriod`) is the
+    application's word about the display it works with: the tools compare it with the capture's period (a capture card: a warning
+    beyond `RefreshTolerance` listing each rate and its frames; a camera: the hint after `--display-hz`, before the calibration),
+    never measure with it, and never say which of the two is wrong. A frames CSV has it as `markerRefreshPeriodNs`, after
+    `preferredNs`. Never call the preferred frame
     time "desired": that is Vulkan's word for a present time point.
   - **Flags:** static is a frame's time on screen (nothing animates until the next frame; the frame itself may have moved). Bit 0
     `StaticAfter` says it on the frame (known upfront: no pending work), bit 1 `StaticBefore` on the next frame (known in hindsight,
@@ -834,7 +839,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     order of the wire format: kind, run id, frame index, flags, animation time (required by every constructor; C++ also has a default
     constructor and stays trivially copyable and standard layout: private fields read through getters, `WithKind` for another kind; the
     constructor asserts the kind and `EncodePayload` refuses an unknown one, the flags are kept as given), then the optional
-    preferred frame time, target frame time, intended display time, CPU start time and CPU busy. The golden CSVs' columns
+    preferred frame time, target frame time, refresh period, intended display time, CPU start time and CPU busy. The golden CSVs' columns
     (`sdk/test-data/markers`) and the docs' field lists follow it; keep new fields in their wire position.
   - **Frame rates describe the frames that animate:** a static frame's time on screen (the next frame's display time step, flag
     `StaticBefore`) is left out of average fps, the lows and the display time step statistics and histogram
@@ -842,7 +847,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     description and the statistics tables say "excluding N static frames" (`RunHeadline.ExcludedStatic`).
   - **Late share:** amber = on screen at least half a refresh longer than the preferred frame time (the marker's, else
     `--target-fps`, else one refresh) without being late; never for static steps or on-demand frames (`LateShareData`, `PresentedFrame.PreferredFrameTime`).
-  - The start marker (81 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
+  - The start marker (85 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
     most 16 ASCII characters, shown as text or UUID hex), not a name. Format version 1 is the baseline for all data (markers,
     captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 20 bytes: the header's start, run id and frame index, and the CRC; matched to its main marker by both) is QR version 2 (25×25), drawn
     bottom-left: it checks tearing (capture cards, optional) and times the frames for a camera (required). `Options.RecommendedOrigin(kind, …)`

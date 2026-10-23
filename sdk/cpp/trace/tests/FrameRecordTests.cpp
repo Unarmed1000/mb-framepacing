@@ -31,6 +31,7 @@ namespace
 {
   constexpr FP::NanosecondTimeDuration FrameTime60 = FP::NanosecondTimeDuration::FromNanoseconds(16'666'667);
   constexpr FP::NanosecondTimeDuration FrameTime30 = FP::NanosecondTimeDuration::FromNanoseconds(33'333'333);
+  constexpr FP::NanosecondTimeDuration RefreshPeriod240 = FP::NanosecondTimeDuration::FromNanoseconds(4'166'667);
 
   //! A frame marker's payload with every time known: frame 200 of run 7
   constexpr FM::Payload FullPayload(const FM::MarkerKind kind = FM::MarkerKind::Frame)
@@ -42,6 +43,7 @@ namespace
             FP::NanosecondTimeSpan(833'277'800),
             FrameTime60,
             FrameTime30,
+            RefreshPeriod240,
             FP::NanosecondTickCount(5'000'689'390'831),
             FP::NanosecondTickCount(5'000'685'872'400),
             FP::NanosecondTimeDuration::FromNanoseconds(77'600)};
@@ -55,6 +57,7 @@ namespace
             201u,
             FM::MarkerFlags::NoFlags,
             FP::NanosecondTimeSpan(10),
+            {},
             {},
             {},
             {},
@@ -196,7 +199,7 @@ TEST(FrameRecord, ADefaultRecordIsEmpty)
   const TR::FrameRecord record;
   ExpectEmpty(record);
   EXPECT_EQ(record.EndTime(), FP::NanosecondTickCount());
-  EXPECT_EQ(TR::FrameRecord::MaxAnnotationCount, 4u);
+  EXPECT_EQ(TR::FrameRecord::MaxAnnotationCount, 5u);
   EXPECT_EQ(record.AnnotationBuffer.size(), TR::FrameRecord::MaxAnnotationCount);
 }
 
@@ -246,11 +249,12 @@ TEST(FrameRecordUtil, AFrameMarkerGivesItsRecord)
   EXPECT_EQ(record.EndTime(), FP::NanosecondTickCount(5'000'685'950'000));
   // Every annotation, in the order of the marker's fields
   const std::span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
-  ASSERT_EQ(annotations.size(), 4u);
+  ASSERT_EQ(annotations.size(), 5u);
   EXPECT_EQ(annotations[0], (TR::FrameRecordAnnotation{"animationNs", 833'277'800}));
   EXPECT_EQ(annotations[1], (TR::FrameRecordAnnotation{"markerPreferredNs", 16'666'667}));
   EXPECT_EQ(annotations[2], (TR::FrameRecordAnnotation{"markerTargetNs", 33'333'333}));
-  EXPECT_EQ(annotations[3], (TR::FrameRecordAnnotation{"intendedDisplayNs", 5'000'689'390'831}));
+  EXPECT_EQ(annotations[3], (TR::FrameRecordAnnotation{"markerRefreshPeriodNs", 4'166'667}));
+  EXPECT_EQ(annotations[4], (TR::FrameRecordAnnotation{"intendedDisplayNs", 5'000'689'390'831}));
   // The names are the module's own literals, so each ends with a zero
   for (const TR::FrameRecordAnnotation& annotation : annotations)
   {
@@ -325,7 +329,7 @@ TEST(FrameRecordUtil, AFailedCallEmptiesARecordThatHeldValues)
 {
   TR::FrameRecord record;
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(FullPayload(), record));
-  ASSERT_EQ(record.AnnotationCount, 4u);
+  ASSERT_EQ(record.AnnotationCount, 5u);
   EXPECT_FALSE(TR::FrameRecordUtil::TryCreate(PayloadStartingAt(0), record));
   ExpectEmpty(record);
 
@@ -352,7 +356,7 @@ TEST(FrameRecordUtil, TheAnimationTimeIsAlwaysAnAnnotation)
 {
   for (const int64_t animation : {int64_t{0}, int64_t{-5}, int64_t{833'277'800}, std::numeric_limits<int64_t>::max()})
   {
-    const FM::Payload payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(animation), {}, {}, {},
+    const FM::Payload payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(animation), {}, {}, {}, {},
                               FP::NanosecondTickCount(1'000));
     TR::FrameRecord record;
     ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(payload, record));
@@ -369,25 +373,31 @@ TEST(FrameRecordUtil, ATimeThatIsNotKnownIsNoAnnotation)
 
   // Only the preferred frame time
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(
-    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, FrameTime60, {}, {}, cpuStart), record));
+    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, FrameTime60, {}, {}, {}, cpuStart), record));
   ASSERT_EQ(record.Annotations().size(), 2u);
   EXPECT_EQ(record.Annotations()[1], (TR::FrameRecordAnnotation{"markerPreferredNs", 16'666'667}));
 
   // Only the target frame time
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(
-    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, {}, FrameTime30, {}, cpuStart), record));
+    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, {}, FrameTime30, {}, {}, cpuStart), record));
   ASSERT_EQ(record.Annotations().size(), 2u);
   EXPECT_EQ(record.Annotations()[1], (TR::FrameRecordAnnotation{"markerTargetNs", 33'333'333}));
 
+  // Only the refresh period
+  ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(
+    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, {}, {}, RefreshPeriod240, {}, cpuStart), record));
+  ASSERT_EQ(record.Annotations().size(), 2u);
+  EXPECT_EQ(record.Annotations()[1], (TR::FrameRecordAnnotation{"markerRefreshPeriodNs", 4'166'667}));
+
   // Only the intended display time
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(
-    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, {}, {}, FP::NanosecondTickCount(2'000), cpuStart), record));
+    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, {}, {}, {}, FP::NanosecondTickCount(2'000), cpuStart), record));
   ASSERT_EQ(record.Annotations().size(), 2u);
   EXPECT_EQ(record.Annotations()[1], (TR::FrameRecordAnnotation{"intendedDisplayNs", 2'000}));
 
   // The first and the last of the three: the order stays the order of the marker's fields
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(
-    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, FrameTime60, {}, FP::NanosecondTickCount(2'000), cpuStart),
+    FM::Payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, animation, FrameTime60, {}, {}, FP::NanosecondTickCount(2'000), cpuStart),
     record));
   ASSERT_EQ(record.Annotations().size(), 3u);
   EXPECT_EQ(record.Annotations()[0], (TR::FrameRecordAnnotation{"animationNs", 10}));
@@ -398,8 +408,8 @@ TEST(FrameRecordUtil, ATimeThatIsNotKnownIsNoAnnotation)
 TEST(FrameRecordUtil, AnIntendedDisplayTimeBeforeTheClocksStartIsAnAnnotation)
 {
   // Only 0 is "not known": the count's signed view is what is written
-  const FM::Payload payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(10), {}, {}, FP::NanosecondTickCount(-3),
-                            FP::NanosecondTickCount(1));
+  const FM::Payload payload(FM::MarkerKind::Frame, 1u, 2u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(10), {}, {}, {},
+                            FP::NanosecondTickCount(-3), FP::NanosecondTickCount(1));
   TR::FrameRecord record;
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(payload, record));
   ASSERT_EQ(record.Annotations().size(), 2u);
@@ -410,21 +420,22 @@ TEST(FrameRecordUtil, TheValuesAreThePayloadsAfterItsCaps)
 {
   // Five seconds are more than a marker's four bytes of nanoseconds hold: the payload caps them where it is made
   const FP::NanosecondTimeDuration fiveSeconds = FP::NanosecondTimeDuration::FromNanoseconds(5'000'000'000);
-  const FM::Payload payload(FM::MarkerKind::Frame, 7u, 203u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(10), fiveSeconds, fiveSeconds, {},
-                            FP::NanosecondTickCount(1), fiveSeconds);
+  const FM::Payload payload(FM::MarkerKind::Frame, 7u, 203u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(10), fiveSeconds, fiveSeconds,
+                            fiveSeconds, {}, FP::NanosecondTickCount(1), fiveSeconds);
   TR::FrameRecord record;
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(payload, record));
   EXPECT_EQ(record.Duration, FM::Payload::MaxCpuBusy);
   EXPECT_EQ(record.Duration.Nanoseconds(), 4'294'967'295);
-  ASSERT_EQ(record.Annotations().size(), 3u);
+  ASSERT_EQ(record.Annotations().size(), 4u);
   EXPECT_EQ(record.Annotations()[1], (TR::FrameRecordAnnotation{"markerPreferredNs", 4'294'967'294}));
   EXPECT_EQ(record.Annotations()[2], (TR::FrameRecordAnnotation{"markerTargetNs", 4'294'967'294}));
+  EXPECT_EQ(record.Annotations()[3], (TR::FrameRecordAnnotation{"markerRefreshPeriodNs", 4'294'967'295}));
 }
 
 TEST(FrameRecordUtil, AFrameOnDemandIsAnnotatedAsTheMarkerHasIt)
 {
   const FM::Payload payload(FM::MarkerKind::Frame, 7u, 204u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(10), FM::Payload::OnDemandFrameTime,
-                            FM::Payload::OnDemandFrameTime, {}, FP::NanosecondTickCount(2));
+                            FM::Payload::OnDemandFrameTime, {}, {}, FP::NanosecondTickCount(2));
   TR::FrameRecord record;
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(payload, record));
   ASSERT_EQ(record.Annotations().size(), 3u);
@@ -443,8 +454,9 @@ TEST(FrameRecordUtil, ACpuBusyTimeOfZeroGivesASliceWithoutLength)
 TEST(FrameRecordUtil, TheFlagsDoNotChangeTheRecord)
 {
   const FM::Payload payload(FM::MarkerKind::Frame, 7u, 200u, FM::MarkerFlags::StaticAfter | FM::MarkerFlags::StaticBefore,
-                            FP::NanosecondTimeSpan(833'277'800), FrameTime60, FrameTime30, FP::NanosecondTickCount(5'000'689'390'831),
-                            FP::NanosecondTickCount(5'000'685'872'400), FP::NanosecondTimeDuration::FromNanoseconds(77'600));
+                            FP::NanosecondTimeSpan(833'277'800), FrameTime60, FrameTime30, RefreshPeriod240,
+                            FP::NanosecondTickCount(5'000'689'390'831), FP::NanosecondTickCount(5'000'685'872'400),
+                            FP::NanosecondTimeDuration::FromNanoseconds(77'600));
   TR::FrameRecord record;
   TR::FrameRecord expected;
   ASSERT_TRUE(TR::FrameRecordUtil::TryCreate(payload, record));

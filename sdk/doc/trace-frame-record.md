@@ -31,14 +31,15 @@ record and works out, from a marker's payload, what to log.
 
 The annotations, in the order of the marker's fields. Each is the payload's value, after its cap where it has one:
 
-| Annotation          | The marker's field    | Written        |
-| ------------------- | --------------------- | -------------- |
-| `animationNs`       | Animation time        | Always         |
-| `markerPreferredNs` | Preferred frame time  | Unless it is 0 |
-| `markerTargetNs`    | Target frame time     | Unless it is 0 |
-| `intendedDisplayNs` | Intended display time | Unless it is 0 |
+| Annotation              | The marker's field    | Written        |
+| ----------------------- | --------------------- | -------------- |
+| `animationNs`           | Animation time        | Always         |
+| `markerPreferredNs`     | Preferred frame time  | Unless it is 0 |
+| `markerTargetNs`        | Target frame time     | Unless it is 0 |
+| `markerRefreshPeriodNs` | Refresh period        | Unless it is 0 |
+| `intendedDisplayNs`     | Intended display time | Unless it is 0 |
 
-A value of 0 in those three fields is "not known" ([the marker's fields](marker-fields.md)), so its annotation is left out. The
+A value of 0 in those four fields is "not known" ([the marker's fields](marker-fields.md)), so its annotation is left out. The
 names are the columns [the analysis output](analysis-output-format.md) has for the same values.
 
 The record says what a trace has and names no tracing API. Written with its timestamps, after the frame's CPU work, it is exact:
@@ -63,16 +64,17 @@ other dependency, reads no clock, calls no tracing API and allocates nothing. On
 
 The strings:
 
-| Constant            | Value                          |
-| ------------------- | ------------------------------ |
-| `Category`          | `mbfp`                         |
-| `TrackName`         | `mbfp frames`                  |
-| `NamePrefix`        | `mbfp frame ` (with the space) |
-| `AnimationNs`       | `animationNs`                  |
-| `MarkerPreferredNs` | `markerPreferredNs`            |
-| `MarkerTargetNs`    | `markerTargetNs`               |
-| `IntendedDisplayNs` | `intendedDisplayNs`            |
-| `ClockId`           | 3                              |
+| Constant                | Value                          |
+| ----------------------- | ------------------------------ |
+| `Category`              | `mbfp`                         |
+| `TrackName`             | `mbfp frames`                  |
+| `NamePrefix`            | `mbfp frame ` (with the space) |
+| `AnimationNs`           | `animationNs`                  |
+| `MarkerPreferredNs`     | `markerPreferredNs`            |
+| `MarkerTargetNs`        | `markerTargetNs`               |
+| `MarkerRefreshPeriodNs` | `markerRefreshPeriodNs`        |
+| `IntendedDisplayNs`     | `intendedDisplayNs`            |
+| `ClockId`               | 3                              |
 
 In C++, after the frame's marker is made:
 

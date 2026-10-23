@@ -354,10 +354,10 @@ class FramesCsvTests(unittest.TestCase):
         text = (
             "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,displayDeltaNs,"
             "animationDeltaNs,animationErrorNs,driftNs,flags,intendedDisplayNs,markerTargetNs,targetNs,markerPreferredNs,"
-            "preferredNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,"
+            "preferredNs,markerRefreshPeriodNs,pacingErrorNs,predictionErrorNs,latenessNs,lastSeenNs,cpuStartNs,cpuBusyNs,frameTimeNs,"
             "cpuWaitNs,olderFrames,mainMarkerFirstSeenNs,scanoutDelayNs\n"
             "2,18446744073709551615,-9223372036854775808,5,9223372036854775807,16666667,1,0,16666666,9223372036854775807,-1,-7,Late,"
-            "-9223372036854775808,4294967295,33333334,1,16666667,3,-3,8333333,1234567890123456789,-1234567890123456789,12006034,16666812,4660778,"
+            "-9223372036854775808,4294967295,33333334,1,16666667,4294967294,3,-3,8333333,1234567890123456789,-1234567890123456789,12006034,16666812,4660778,"
             "41@1234567890123456790|40@-5,9007199254740993,-9007199254740993\n"
         )
         (row,) = frames(text)
@@ -382,6 +382,7 @@ class FramesCsvTests(unittest.TestCase):
                 target_ns=33_333_334,
                 marker_preferred_ns=1,
                 preferred_ns=16_666_667,
+                marker_refresh_period_ns=4_294_967_294,
                 pacing_error_ns=3,
                 prediction_error_ns=-3,
                 lateness_ns=8_333_333,

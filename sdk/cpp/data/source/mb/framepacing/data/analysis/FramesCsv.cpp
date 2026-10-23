@@ -51,6 +51,7 @@ namespace MB::FramePacing::Data
       frame.TargetFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "targetNs"));
       frame.MarkerPreferredFrameTime = Csv::OptionalMarkerDuration(table.Cell(row, "markerPreferredNs"));
       frame.PreferredFrameTime = Csv::OptionalNanosecondTimeDuration(table.Cell(row, "preferredNs"));
+      frame.MarkerRefreshPeriod = Csv::OptionalMarkerDuration(table.Cell(row, "markerRefreshPeriodNs"));
       frame.PacingError = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "pacingErrorNs"));
       frame.PredictionError = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "predictionErrorNs"));
       frame.Lateness = Csv::OptionalNanosecondTimeSpan(table.Cell(row, "latenessNs"));

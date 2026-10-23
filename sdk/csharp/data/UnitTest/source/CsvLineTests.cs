@@ -174,6 +174,7 @@ namespace MB.FramePacing.Data.UnitTest
           NanosecondTimeDuration.FromNanoseconds(16_666_700),
           NanosecondTimeDuration.FromNanoseconds(16_666_700),
           NanosecondTimeDuration.FromNanoseconds(16_666_700),
+          NanosecondTimeDuration.FromNanoseconds(16_666_667),
           NanosecondTimeSpan.Zero,
           NanosecondTimeSpan.Zero,
           NanosecondTimeSpan.Zero,

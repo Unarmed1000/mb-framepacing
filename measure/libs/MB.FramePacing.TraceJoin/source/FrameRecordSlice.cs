@@ -26,13 +26,22 @@ namespace MB.FramePacing.TraceJoin
   {
     /// <summary>The annotations a slice may have, in the order of the marker's fields: the SDK's names.</summary>
     public static IReadOnlyList<string> AnnotationNames { get; } =
-      new[] { FrameRecordText.AnimationNs, FrameRecordText.MarkerPreferredNs, FrameRecordText.MarkerTargetNs, FrameRecordText.IntendedDisplayNs };
+      new[]
+      {
+        FrameRecordText.AnimationNs,
+        FrameRecordText.MarkerPreferredNs,
+        FrameRecordText.MarkerTargetNs,
+        FrameRecordText.MarkerRefreshPeriodNs,
+        FrameRecordText.IntendedDisplayNs,
+      };
 
     public long? AnimationNs { get; init; }
 
     public long? MarkerPreferredNs { get; init; }
 
     public long? MarkerTargetNs { get; init; }
+
+    public long? MarkerRefreshPeriodNs { get; init; }
 
     public long? IntendedDisplayNs { get; init; }
 

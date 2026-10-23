@@ -256,6 +256,7 @@ namespace
       static_cast<FM::MarkerFlags>(running ? rRandom.Below(4) : rRandom.Below(256)), FP::NanosecondTimeSpan(running ? time : time / 4),
       FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(running ? 16'666'667u : rRandom.Next())),
       FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(running ? 16'666'667u : rRandom.Next())),
+      FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(running ? 16'666'667u : rRandom.Next())),
       FP::NanosecondTickCount(running ? 3'600'000'000'000 + time : time), FP::NanosecondTickCount(running ? 3'599'990'000'000 + time : time / 2),
       FP::NanosecondTimeDuration::FromNanoseconds(static_cast<uint32_t>(rRandom.Below(40'000'000))));
     FM::StartMetadata metadata;

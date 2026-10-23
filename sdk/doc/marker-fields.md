@@ -19,8 +19,8 @@ from three clocks; keep each field on its clock for the whole run:
 | The **pacer's steady clock**              | Intended display time, CPU start time | A monotonic clock (`std::chrono::steady_clock`, `QueryPerformanceCounter`, `Stopwatch`, `time.monotonic_ns`), any epoch |
 | **UTC**                                   | Start time (start marker only)        | The wall clock, as C# `DateTime` UTC ticks (100 ns since 0001-01-01)                                                    |
 
-The three frame times (target, preferred, CPU busy) are intervals, not points in time, so they have no clock of their own. The
-libraries type them as durations (`NanosecondTimeDuration`), which are never negative.
+The two frame times (target, preferred), the refresh period and CPU busy are intervals, not points in time, so they have no clock
+of their own. The libraries type them as durations (`NanosecondTimeDuration`), which are never negative.
 
 `0` means **unknown** in every time field but the animation time. A steady clock whose epoch could make a real value
 exactly `0` (a counter that starts at the process start, say) must be offset, or that frame reads as unknown.
@@ -195,6 +195,35 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **Goes wrong when:** it holds the display's refresh period while a frame limiter holds a lower rate: every limited frame's step is
   off its target.
 
+### Refresh period
+
+- **Means:** the refresh period of the display the application works with: the one it gives its pacer, or the one its swap chain or
+  platform reports. It is the application's word about the display, not a measurement.
+- **Value:** a duration, `u32` nanoseconds in the marker: `16'666'667` for 60 Hz, `16'683'333` for 59.94 Hz, `6'944'444` for
+  144 Hz. The libraries take a 64-bit duration and hold a longer one as the longest a marker carries (`Payload::MaxRefreshPeriod` in
+  C++, `Payload.MaxRefreshPeriod` in C#, `MAX_REFRESH_PERIOD_NS` in Python: `0xFFFFFFFF`, 4.294967295 s), which has no special
+  meaning here. The pacer's schedule has it (`FrameSchedule::RefreshPeriod`, experimental), and the Unity helper fills it from
+  Unity's screen settings.
+- **Changes:** when the display's refresh rate changes, or the window moves to a display with another rate.
+- **Unknown (`0`):** nothing is compared. Write `0` under variable refresh: there is no one period.
+- **What the analysis does:** it measures nothing by it, flags no frame and colours nothing; the refresh period it measures with
+  stays the capture's.
+  - A capture card captures at the display's refresh rate, so the analysis takes the capture period as the refresh period. When
+    frames of a run carry a refresh period more than 1 % away from it, `analyze` warns with each such value as a rate, how many
+    frames carry it, and the capture's rate. The warning says that the markers and the capture disagree, not which one is wrong:
+    check the card's mode, the display's refresh rate and the refresh period the application writes. It comes beside the warning
+    about a rate given with `--display-hz`, not instead of it. A run whose frames carry several values (the window moved to another
+    display) lists them all.
+  - A camera (very experimental) calculates the refresh from its frames. Without `--display-hz`, the markers' most common refresh
+    period is what settles an ambiguous estimate (before the rig's calibration), and the calculated rate is compared with it as with
+    `--display-hz`.
+- **Goes wrong when:**
+  - It is the rate a swap chain reports for another display (a swap chain has been seen reporting the fastest display of the
+    desktop): the warning shows a disagreement that is not the capture's.
+  - It is written under variable refresh: the value is not the period the display refreshes at. Write `0`.
+  - It stays the old display's after the window moved to another display: the frames after the move carry the wrong period.
+  - It is a rounded whole-Hz rate (60 Hz for a 59.94 Hz display): that is 0.1 % off, inside the 1 %, and nothing is wrong.
+
 ### Intended display time
 
 - **Means:** when the pacer intends this frame to become visible: the vsync it targets, the present time it requests from a present
@@ -265,12 +294,12 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 Times are nanoseconds. `0` = unknown; "on demand" = `0xFFFFFFFF`.
 
 **A fixed 60 fps loop with vsync on a 60 Hz display, without a present timing API.** Preferred and target frame time `16'666'667` on
-every frame, intended display time `0`. The analysis measures every frame against the one before it: a frame shown two refreshes
-after it and animated for one is late. After dropped frames a game that renders every frame animated for them too, and the frame
-is not late.
+every frame, refresh period `16'666'667`, intended display time `0`. The analysis measures every frame against the one before it: a
+frame shown two refreshes after it and animated for one is late. After dropped frames a game that renders every frame animated for
+them too, and the frame is not late.
 
-**A 30 fps lock on a 60 Hz display.** Preferred and target frame time `33'333'333`. Steps of two refreshes are on target; a step of three
-that was animated for two is late. Nothing is amber: the game runs at the rate it wants. Without the preferred frame time every frame
+**A 30 fps lock on a 60 Hz display.** Preferred and target frame time `33'333'333`, refresh period `16'666'667`. Steps of two
+refreshes are on target; a step of three that was animated for two is late. Nothing is amber: the game runs at the rate it wants. Without the preferred frame time every frame
 would be amber.
 
 **An adaptive pacer lowering from 60 to 30 fps for a busy stretch.** The preferred frame time stays `16'666'667`; the target frame time
@@ -285,8 +314,8 @@ requests:
 
 The late share shows the lowered stretch in amber and the late frames in red.
 
-**A frame rate cap just under the refresh rate (117 fps on 120 Hz).** Preferred and target frame time `8'547'009`. A capture card needs
-a fixed refresh rate, so the display refreshes every `8'333'333`: the target rounds up to one refresh (5 % slack), and the refreshes
+**A frame rate cap just under the refresh rate (117 fps on 120 Hz).** Preferred and target frame time `8'547'009`, refresh period
+`8'333'333`. A capture card needs a fixed refresh rate, so the display refreshes every `8'333'333`: the target rounds up to one refresh (5 % slack), and the refreshes
 where the cap makes a frame wait a second refresh are measured as late: the frame was animated for 8.5 ms and shown 16.7 ms after the
 one before it.
 
@@ -329,7 +358,10 @@ The frame timeline card draws the overlapping CPU boxes in further lanes.
 - The sync marker without the run id: every capture reads as torn, and nothing is measured.
 - The frame index counts something other than rendered frames, or restarts without a new run id.
 - The payload built by position in the wrong order: every library takes the fields in the order of the wire format (kind, run id,
-  frame index, flags and animation time, then the optional preferred frame time, target frame time, intended display time, CPU start
-  time and CPU busy). Name the optional ones where the language can (C# named arguments, Python keywords); in C++ check their order against the
-  constructor.
+  frame index, flags and animation time, then the optional preferred frame time, target frame time, refresh period, intended
+  display time, CPU start time and CPU busy). Name the optional ones where the language can (C# named arguments, Python keywords);
+  in C++ check their order against the constructor. The refresh period was added after the target frame time: a C++ call written
+  before it that passes `{}` for the fields it leaves out can still compile with every value after the target frame time one field
+  off.
+- A refresh period from another display than the window's, or one written under variable refresh: write `0` there.
 - A time written in ticks of 100 ns or in milliseconds: every time in the payload is nanoseconds.

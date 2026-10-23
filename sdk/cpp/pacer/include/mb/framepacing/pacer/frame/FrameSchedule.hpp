@@ -12,7 +12,7 @@
 namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer.md). What the pacer plans for a frame (TierPacer::BeginFrame): the swap interval to
-  //! hold it for, the time to render it for, and the marker's pacing fields.
+  //! hold it for, the time to render it for, and the marker's pacing fields and refresh period.
   //!
   //! While the application is not pacing (TierPacer::SetPacing) nothing is aimed for: the swap interval is 1, the animation
   //! step is the time since the frame before started, and IntendedDisplayTime, NextFrameStartTime and TargetFrameTime are
@@ -44,6 +44,9 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeDuration TargetFrameTime;
     //! The marker's preferred frame time: the preferred swap interval's refreshes (PacerSettings::PreferredSwapIntervalAt).
     NanosecondTimeDuration PreferredFrameTime;
+    //! The marker's refresh period: the period the pacer is on (PacerSettings::Refresh), rounded to a nanosecond. Given whether
+    //! the application paces or not.
+    NanosecondTimeDuration RefreshPeriod;
     //! What the swap interval rule decided from the previous frame; this frame is the first at the new interval.
     SwapIntervalChange Change{SwapIntervalChange::Unchanged};
   };

@@ -107,6 +107,7 @@ TEST(TimerPeriodOnlyPacer, TheFirstFrameStartsAtOnceAndStartsTheGrid)
   EXPECT_EQ(schedule.IntendedDisplayTime, At(Start + Period));
   EXPECT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
   EXPECT_EQ(schedule.PreferredFrameTime, FP::NanosecondTimeDuration::FromNanoseconds(Period));
+  EXPECT_EQ(schedule.RefreshPeriod, FP::NanosecondTimeDuration::FromNanoseconds(Period));
   EXPECT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged);
 
   const PC::PresentPlan present = pacer.EndFrame(At(Start + 3'000'000));

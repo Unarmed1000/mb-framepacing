@@ -128,7 +128,8 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       (ulong FrameIndex, long CaptureNs)[]? olderFrames = null,
       long animationNs = 0,
       long? markerTargetNs = null,
-      long? markerPreferredNs = null
+      long? markerPreferredNs = null,
+      long? markerRefreshPeriodNs = null
     ) =>
       new FrameRow(
         Segment: 0,
@@ -149,6 +150,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
         TargetFrameTime: Length(targetNs),
         MarkerPreferredFrameTime: Length(markerPreferredNs),
         PreferredFrameTime: null,
+        MarkerRefreshPeriod: Length(markerRefreshPeriodNs),
         PacingError: null,
         PredictionError: null,
         Lateness: Span(latenessNs),

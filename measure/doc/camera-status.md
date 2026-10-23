@@ -90,7 +90,8 @@ of C# rectification, well above 1000 fps on one core.
   not taken when its own numbering does not hold up against it (a camera below about twice the refresh rate) or when it leaves
   the estimate by more than 1 %. The user can give the **expected display rate** (`--display-hz`, GUI "Display refresh
   rate"): it settles the ambiguity first, and the analysis compares it with the calculated rate (`runs[].pacing.refreshDeviation`,
-  a warning above 1 %). The calibration uses the same estimator, so a calibration clip must show one frame per
+  a warning above 1 %). Without it, the markers' most common refresh period (the application's word, when it writes one) settles
+  the ambiguity next, before the calibration, and is compared with the calculated rate the same way. The calibration uses the same estimator, so a calibration clip must show one frame per
   refresh for most of it (vsync on, full rate).
 - **Animation error noise:** a camera's animation error is the difference of two first-seen times, each good to about one camera
   period. The error threshold is the same for every source (1 ms, `--error-threshold-ms`), so a slower camera's noise counts as

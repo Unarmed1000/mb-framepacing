@@ -32,6 +32,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         new NanosecondTimeSpan(0x1112131415161718),
         PreferredFrameTime: NanosecondTimeDuration.FromNanoseconds(0x71727374),
         TargetFrameTime: NanosecondTimeDuration.FromNanoseconds(0x41424344),
+        RefreshPeriod: NanosecondTimeDuration.FromNanoseconds(0x81828384),
         IntendedDisplayTime: new NanosecondTickCount(0x3132333435363738),
         CpuStartTime: new NanosecondTickCount(0x5152535455565758),
         CpuBusy: NanosecondTimeDuration.FromNanoseconds(0x61626364)
@@ -77,6 +78,11 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         0x43,
         0x42,
         0x41,
+        // refresh period
+        0x84,
+        0x83,
+        0x82,
+        0x81,
         // intended display time
         0x38,
         0x37,
@@ -100,11 +106,11 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         0x63,
         0x62,
         0x61,
-        // CRC (0x7ED16A3D: what Python's binascii.crc32 gives for the 53 bytes before it)
-        0x3D,
-        0x6A,
-        0xD1,
-        0x7E,
+        // CRC (0x4DA7B73B: what Python's binascii.crc32 gives for the 57 bytes before it)
+        0x3B,
+        0xB7,
+        0xA7,
+        0x4D,
       ];
       Assert.That(payload.Encode(), Is.EqualTo(expected));
       Assert.That(MarkerPayload.TryDecode(expected, out var decoded), Is.True);
@@ -319,7 +325,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
         CpuStartTime: new NanosecondTickCount(6_000)
       );
       var bytes = payload.Encode(metadata);
-      Assert.That(bytes, Has.Length.EqualTo(81), "a start marker's payload");
+      Assert.That(bytes, Has.Length.EqualTo(85), "a start marker's payload");
       Assert.That(MarkerPayload.TryDecode(bytes, out var decoded, out var start), Is.True);
       Assert.That(decoded, Is.EqualTo(payload));
       Assert.That(start, Is.EqualTo(metadata));
@@ -342,7 +348,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(200)).Encode(
         StartMetadata.FromTag(5, "ignored")
       );
-      Assert.That(bytes, Has.Length.EqualTo(57), "a frame marker's payload");
+      Assert.That(bytes, Has.Length.EqualTo(61), "a frame marker's payload");
     }
 
     [Test]
@@ -351,7 +357,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       var bytes = new MarkerPayload(MarkerKind.Frame, 3, 1, MB.FramePacing.Marker.MarkerFlags.NoFlags, new NanosecondTimeSpan(200)).Encode();
       Assert.That(MarkerPayload.TryDecode(bytes, out _), Is.True);
       Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 56), out _), Is.False);
-      Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 53), out _), Is.False, "the header without its CRC");
+      Assert.That(MarkerPayload.TryDecode(bytes.AsSpan(0, 57), out _), Is.False, "the header without its CRC");
 
       // One bit of a field: only the CRC tells
       bytes[8] ^= 1;

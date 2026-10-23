@@ -38,6 +38,7 @@ namespace MB.FramePacing.Data
   /// The preferred frame time the late share is measured against, in whole refreshes: the marker's, else the target frame rate given to the
   /// tools, else one refresh; null on demand.
   /// </param>
+  /// <param name="MarkerRefreshPeriod">From the marker: the refresh period of the display the application works with.</param>
   /// <param name="LastSeenTime">When the last capture showing it was taken; null in output written before it existed.</param>
   /// <param name="CpuStartTime">From the marker: the CPU start time (PresentMon's CPUStartTime, the pacer's clock).</param>
   /// <param name="CpuBusy">From the marker: CPU busy (PresentMon's MsCPUBusy).</param>
@@ -65,6 +66,7 @@ namespace MB.FramePacing.Data
     NanosecondTimeDuration? TargetFrameTime,
     NanosecondTimeDuration? MarkerPreferredFrameTime,
     NanosecondTimeDuration? PreferredFrameTime,
+    NanosecondTimeDuration? MarkerRefreshPeriod,
     NanosecondTimeSpan? PacingError,
     NanosecondTimeSpan? PredictionError,
     NanosecondTimeSpan? Lateness,

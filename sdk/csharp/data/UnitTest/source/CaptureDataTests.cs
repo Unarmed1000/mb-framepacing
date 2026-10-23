@@ -225,7 +225,7 @@ namespace MB.FramePacing.Data.UnitTest
       );
       var sync = new byte[Payload.MaxEncodedByteCount];
       int syncLength = FrameMarker.EncodePayload(new Payload(MarkerKind.Sync, 7, 11, MarkerFlags.NoFlags, NanosecondTimeSpan.Zero), default, sync);
-      Assert.That((mainLength, syncLength), Is.EqualTo((81, 20)), "the longest and the shortest marker");
+      Assert.That((mainLength, syncLength), Is.EqualTo((85, 20)), "the longest and the shortest marker");
       Assert.That(mainLength, Is.LessThanOrEqualTo(CaptureDataRecord.MainCapacity), "any marker fits a slot");
 
       // The recorder writes the capture part when the frame arrives and the decoded part when the decoder is done

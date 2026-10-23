@@ -46,6 +46,11 @@ namespace MB::FramePacing::Trace::FrameRecordUtil
       rRecord.AnnotationBuffer[count] = {FrameRecordText::MarkerTargetNs, payload.TargetFrameTime().Nanoseconds()};
       ++count;
     }
+    if (payload.RefreshPeriod() != NanosecondTimeDuration())
+    {
+      rRecord.AnnotationBuffer[count] = {FrameRecordText::MarkerRefreshPeriodNs, payload.RefreshPeriod().Nanoseconds()};
+      ++count;
+    }
     if (payload.IntendedDisplayTime() != NanosecondTickCount())
     {
       rRecord.AnnotationBuffer[count] = {FrameRecordText::IntendedDisplayNs, payload.IntendedDisplayTime().Nanoseconds()};

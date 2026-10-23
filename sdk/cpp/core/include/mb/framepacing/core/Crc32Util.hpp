@@ -7,7 +7,7 @@
 // records (doc/frame-log-format.md). It is the CRC-32 of zlib, PNG and Ethernet: the polynomial 0x04C11DB7 bit reversed (0xEDB88320),
 // the register started at and XORed at the end with 0xFFFFFFFF. Two forms with the same result:
 // - Compute and Continue take half a byte per step, so their table is 16 entries made at compile time (64 bytes): the small one,
-//   which the marker uses (a payload is at most 81 bytes, once a frame, and its code size counts).
+//   which the marker uses (a payload is at most 85 bytes, once a frame, and its code size counts).
 // - ComputeFast and ContinueFast take a byte per step with a table of 256 entries (1 KiB): the fast one, for the frame log's
 //   records. An application that never calls them does not get the table.
 

@@ -70,6 +70,7 @@ namespace
                               schedule.AnimationTime,
                               schedule.PreferredFrameTime,
                               schedule.TargetFrameTime,
+                              schedule.RefreshPeriod,
                               schedule.IntendedDisplayTime,
                               cpuStartTime,
                               cpuBusy};
@@ -80,7 +81,8 @@ namespace
                 static_cast<unsigned>(schedule.SwapInterval), static_cast<long long>(payload.TargetFrameTime().Nanoseconds()),
                 static_cast<long long>(payload.CpuBusy().Nanoseconds()));
     return encoded && tier == PC::PacerTier::TimerPeriodOnly && schedule.SwapInterval == 2u &&
-           payload.TargetFrameTime().Nanoseconds() == 33'333'333 && payload.CpuBusy().Nanoseconds() == 4'000'000;
+           payload.TargetFrameTime().Nanoseconds() == 33'333'333 && payload.RefreshPeriod().Nanoseconds() == 16'666'667 &&
+           payload.CpuBusy().Nanoseconds() == 4'000'000;
   }
 }
 #endif
@@ -102,6 +104,7 @@ namespace
                               FP::NanosecondTimeSpan::FromSeconds(1),
                               frameTime,
                               frameTime,
+                              frameTime,
                               {},
                               FP::NanosecondTickCount::FromSeconds(10),
                               FP::NanosecondTimeDuration::FromNanoseconds(4'000'000)};
@@ -110,7 +113,7 @@ namespace
     std::printf("the trace module (experimental): a slice '%s' in the category %s, %lld ns long, with %zu annotations\n", record.Name.CStr(),
                 TR::FrameRecordText::Category.data(), static_cast<long long>(record.Duration.Nanoseconds()), record.Annotations().size());
     return created && record.Name.View() == "mbfp frame 1 60" && record.StartTime == payload.CpuStartTime() &&
-           record.Duration.Nanoseconds() == 4'000'000 && record.Annotations().size() == 3u;
+           record.Duration.Nanoseconds() == 4'000'000 && record.Annotations().size() == 4u;
   }
 }
 #endif

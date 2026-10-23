@@ -24,6 +24,7 @@ namespace MB.FramePacing.Trace.UnitTest
       long preferredNs = 0,
       long targetNs = 0,
       long intendedDisplayNs = 0,
+      long refreshPeriodNs = 0,
       MarkerKind kind = MarkerKind.Frame
     ) =>
       new Payload(
@@ -34,6 +35,7 @@ namespace MB.FramePacing.Trace.UnitTest
         NanosecondTimeSpan.FromNanoseconds(animationNs),
         NanosecondTimeDuration.FromNanoseconds(preferredNs),
         NanosecondTimeDuration.FromNanoseconds(targetNs),
+        NanosecondTimeDuration.FromNanoseconds(refreshPeriodNs),
         NanosecondTickCount.FromNanoseconds(intendedDisplayNs),
         NanosecondTickCount.FromNanoseconds(cpuStartNs),
         NanosecondTimeDuration.FromNanoseconds(cpuBusyNs)
@@ -48,6 +50,7 @@ namespace MB.FramePacing.Trace.UnitTest
       Assert.That(FrameRecordText.AnimationNs, Is.EqualTo("animationNs"));
       Assert.That(FrameRecordText.MarkerPreferredNs, Is.EqualTo("markerPreferredNs"));
       Assert.That(FrameRecordText.MarkerTargetNs, Is.EqualTo("markerTargetNs"));
+      Assert.That(FrameRecordText.MarkerRefreshPeriodNs, Is.EqualTo("markerRefreshPeriodNs"));
       Assert.That(FrameRecordText.IntendedDisplayNs, Is.EqualTo("intendedDisplayNs"));
       Assert.That(FrameRecordText.ClockId, Is.EqualTo(3));
     }
@@ -107,7 +110,7 @@ namespace MB.FramePacing.Trace.UnitTest
     [Test]
     public void ARecord_HasTheMarkersValues()
     {
-      var payload = Frame(1_000, 400, animationNs: -5, preferredNs: 16, targetNs: 33, intendedDisplayNs: 2_000);
+      var payload = Frame(1_000, 400, animationNs: -5, preferredNs: 16, targetNs: 33, intendedDisplayNs: 2_000, refreshPeriodNs: 8);
 
       Assert.That(FrameRecord.TryCreate(payload, out var record), Is.True);
 
@@ -119,8 +122,9 @@ namespace MB.FramePacing.Trace.UnitTest
       Assert.That(record.GetAnnotation(0), Is.EqualTo(new FrameRecordAnnotation("animationNs", -5)));
       Assert.That(record.GetAnnotation(1), Is.EqualTo(new FrameRecordAnnotation("markerPreferredNs", 16)));
       Assert.That(record.GetAnnotation(2), Is.EqualTo(new FrameRecordAnnotation("markerTargetNs", 33)));
-      Assert.That(record.GetAnnotation(3), Is.EqualTo(new FrameRecordAnnotation("intendedDisplayNs", 2_000)));
-      Assert.Throws<ArgumentOutOfRangeException>(() => Annotation(payload, 4));
+      Assert.That(record.GetAnnotation(3), Is.EqualTo(new FrameRecordAnnotation("markerRefreshPeriodNs", 8)));
+      Assert.That(record.GetAnnotation(4), Is.EqualTo(new FrameRecordAnnotation("intendedDisplayNs", 2_000)));
+      Assert.Throws<ArgumentOutOfRangeException>(() => Annotation(payload, 5));
       Assert.Throws<ArgumentOutOfRangeException>(() => Annotation(payload, -1));
 
       Span<char> name = stackalloc char[FrameRecordName.MaxLength];
@@ -136,9 +140,10 @@ namespace MB.FramePacing.Trace.UnitTest
       Assert.That(bare.GetAnnotation(0), Is.EqualTo(new FrameRecordAnnotation("animationNs", 0)));
       Assert.Throws<ArgumentOutOfRangeException>(() => Annotation(Frame(1_000), 1));
 
-      // Each of the other three alone: the second annotation is that one
+      // Each of the other four alone: the second annotation is that one
       Assert.That(Annotation(Frame(1_000, preferredNs: 16), 1), Is.EqualTo(new FrameRecordAnnotation("markerPreferredNs", 16)));
       Assert.That(Annotation(Frame(1_000, targetNs: 33), 1), Is.EqualTo(new FrameRecordAnnotation("markerTargetNs", 33)));
+      Assert.That(Annotation(Frame(1_000, refreshPeriodNs: 8), 1), Is.EqualTo(new FrameRecordAnnotation("markerRefreshPeriodNs", 8)));
       Assert.That(Annotation(Frame(1_000, intendedDisplayNs: -2), 1), Is.EqualTo(new FrameRecordAnnotation("intendedDisplayNs", -2)));
       // Two of them: in the order of the marker's fields
       var two = Frame(1_000, targetNs: 33, intendedDisplayNs: 9);
@@ -150,13 +155,14 @@ namespace MB.FramePacing.Trace.UnitTest
     [Test]
     public void TheValues_AreThePayloadsAfterItsCap()
     {
-      var payload = Frame(1, cpuBusyNs: 5_000_000_000, preferredNs: 5_000_000_000, targetNs: 4_294_967_295);
+      var payload = Frame(1, cpuBusyNs: 5_000_000_000, preferredNs: 5_000_000_000, targetNs: 4_294_967_295, refreshPeriodNs: 5_000_000_000);
 
       Assert.That(FrameRecord.TryCreate(payload, out var record), Is.True);
 
       Assert.That(record.Duration, Is.EqualTo(Payload.MaxCpuBusy));
       Assert.That(record.GetAnnotation(1).Value, Is.EqualTo(Payload.MaxFrameTime.Nanoseconds));
       Assert.That(record.GetAnnotation(2).Value, Is.EqualTo(Payload.OnDemandFrameTime.Nanoseconds));
+      Assert.That(record.GetAnnotation(3).Value, Is.EqualTo(Payload.MaxRefreshPeriod.Nanoseconds));
     }
 
     [TestCase(MarkerKind.Frame, true)]
@@ -198,6 +204,7 @@ namespace MB.FramePacing.Trace.UnitTest
           Frame(1_000, 400, 5, 17, 33, 2_000),
           Frame(1_000, 400, 5, 16, 34, 2_000),
           Frame(1_000, 400, 5, 16, 33, 2_001),
+          Frame(1_000, 400, 5, 16, 33, 2_000, 8),
           new Payload(MarkerKind.Frame, 8, 200, MarkerFlags.NoFlags, default, cpuStartTime: NanosecondTickCount.FromNanoseconds(1_000)),
           new Payload(MarkerKind.Frame, 7, 201, MarkerFlags.NoFlags, default, cpuStartTime: NanosecondTickCount.FromNanoseconds(1_000)),
         }

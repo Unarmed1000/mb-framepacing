@@ -31,7 +31,7 @@ namespace MB.FramePacing.Marker
 
     /// <summary>
     /// Serialize the payload into <paramref name="destination"/>. Start markers append the metadata, other kinds ignore it. A frame or end
-    /// marker is 57 bytes, a start marker 81, a sync marker 20, each ending with the CRC-32 of the bytes before it;
+    /// marker is 61 bytes, a start marker 85, a sync marker 20, each ending with the CRC-32 of the bytes before it;
     /// <see cref="Payload.MaxEncodedByteCount"/> bytes are always enough. Returns the number of bytes written, or 0 if the destination is
     /// too small.
     /// </summary>
@@ -58,6 +58,7 @@ namespace MB.FramePacing.Marker
       BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(WireFormat.OffsetAnimationTime), payload.AnimationTime.Nanoseconds);
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetPreferredFrameTime), DurationField(payload.PreferredFrameTime));
       BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetTargetFrameTime), DurationField(payload.TargetFrameTime));
+      BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(WireFormat.OffsetRefreshPeriod), DurationField(payload.RefreshPeriod));
       BinaryPrimitives.WriteUInt64LittleEndian(
         destination.Slice(WireFormat.OffsetIntendedDisplayTime),
         payload.IntendedDisplayTime.UnsignedNanoseconds
@@ -145,6 +146,7 @@ namespace MB.FramePacing.Marker
         new NanosecondTimeSpan(BinaryPrimitives.ReadInt64LittleEndian(source.Slice(WireFormat.OffsetAnimationTime))),
         NanosecondTimeDuration.FromNanoseconds(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetPreferredFrameTime))),
         NanosecondTimeDuration.FromNanoseconds(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetTargetFrameTime))),
+        NanosecondTimeDuration.FromNanoseconds(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetRefreshPeriod))),
         NanosecondTickCount.FromUnsignedNanoseconds(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetIntendedDisplayTime))),
         NanosecondTickCount.FromUnsignedNanoseconds(BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(WireFormat.OffsetCpuStartTime))),
         NanosecondTimeDuration.FromNanoseconds(BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(WireFormat.OffsetCpuBusy)))

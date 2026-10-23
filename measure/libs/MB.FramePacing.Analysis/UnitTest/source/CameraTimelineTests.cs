@@ -132,6 +132,44 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(wrong.Warnings, Has.Some.Contains("58.82 Hz display, but 60 Hz was expected"));
     }
 
+    /// <summary>The rows with every frame marker's refresh period <paramref name="nanoseconds"/>.</summary>
+    private static List<CaptureRow> WithRefreshPeriod(List<CaptureRow> rows, long nanoseconds) =>
+      rows.Select(row =>
+          row.Payload.Kind == MarkerKind.Frame
+            ? row with
+            {
+              Payload = row.Payload with { RefreshPeriod = NanosecondTimeDuration.FromNanoseconds(nanoseconds) },
+            }
+            : row
+        )
+        .ToList();
+
+    [Test]
+    public void TheMarkersRefreshPeriod_SettlesASteadyGameBelowTheRefreshRate_AndIsComparedWithTheCalculatedOne()
+    {
+      // Every frame is 17 camera periods apart; the markers say the display runs twice as fast: the game is at half rate
+      var rows = WithRefreshPeriod(Rows(30, longGapFrame: -1, tornFrame: -1, secondZoneOnly: -1), CapturesPerFrame * Period / 2);
+      var run = TimelineAnalyzer.Analyze(rows, new TimelineOptions { Scanout = ScanoutModel.Camera }).Runs.Single();
+      Assert.That(run.Pacing!.RefreshPeriod.Value.TotalMilliseconds, Is.EqualTo(CapturesPerFrame / 2.0).Within(0.01));
+      Assert.That(run.Warnings, Has.None.Contains("the markers say"));
+
+      // The user's expected rate comes first: told one frame a refresh, the markers' rate is not the hint and nothing compares with it
+      var told = TimelineAnalyzer
+        .Analyze(rows, new TimelineOptions { Scanout = ScanoutModel.Camera, ExpectedRefreshHz = 1000.0 / CapturesPerFrame })
+        .Runs.Single();
+      Assert.That(told.Pacing!.RefreshPeriod.Value.TotalMilliseconds, Is.EqualTo(CapturesPerFrame).Within(0.01));
+      Assert.That(told.Warnings, Has.None.Contains("the markers say"));
+
+      // Markers that say another rate than the frames give, with nothing else to go by: a warning with both
+      var other = WithRefreshPeriod(Rows(30, longGapFrame: -1, tornFrame: -1, secondZoneOnly: -1), 16_666_667);
+      var wrong = TimelineAnalyzer.Analyze(other, new TimelineOptions { Scanout = ScanoutModel.Camera, CalibratedRefreshHz = 60 }).Runs.Single();
+      Assert.That(
+        wrong.Warnings,
+        Has.Some.Contains("the frames give a 58.82 Hz display, but the markers say the application works with a 60 Hz display (30 frames)")
+      );
+      Assert.That(wrong.Warnings, Has.None.Contains("the camera rig measured"), "the markers come before the rig's calibration");
+    }
+
     [Test]
     public void ExpectedDisplayRate_SettlesASteadyGameBelowTheRefreshRate()
     {

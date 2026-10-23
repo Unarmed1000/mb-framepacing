@@ -370,6 +370,7 @@ def build_app() -> bytes:
         if has_frame_times(frame.frame_index):
             values["markerTargetNs"] = frame.marker_target_ns or 0
             values["markerPreferredNs"] = frame.marker_preferred_ns or 0
+            values["markerRefreshPeriodNs"] = frame.marker_refresh_period_ns or 0
         _record(builder, RUN_ID, frame.frame_index, begin, frame.cpu_busy_ns or 0, values)
     # Another run's frame, with a frame index this run has too: it is not this run's
     _record(builder, OTHER_RUN_ID, worked[0].frame_index, last_end + 1_000_000, 2_000_000, {})
@@ -498,6 +499,8 @@ def build_example() -> bytes:
             values["markerPreferredNs"] = frame.marker_preferred_ns
         if frame.marker_target_ns:
             values["markerTargetNs"] = frame.marker_target_ns
+        if frame.marker_refresh_period_ns:
+            values["markerRefreshPeriodNs"] = frame.marker_refresh_period_ns
         if frame.intended_display_ns:
             values["intendedDisplayNs"] = frame.intended_display_ns
         _slice(builder, APP_RECORD_TRACK, f"mbfp frame {ids}", begin, presented, values)

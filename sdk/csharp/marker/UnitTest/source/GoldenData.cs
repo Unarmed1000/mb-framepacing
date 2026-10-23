@@ -94,9 +94,10 @@ namespace MB.FramePacing.Marker.UnitTest
         ulong.Parse(row.Text("frameIndex"), CultureInfo.InvariantCulture),
         (MarkerFlags)byte.Parse(row.Text("flags"), CultureInfo.InvariantCulture),
         new NanosecondTimeSpan(row.Long("animationNs")),
-        // The three durations as a marker holds them, four unsigned bytes: a value that does not fit is a fault in the golden data
+        // The four durations as a marker holds them, four unsigned bytes: a value that does not fit is a fault in the golden data
         preferredFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(row.Text("preferredFrameNs"), CultureInfo.InvariantCulture)),
         targetFrameTime: NanosecondTimeDuration.FromNanoseconds(uint.Parse(row.Text("targetFrameNs"), CultureInfo.InvariantCulture)),
+        refreshPeriod: NanosecondTimeDuration.FromNanoseconds(uint.Parse(row.Text("refreshPeriodNs"), CultureInfo.InvariantCulture)),
         intendedDisplayTime: new NanosecondTickCount(row.Long("intendedDisplayNs")),
         cpuStartTime: new NanosecondTickCount(row.Long("cpuStartNs")),
         cpuBusy: NanosecondTimeDuration.FromNanoseconds(uint.Parse(row.Text("cpuBusyNs"), CultureInfo.InvariantCulture))

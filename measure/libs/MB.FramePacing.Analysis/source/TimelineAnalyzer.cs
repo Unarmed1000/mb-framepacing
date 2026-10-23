@@ -223,6 +223,7 @@ namespace MB.FramePacing.Analysis
       public NanosecondTickCount CpuStartTime;
       public NanosecondTimeDuration CpuBusy;
       public NanosecondTimeDuration PreferredFrameTime;
+      public NanosecondTimeDuration RefreshPeriod;
       public bool StaticAfter;
       public bool StaticBefore;
       public bool StaticAssumed;
@@ -335,6 +336,7 @@ namespace MB.FramePacing.Analysis
           CpuStartTime = payload.CpuStartTime,
           CpuBusy = payload.CpuBusy,
           PreferredFrameTime = payload.PreferredFrameTime,
+          RefreshPeriod = payload.RefreshPeriod,
           StaticAfter = payload.IsStaticAfter,
           StaticBefore = payload.IsStaticBefore,
           FirstCaptureIndex = row.CaptureIndex,
@@ -494,7 +496,8 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>
     /// Late frames and the pacing verdict. A capture card captures at the display's refresh rate, so the refresh period is the capture period;
-    /// an EXPERIMENTAL camera films faster, so the refresh is calculated from when it first saw each frame.
+    /// an EXPERIMENTAL camera films faster, so the refresh is calculated from when it first saw each frame. The refresh period the markers
+    /// carry (the application's word) is compared with it, and settles a camera's ambiguous estimate; it is never taken as the refresh.
     /// </summary>
     private static RunPacing? AnalyzePacing(
       List<PresentedFrame> frames,
@@ -508,11 +511,14 @@ namespace MB.FramePacing.Analysis
       if (period <= NanosecondTimeDuration.Zero)
         return null;
       double? expected = options.ExpectedRefreshHz is > 0 ? options.ExpectedRefreshHz : null;
+      var marked = MarkerRefreshPeriods(frames);
+      double? markedHz = marked.Count > 0 ? RateOf(marked[0].PeriodNanoseconds) : null;
       var refresh = period;
       if (camera)
       {
-        // The user's expected rate settles an ambiguous estimate (a steady game below the refresh rate) before the rig's calibration
-        double? hintHz = expected ?? (options.CalibratedRefreshHz is > 0 ? options.CalibratedRefreshHz : null);
+        // The user's expected rate settles an ambiguous estimate (a steady game below the refresh rate), then the rate the markers say
+        // the application works with, then the rig's calibration
+        double? hintHz = expected ?? markedHz ?? (options.CalibratedRefreshHz is > 0 ? options.CalibratedRefreshHz : null);
         // RefreshEstimator works in doubles of nanoseconds: the expected period, the intervals and the camera's period go in so, and
         // the period that comes out gives the calculated rate and, rounded to the nearest nanosecond, the refresh
         double? hint = hintHz is { } hz ? NanosecondTimeSpan.NanosecondsPerSecond / hz : null;
@@ -546,7 +552,19 @@ namespace MB.FramePacing.Analysis
               $"Camera capture: the frames give a {calculatedHz:0.##} Hz display, but {expectedHz:0.##} Hz was expected. Check the display's refresh rate (or the camera's frame rate, --recorded-fps for slow motion clips)."
             )
           );
-        else if (expected == null && options.CalibratedRefreshHz is > 0 && !WithinTolerance(calculatedHz, options.CalibratedRefreshHz.Value))
+        else if (expected == null && markedHz is { } markerHz && !WithinTolerance(calculatedHz, markerHz))
+          warnings.Add(
+            string.Create(
+              CultureInfo.InvariantCulture,
+              $"Camera capture: the frames give a {calculatedHz:0.##} Hz display, but the markers say the application works with {Displays(marked.Take(1))}. Check the display's refresh rate (or the camera's frame rate, --recorded-fps for slow motion clips) and the refresh period the application writes."
+            )
+          );
+        else if (
+          expected == null
+          && markedHz == null
+          && options.CalibratedRefreshHz is > 0
+          && !WithinTolerance(calculatedHz, options.CalibratedRefreshHz.Value)
+        )
           warnings.Add(
             string.Create(
               CultureInfo.InvariantCulture,
@@ -554,14 +572,25 @@ namespace MB.FramePacing.Analysis
             )
           );
       }
-      else if (expected is { } expectedHz && !WithinTolerance(NanosecondTimeSpan.NanosecondsPerSecond / (double)period.Nanoseconds, expectedHz))
+      else
       {
-        warnings.Add(
-          string.Create(
-            CultureInfo.InvariantCulture,
-            $"The capture runs at {NanosecondTimeSpan.NanosecondsPerSecond / (double)period.Nanoseconds:0.##} fps, but a {expectedHz:0.##} Hz display was expected. A capture card must capture at the display's refresh rate: check the card's mode and the display's refresh rate."
-          )
-        );
+        double captureHz = RateOf(period.Nanoseconds);
+        if (expected is { } expectedHz && !WithinTolerance(captureHz, expectedHz))
+          warnings.Add(
+            string.Create(
+              CultureInfo.InvariantCulture,
+              $"The capture runs at {captureHz:0.##} fps, but a {expectedHz:0.##} Hz display was expected. A capture card must capture at the display's refresh rate: check the card's mode and the display's refresh rate."
+            )
+          );
+        // Every rate the markers say that is not the capture's: a window that moved to another display has two
+        var different = marked.Where(m => !WithinTolerance(RateOf(m.PeriodNanoseconds), captureHz)).ToList();
+        if (different.Count > 0)
+          warnings.Add(
+            string.Create(
+              CultureInfo.InvariantCulture,
+              $"The markers say the application works with {Displays(different)}, but the capture runs at {captureHz:0.##} fps. A capture card must capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application writes."
+            )
+          );
       }
       // A camera's animation error is the difference of two first-seen times, each good to about one camera period: the verdict only
       // attributes errors beyond that noise
@@ -572,6 +601,30 @@ namespace MB.FramePacing.Analysis
     }
 
     private static bool WithinTolerance(double actualHz, double expectedHz) => Math.Abs((actualHz / expectedHz) - 1) <= RefreshTolerance;
+
+    private static double RateOf(long periodNanoseconds) => NanosecondTimeSpan.NanosecondsPerSecond / (double)periodNanoseconds;
+
+    /// <summary>The refresh periods the frames' markers carry (0, unknown, left out) with how many frames carry each, the most first.</summary>
+    private static List<(long PeriodNanoseconds, int Frames)> MarkerRefreshPeriods(List<PresentedFrame> frames) =>
+      frames
+        .Where(frame => frame.MarkerRefreshPeriod != NanosecondTimeDuration.Zero)
+        .GroupBy(frame => frame.MarkerRefreshPeriod.Nanoseconds)
+        .Select(group => (PeriodNanoseconds: group.Key, Frames: group.Count()))
+        .OrderByDescending(marked => marked.Frames)
+        .ThenBy(marked => marked.PeriodNanoseconds)
+        .ToList();
+
+    /// <summary>"a 144 Hz display (1200 frames), a 60 Hz display (300 frames)".</summary>
+    private static string Displays(IEnumerable<(long PeriodNanoseconds, int Frames)> marked) =>
+      string.Join(
+        ", ",
+        marked.Select(m =>
+          string.Create(
+            CultureInfo.InvariantCulture,
+            $"a {RateOf(m.PeriodNanoseconds):0.##} Hz display ({m.Frames} frame{(m.Frames == 1 ? "" : "s")})"
+          )
+        )
+      );
 
     /// <summary>
     /// First-seen intervals a camera measured reliably, in nanoseconds (what RefreshEstimator takes): not across a tear or an
@@ -803,6 +856,7 @@ namespace MB.FramePacing.Analysis
             FrameTime: frameTime,
             CpuWait: cpuWait,
             MarkerPreferredFrameTime: b.PreferredFrameTime,
+            MarkerRefreshPeriod: b.RefreshPeriod,
             OlderFrames: b.OlderFrames
           )
         );

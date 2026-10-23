@@ -76,6 +76,7 @@ TEST(Allocations, MakingARecordDoesNotAllocate)
                                      FP::NanosecondTimeSpan{time},
                                      FrameTime60,
                                      FrameTime60,
+                                     FrameTime60,
                                      FP::NanosecondTickCount{time + 5'000'000},
                                      FP::NanosecondTickCount{time},
                                      FP::NanosecondTimeDuration::FromNanoseconds(8'000'000)};

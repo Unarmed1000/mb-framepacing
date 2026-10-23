@@ -23,7 +23,7 @@ namespace MB.FramePacing.Trace
   public readonly struct FrameRecord : IEquatable<FrameRecord>
   {
     /// <summary>The most annotations a record has.</summary>
-    public const int MaxAnnotationCount = 4;
+    public const int MaxAnnotationCount = 5;
 
     private FrameRecord(in Payload payload)
     {
@@ -34,6 +34,7 @@ namespace MB.FramePacing.Trace
       AnimationTime = payload.AnimationTime;
       PreferredFrameTime = payload.PreferredFrameTime;
       TargetFrameTime = payload.TargetFrameTime;
+      RefreshPeriod = payload.RefreshPeriod;
       IntendedDisplayTime = payload.IntendedDisplayTime;
     }
 
@@ -57,6 +58,9 @@ namespace MB.FramePacing.Trace
 
     /// <summary>The marker's target frame time; zero: not known, and no annotation.</summary>
     public readonly NanosecondTimeDuration TargetFrameTime;
+
+    /// <summary>The marker's refresh period; zero: not known, and no annotation.</summary>
+    public readonly NanosecondTimeDuration RefreshPeriod;
 
     /// <summary>The marker's intended display time; zero: not known, and no annotation.</summary>
     public readonly NanosecondTickCount IntendedDisplayTime;
@@ -89,13 +93,17 @@ namespace MB.FramePacing.Trace
     public bool TryFormatName(Span<char> destination, out int charsWritten) =>
       FrameRecordName.TryFormat(RunId, FrameIndex, destination, out charsWritten);
 
-    /// <summary>How many annotations the slice has: the animation time, and each of the other three the marker knows.</summary>
+    /// <summary>How many annotations the slice has: the animation time, and each of the other four the marker knows.</summary>
     public int AnnotationCount =>
-      1 + (PreferredFrameTime.Nanoseconds != 0 ? 1 : 0) + (TargetFrameTime.Nanoseconds != 0 ? 1 : 0) + (IntendedDisplayTime.Nanoseconds != 0 ? 1 : 0);
+      1
+      + (PreferredFrameTime.Nanoseconds != 0 ? 1 : 0)
+      + (TargetFrameTime.Nanoseconds != 0 ? 1 : 0)
+      + (RefreshPeriod.Nanoseconds != 0 ? 1 : 0)
+      + (IntendedDisplayTime.Nanoseconds != 0 ? 1 : 0);
 
     /// <summary>
     /// The annotation at <paramref name="index"/> (0 to <see cref="AnnotationCount"/> less one), in the order of the marker's fields: the
-    /// animation time, the preferred frame time, the target frame time, the intended display time.
+    /// animation time, the preferred frame time, the target frame time, the refresh period, the intended display time.
     /// </summary>
     public FrameRecordAnnotation GetAnnotation(int index)
     {
@@ -106,6 +114,8 @@ namespace MB.FramePacing.Trace
         return new FrameRecordAnnotation(FrameRecordText.MarkerPreferredNs, PreferredFrameTime.Nanoseconds);
       if (TargetFrameTime.Nanoseconds != 0 && ++position == index)
         return new FrameRecordAnnotation(FrameRecordText.MarkerTargetNs, TargetFrameTime.Nanoseconds);
+      if (RefreshPeriod.Nanoseconds != 0 && ++position == index)
+        return new FrameRecordAnnotation(FrameRecordText.MarkerRefreshPeriodNs, RefreshPeriod.Nanoseconds);
       if (IntendedDisplayTime.Nanoseconds != 0 && ++position == index)
         return new FrameRecordAnnotation(FrameRecordText.IntendedDisplayNs, IntendedDisplayTime.Nanoseconds);
       throw new ArgumentOutOfRangeException(nameof(index), index, "Not an annotation of this record");
@@ -119,12 +129,26 @@ namespace MB.FramePacing.Trace
       && AnimationTime == other.AnimationTime
       && PreferredFrameTime == other.PreferredFrameTime
       && TargetFrameTime == other.TargetFrameTime
+      && RefreshPeriod == other.RefreshPeriod
       && IntendedDisplayTime == other.IntendedDisplayTime;
 
     public override bool Equals(object obj) => obj is FrameRecord other && Equals(other);
 
-    public override int GetHashCode() =>
-      HashCode.Combine(RunId, FrameIndex, StartTime, Duration, AnimationTime, PreferredFrameTime, TargetFrameTime, IntendedDisplayTime);
+    public override int GetHashCode()
+    {
+      // Nine fields: more than HashCode.Combine takes
+      var hash = new HashCode();
+      hash.Add(RunId);
+      hash.Add(FrameIndex);
+      hash.Add(StartTime);
+      hash.Add(Duration);
+      hash.Add(AnimationTime);
+      hash.Add(PreferredFrameTime);
+      hash.Add(TargetFrameTime);
+      hash.Add(RefreshPeriod);
+      hash.Add(IntendedDisplayTime);
+      return hash.ToHashCode();
+    }
 
     public static bool operator ==(FrameRecord left, FrameRecord right) => left.Equals(right);
 

@@ -5,7 +5,8 @@
 //*
 //* The tools count in nanoseconds, as the marker and the marker library's payload do, with the same types, so every time is the same both
 //* ways (ToFrameMarker, FromFrameMarker): a sixtieth of a second, 16 666 667 ns in the marker, is 16 666 667 ns here.
-//* - A frame time or CPU busy longer than a marker carries (4.29 s) is held as the longest it carries, by the marker library's payload.
+//* - A frame time, refresh period or CPU busy longer than a marker carries (4.29 s) is held as the longest it carries, by the marker library's
+//*   payload.
 //* - 0 (unknown) is 0, and on demand is the marker library's value (FM.Payload.OnDemandFrameTime).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -31,6 +32,7 @@ namespace MB.FramePacing.MarkerDecoding
   /// The interval the application wants to run at; 0 = unknown, <see cref="OnDemandFrameTime"/> = frames only when something changes.
   /// </param>
   /// <param name="TargetFrameTime">The interval the frame pacer aims for before this frame; 0 = unknown.</param>
+  /// <param name="RefreshPeriod">The refresh period of the display the application works with; 0 = unknown.</param>
   /// <param name="IntendedDisplayTime">
   /// When the application's frame pacer intends the frame to become visible, on its steady clock; 0 = unknown.
   /// </param>
@@ -44,6 +46,7 @@ namespace MB.FramePacing.MarkerDecoding
     NanosecondTimeSpan AnimationTime,
     NanosecondTimeDuration PreferredFrameTime = default,
     NanosecondTimeDuration TargetFrameTime = default,
+    NanosecondTimeDuration RefreshPeriod = default,
     NanosecondTickCount IntendedDisplayTime = default,
     NanosecondTickCount CpuStartTime = default,
     NanosecondTimeDuration CpuBusy = default
@@ -101,8 +104,8 @@ namespace MB.FramePacing.MarkerDecoding
     public static bool TryDecode(ReadOnlySpan<byte> src, out MarkerPayload payload) => TryDecode(src, out payload, out _);
 
     /// <summary>
-    /// The same payload as the marker library's type, every time as it is. A frame time (other than on demand) or CPU busy longer than a
-    /// marker carries comes back as the longest it carries.
+    /// The same payload as the marker library's type, every time as it is. A frame time (other than on demand), refresh period or CPU busy
+    /// longer than a marker carries comes back as the longest it carries.
     /// </summary>
     public FM.Payload ToFrameMarker() =>
       new FM.Payload(
@@ -113,6 +116,7 @@ namespace MB.FramePacing.MarkerDecoding
         AnimationTime,
         PreferredFrameTime,
         TargetFrameTime,
+        RefreshPeriod,
         IntendedDisplayTime,
         CpuStartTime,
         CpuBusy
@@ -128,6 +132,7 @@ namespace MB.FramePacing.MarkerDecoding
         payload.AnimationTime,
         payload.PreferredFrameTime,
         payload.TargetFrameTime,
+        payload.RefreshPeriod,
         payload.IntendedDisplayTime,
         payload.CpuStartTime,
         payload.CpuBusy

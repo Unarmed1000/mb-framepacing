@@ -235,7 +235,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
   const std::vector<uint8_t> main(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(mainSize));
   const std::size_t syncSize = FM::EncodePayload({FM::MarkerKind::Sync, 7u, 11u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan(0)}, {}, buffer);
   const std::vector<uint8_t> sync(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(syncSize));
-  ASSERT_EQ(main.size(), 81u) << "the longest marker";
+  ASSERT_EQ(main.size(), 85u) << "the longest marker";
   ASSERT_EQ(sync.size(), 20u) << "the shortest";
 
   const auto record = FD::CaptureDataRecord::Parse(RecordBytes(5, 83'350'002, 2, main, sync));

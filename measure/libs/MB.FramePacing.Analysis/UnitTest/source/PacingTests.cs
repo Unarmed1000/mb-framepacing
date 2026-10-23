@@ -371,6 +371,67 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(wrong.Warnings, Has.Some.Contains("capture runs at 62.5 fps, but a 120 Hz display was expected"));
     }
 
+    /// <summary>The rows with the frame markers' refresh period: <paramref name="periodOf"/> of the frame's index from the run's first.</summary>
+    private static List<CaptureRow> WithRefreshPeriods(List<CaptureRow> rows, Func<ulong, long> periodOf) =>
+      rows.Select(row =>
+          row.Payload.Kind == MarkerKind.Frame
+            ? row with
+            {
+              Payload = row.Payload with { RefreshPeriod = NanosecondTimeDuration.FromNanoseconds(periodOf(row.Payload.FrameIndex - 100)) },
+            }
+            : row
+        )
+        .ToList();
+
+    [Test]
+    public void CaptureCard_TheMarkersRefreshPeriod_IsComparedWithTheCaptureRate()
+    {
+      var rows = Rows(Steady(20));
+
+      // Within 1 %: 62.5 Hz, and 62 Hz (0.8 % off); nothing the markers do not say (0)
+      foreach (long period in new[] { 16 * Ms, 16_129_032, 0 })
+      {
+        var matching = TimelineAnalyzer.Analyze(WithRefreshPeriods(rows, _ => period), new TimelineOptions()).Runs.Single();
+        Assert.That(matching.Warnings, Has.None.Contains("The markers say"), period.ToString());
+        Assert.That(matching.Frames.Select(f => f.MarkerRefreshPeriod.Nanoseconds), Is.All.EqualTo(period));
+      }
+
+      // A 144 Hz display: the capture's rate stays the refresh, and the warning gives both
+      var wrong = TimelineAnalyzer.Analyze(WithRefreshPeriods(rows, _ => 6_944_444), new TimelineOptions()).Runs.Single();
+      Assert.That(
+        wrong.Pacing!.RefreshPeriod,
+        Is.EqualTo(NanosecondTimeDuration.FromNanoseconds(16 * Ms)),
+        "a capture card's refresh stays the capture period"
+      );
+      Assert.That(
+        wrong.Warnings,
+        Has.Some.Contains("The markers say the application works with a 144 Hz display (20 frames), but the capture runs at 62.5 fps.")
+      );
+
+      // A window that moved to another display: each rate that is not the capture's, the most frames first
+      var moved = TimelineAnalyzer
+        .Analyze(
+          WithRefreshPeriods(
+            rows,
+            index =>
+              index < 5 ? 16 * Ms
+              : index < 8 ? 8_333_333
+              : 6_944_444
+          ),
+          new TimelineOptions()
+        )
+        .Runs.Single();
+      Assert.That(
+        moved.Warnings,
+        Has.Some.Contains("works with a 144 Hz display (12 frames), a 120 Hz display (3 frames), but the capture runs at 62.5 fps")
+      );
+
+      // The user's expected rate is its own warning
+      var both = TimelineAnalyzer.Analyze(WithRefreshPeriods(rows, _ => 6_944_444), new TimelineOptions { ExpectedRefreshHz = 144 }).Runs.Single();
+      Assert.That(both.Warnings, Has.Some.Contains("but a 144 Hz display was expected"));
+      Assert.That(both.Warnings, Has.Some.Contains("The markers say the application works with a 144 Hz display"));
+    }
+
     [Test]
     public void LateShare_TellsABusyStretchFromRareSpikes()
     {

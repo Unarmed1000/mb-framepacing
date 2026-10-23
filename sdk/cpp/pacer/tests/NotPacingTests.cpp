@@ -178,6 +178,7 @@ TEST(NotPacing, EveryCallGivesNothingToCarryOutAndTheFramesGoOn)
         ASSERT_EQ(schedule.NextFrameStartTime, FP::NanosecondTickCount()) << frame;
         ASSERT_EQ(schedule.TargetFrameTime, FP::NanosecondTimeDuration()) << frame;
         ASSERT_EQ(schedule.PreferredFrameTime.Nanoseconds(), 2 * Period) << frame;
+        ASSERT_EQ(schedule.RefreshPeriod.Nanoseconds(), Period) << frame;
         ASSERT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged) << frame;
         // Nothing to wait for before the present, and nothing to give it
         ASSERT_EQ(loop.Present.FrameId, schedule.FrameId) << frame;

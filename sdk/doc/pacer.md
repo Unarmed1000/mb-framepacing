@@ -323,8 +323,8 @@ is. As a change of the active set, the switch takes effect when the frame that i
 
 The swap interval rule gets no frame meanwhile and keeps its swap interval. `WorkingTier()` goes on naming the tier that would
 pace; `PacerTierText` has the words to show in its place (`NotPacingName` and the two descriptions). The marker of such a
-frame carries what the schedule has: the animation time, the preferred frame time, and zero (not known) for the intended
-display time and the target frame time.
+frame carries what the schedule has: the animation time, the preferred frame time, the refresh period, and zero (not known)
+for the intended display time and the target frame time.
 
 `SetPacing(true)` is a handover as a change of the active set is: the first frame is placed anew, the frame ids, the animation
 time and the swap interval go on, and the pause after start-up is made once more where it is made at all. That first frame
@@ -542,15 +542,16 @@ take them; its default is what emptied the queue on the one system measured.
 
 ## Filling the marker
 
-| Marker field          | From                                                                                            |
-| --------------------- | ----------------------------------------------------------------------------------------------- |
-| Frame index           | Your own frame counter                                                                          |
-| Animation time        | `schedule.AnimationTime`                                                                        |
-| Preferred frame time  | `schedule.PreferredFrameTime`                                                                   |
-| Target frame time     | `schedule.TargetFrameTime`                                                                      |
-| Intended display time | `schedule.IntendedDisplayTime`                                                                  |
-| CPU start time        | The time you gave `BeginFrame`                                                                  |
-| CPU busy              | `EndFrame`'s `PresentPlan::CpuBusy`, or `CpuBusyAt(Now())` for a marker drawn before `EndFrame` |
+| Marker field          | From                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| Frame index           | Your own frame counter                                                                                 |
+| Animation time        | `schedule.AnimationTime`                                                                               |
+| Preferred frame time  | `schedule.PreferredFrameTime`                                                                          |
+| Target frame time     | `schedule.TargetFrameTime`                                                                             |
+| Refresh period        | `schedule.RefreshPeriod`: the period the pacer is on, to the nearest nanosecond, also while not pacing |
+| Intended display time | `schedule.IntendedDisplayTime`                                                                         |
+| CPU start time        | The time you gave `BeginFrame`                                                                         |
+| CPU busy              | `EndFrame`'s `PresentPlan::CpuBusy`, or `CpuBusyAt(Now())` for a marker drawn before `EndFrame`        |
 
 [Filling the marker fields](marker-fields.md) says what the analysis does with each. The pacer and the marker both count in
 nanoseconds, so a schedule's values go into a `Payload` as they are; what a marker's four bytes do not hold is capped by the

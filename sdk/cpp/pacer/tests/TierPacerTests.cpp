@@ -1491,3 +1491,18 @@ TEST(TierPacer, EverySetIsPacedAtTheBestTierItReaches)
   }
   EXPECT_EQ(sets, 384u);
 }
+
+TEST(TierPacer, EveryScheduleCarriesTheRefreshPeriodTheMarkerSays)
+{
+  // Paced on the clock, on vertical blanks and not paced: the period the pacer is on, rounded to a nanosecond
+  for (const PacerCapability capability : {PacerCapability::NoCapabilities, VBlank})
+  {
+    Loop loop(Settings(), PacerCapabilities(capability));
+    EXPECT_EQ(loop.Frame().RefreshPeriod.Nanoseconds(), Period) << static_cast<uint32_t>(capability);
+    loop.Pacer.SetPacing(false);
+    EXPECT_EQ(loop.Frame().RefreshPeriod.Nanoseconds(), Period) << static_cast<uint32_t>(capability);
+  }
+  // 59.94 Hz: 16'683'333.3 ns
+  PC::TierPacer ntsc(PC::PacerSettings(PC::RefreshPeriod::FromRate(60'000, 1'001)), PacerCapabilities());
+  EXPECT_EQ(ntsc.BeginFrame(At(Start)).RefreshPeriod.Nanoseconds(), 16'683'333);
+}

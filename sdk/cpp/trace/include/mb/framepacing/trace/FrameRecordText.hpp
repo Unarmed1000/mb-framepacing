@@ -26,6 +26,8 @@ namespace MB::FramePacing::Trace::FrameRecordText
   inline constexpr std::string_view MarkerPreferredNs = "markerPreferredNs";
   //! The annotation with the marker's target frame time.
   inline constexpr std::string_view MarkerTargetNs = "markerTargetNs";
+  //! The annotation with the marker's refresh period.
+  inline constexpr std::string_view MarkerRefreshPeriodNs = "markerRefreshPeriodNs";
   //! The annotation with the marker's intended display time.
   inline constexpr std::string_view IntendedDisplayNs = "intendedDisplayNs";
 

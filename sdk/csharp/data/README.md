@@ -52,7 +52,7 @@ in time are `NanosecondTickCount`s, on the capture's clock (a frame's `FirstSeen
 when the device gave none) or the frame pacer's (`IntendedDisplayTime`, `CpuStartTime`). A length of time is a
 `NanosecondTimeDuration`, which is never negative: a frame's `TargetFrameTime`, `PreferredFrameTime` and `FrameTime`, the summary's
 `CapturePeriod`, `MeasurementResolution` and `ErrorThreshold`, a run's pacing `RefreshPeriod` and `TargetFrameTime`, and the
-marker's own durations (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `CpuBusy`: 32 bits in the marker and in the file), as
+marker's own durations (`MarkerTargetFrameTime`, `MarkerPreferredFrameTime`, `MarkerRefreshPeriod`, `CpuBusy`: 32 bits in the marker and in the file), as
 the marker's `Payload` returns them; a frame time of `Payload.OnDemandFrameTime` is a frame presented on demand. What can go either
 way is a `NanosecondTimeSpan`: `AnimationTime`, `AnimationDelta`, `AnimationError`, `PacingError`, `PredictionError`, `Lateness`,
 `Drift`, `CpuWait`, a camera capture's `ScanoutDelay` (the sync marker can be seen before the main marker decodes), and
