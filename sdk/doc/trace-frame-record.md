@@ -1,5 +1,8 @@
 # The frame record: what an application logs to a trace
 
+> How to log it with Perfetto's Tracing SDK, record a trace and check it: [Logging to a trace](trace-logging.md). This page is the
+> reference.
+
 A capture card recording says when each frame was on screen. A [Perfetto](https://perfetto.dev) trace of the same run says what
 the application and the system did meanwhile. The tools merge the two ([the tools' guide](../../measure/doc/perfetto.md)), and
 for that a frame of the trace has to be known as a frame of the capture. Nothing in a trace says so unless the application
@@ -15,19 +18,19 @@ record and works out, from a marker's payload, what to log.
 
 ## The record
 
-| What            | The rule                                                                                                                                                                      |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which frames    | One slice for every frame whose main marker (a frame, start or end marker) is drawn and carries a CPU start time greater than 0. None for a sync marker                       |
-| Name            | `mbfp frame <run id> <frame index>`: the two ids of that frame's marker, as decimal numbers without leading zeros                                                             |
-| Start           | The marker's CPU start time                                                                                                                                                   |
-| Length          | The marker's CPU busy time; a slice without length for a CPU busy time of 0                                                                                                   |
-| Precision       | Both as the payload carries them, to the nanosecond: the CPU busy time after the payload's cap                                                                                |
-| Clock           | The system's `CLOCK_MONOTONIC` (Perfetto's built-in clock 3): the clock the times in the marker are read from                                                                 |
-| Category        | `mbfp`                                                                                                                                                                        |
-| Track           | A track named `mbfp frames` under the application's process. A writer that can only begin and end a section on the running thread writes it there, on that thread's own track |
-| How many        | At most one for a run id and frame index, and never one inside another: frames whose CPU work overlaps go on further tracks of the same name                                  |
-| Annotations     | The marker's other times, as whole numbers of nanoseconds (below)                                                                                                             |
-| A CPU start ≤ 0 | No slice: 0 is "not known" in a marker, and a trace has no time before its clock's start                                                                                      |
+| What            | The rule                                                                                                                                                                               |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Which frames    | One slice for every frame whose main marker (a frame, start or end marker) is drawn and carries a CPU start time greater than 0. None for a sync marker                                |
+| Name            | `mbfp frame <run id> <frame index>`: the two ids of that frame's marker, as decimal numbers without leading zeros                                                                      |
+| Start           | The marker's CPU start time                                                                                                                                                            |
+| Length          | The marker's CPU busy time; a slice without length for a CPU busy time of 0                                                                                                            |
+| Precision       | Both as the payload carries them, to the nanosecond: the CPU busy time after the payload's cap                                                                                         |
+| Clock           | The system's `CLOCK_MONOTONIC` (Perfetto's built-in clock 3): the clock the times in the marker are read from                                                                          |
+| Category        | `mbfp`                                                                                                                                                                                 |
+| Track           | A track named `mbfp frames` under the application's process. A writer that can only begin and end a section on the running thread writes it there, on that thread's own track          |
+| How many        | At most one for a run id and frame index, and never one inside another: frames whose CPU work overlaps go on further tracks of the same name, the record's lane (below) its track's id |
+| Annotations     | The marker's other times, as whole numbers of nanoseconds (below)                                                                                                                      |
+| A CPU start ≤ 0 | No slice: 0 is "not known" in a marker, and a trace has no time before its clock's start                                                                                               |
 
 The annotations, in the order of the marker's fields. Each is the payload's value, after its cap where it has one:
 
@@ -59,6 +62,7 @@ other dependency, reads no clock, calls no tracing API and allocates nothing. On
 | `FrameRecord`                    | `FrameRecord`                    | What to log for one marker: the name, the start, the length and the annotations with their values |
 | `FrameRecordAnnotation`          | `FrameRecordAnnotation`          | One annotation: its name and its value                                                            |
 | `FrameRecordUtil::TryCreate`     | `FrameRecord.TryCreate`          | The record of a marker's payload; false for a marker that gets none                               |
+| `TrackLanes`                     | `TrackLanes`                     | Which of the tracks of one name a slice goes on, so that overlapping slices never share one       |
 | (none: applications only write)  | `FrameRecordName.TryParse`       | The run id and frame index of a slice's name, for a reader                                        |
 | `FrameDetail`, `FrameDetailName` | `FrameDetail`, `FrameDetailName` | Part 2: what of a frame a slice or a moment is, and its name (C#: `TryParse` for a reader)        |
 
@@ -97,6 +101,22 @@ if (FT::FrameRecordUtil::TryCreate(payload, record))
 literal that ends with a zero, and the name's `CStr()` does too: they can be given to a function that takes a C string.
 
 `sdk/test-data/trace/frame-records.csv` holds payloads with the record each gives; the tests of both languages read it.
+
+### Frames that overlap: the lanes
+
+A trace's slices on one track must follow each other or nest: a trace pairs a slice's end with the slice opened last, so two
+slices that overlap without nesting end each other's, and nothing reports it. A loop that makes its frames one after the other never
+overlaps them: a frame's CPU work ends at its present, before the next frame's starts. A pipelined engine (frames in flight: the next
+frame's CPU work starts before this frame is presented) does, and its records go on further tracks of the same name.
+
+`TrackLanes` works out which: give it every record of a run, in the order they are made, and it gives each the first lane whose
+slices have all ended by the record's start (`FrameRecordUtil::TryCreate(payload, lanes, record)`, C#
+`FrameRecord.TryCreate(payload, lanes, out record)`: `record.Lane`). The lane is the track's id among the tracks named `mbfp frames`:
+a sequential loop gets lane 0 only, one track, and a pipelined engine as many as its frames overlap, at most 16
+(`TrackLanes::MaxLaneCount`; beyond, `Overflows()` counts the slices that had to share a lane). A trace viewer shows tracks of one
+name as one track. Keep one `TrackLanes` per name of track: part 2's slices that can overlap (the GPU's work on frames in flight)
+take lanes of their own the same way. `sdk/test-data/trace/track-lanes.csv` holds sequences of slices with the lane each gets; the
+tests of both languages read it.
 
 ## Say so in the start marker
 

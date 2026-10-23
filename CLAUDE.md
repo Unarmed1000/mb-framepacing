@@ -230,7 +230,19 @@ https://ui.perfetto.dev`, answers a private network preflight, stops after one s
       tracing API in the SDK; an optional header that makes one library's calls is a roadmap option, not built.
     - C++ `FrameRecordText` (the strings), `FrameRecordName` (inline, no allocation), `FrameRecord`, `FrameRecordAnnotation`,
       `FrameRecordUtil::TryCreate(payload, record)`; C# the same names with `FrameRecord.TryCreate` and, for readers,
-      `FrameRecordName.TryParse`. Both are held to `sdk/test-data/trace/frame-records.csv`. On by default:
+      `FrameRecordName.TryParse`. Both are held to `sdk/test-data/trace/frame-records.csv`.
+    - **Overlapping frames: `TrackLanes`** (the user, 2026-10-23, alpha.5): a track's slices must follow each other or nest, and a
+      trace pairs an end with the slice opened last, so two records that overlap on one track end each other's, silently (found
+      testing the guide against Perfetto v52: wrong lengths, no error counted). A pipelined engine's frames overlap; a sequential
+      loop's never do. `TrackLanes` (C++ and C#, values in, no allocation) gives each slice the first lane free at its start (16 at
+      most, `Overflows()` beyond), `TryCreate(payload, lanes, record)` sets `FrameRecord::Lane`, the track's id among the tracks
+      named `mbfp frames` (lane 0 for a sequential loop: one track; the viewer shows same-named tracks as one). Held to
+      `sdk/test-data/trace/track-lanes.csv` (made from a Python model of the rule). One `TrackLanes` per track name: part 2's GPU
+      slices take lanes too. The tools read the record from every track of that name.
+    - **The how-to guides** (the user, 2026-10-23, for alpha.5): `sdk/doc/marker-logging.md` (a frame loop that fills every
+      marker field, where each value comes from per platform, how to check it) and `sdk/doc/trace-logging.md` (the record and
+      part 2 with Perfetto's Tracing SDK v49+, a recording config, the check). C++ only, full Perfetto code (the user's choice);
+      the code was compiled and run against Perfetto v52.0 and read back with `trace-info`: keep it compiling when either changes. On by default:
       `MB_FRAMEPACING_BUILD_TRACE` (needs the marker module; OFF leaves it out), Conan's `with_trace` (True), the consumer
       check (`subdirectory-trace`, `package-trace` against the default install, which must hold it). Not in Python (the script has the two strings it reads, held to the golden data by a test) and not in the Unity package.
     - **Part 2, optional and not checked against the capture** (the user's request of 2026-10-14, agreed design): what happened

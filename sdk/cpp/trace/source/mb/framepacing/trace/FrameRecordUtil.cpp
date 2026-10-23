@@ -9,6 +9,7 @@
 #include <mb/framepacing/trace/FrameRecordName.hpp>
 #include <mb/framepacing/trace/FrameRecordText.hpp>
 #include <mb/framepacing/trace/FrameRecordUtil.hpp>
+#include <mb/framepacing/trace/TrackLanes.hpp>
 #include <cstdint>
 
 namespace MB::FramePacing::Trace::FrameRecordUtil
@@ -57,6 +58,16 @@ namespace MB::FramePacing::Trace::FrameRecordUtil
       ++count;
     }
     rRecord.AnnotationCount = count;
+    return true;
+  }
+
+  bool TryCreate(const Marker::Payload& payload, TrackLanes& rLanes, FrameRecord& rRecord) noexcept
+  {
+    if (!TryCreate(payload, rRecord))
+    {
+      return false;
+    }
+    rRecord.Lane = rLanes.Assign(rRecord.StartTime, rRecord.EndTime());
     return true;
   }
 }

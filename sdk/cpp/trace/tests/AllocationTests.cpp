@@ -15,6 +15,7 @@
 #include <mb/framepacing/trace/FrameRecordName.hpp>
 #include <mb/framepacing/trace/FrameRecordText.hpp>
 #include <mb/framepacing/trace/FrameRecordUtil.hpp>
+#include <mb/framepacing/trace/TrackLanes.hpp>
 #include <gtest/gtest.h>
 #include <cstddef>
 #include <cstdint>
@@ -63,6 +64,7 @@ TEST(Allocations, MakingARecordDoesNotAllocate)
 {
   std::size_t written = 0;
   int64_t sum = 0;
+  TR::TrackLanes lanes;
   {
     const FT::AllocationCounter counter;
     for (uint64_t frame = 0; frame < 200u; ++frame)
@@ -89,6 +91,10 @@ TEST(Allocations, MakingARecordDoesNotAllocate)
         sum += annotation.Value;
       }
       sum += record.StartTime.Nanoseconds() + record.Duration.Nanoseconds() + record.EndTime().Nanoseconds();
+
+      // The same with its lane
+      written += TR::FrameRecordUtil::TryCreate(framePayload, lanes, record) ? 1u : 0u;
+      written += record.Lane;
 
       // The markers that get no record, and a start marker
       written += TR::FrameRecordUtil::TryCreate(framePayload.WithKind(FM::MarkerKind::Sync), record) ? 1u : 0u;

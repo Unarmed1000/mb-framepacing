@@ -1,7 +1,8 @@
 # Filling the marker fields
 
 [The marker format](marker-format.md) defines every field of the payload; [Integrating the marker](integrating.md) (and
-[Unity](unity.md)) shows how to build it into an application. This page is the guide in between: for every field, where its value
+[Unity](unity.md)) shows how to build it into an application, and [Logging with the marker](marker-logging.md) walks through a frame
+loop that fills every field. This page is the guide in between: for every field, where its value
 comes from, when it changes, what to write when you do not know it, what the analysis does with it and what goes wrong in the report
 when it is wrong. Worked examples for typical frame pacers and a checklist of common mistakes follow.
 

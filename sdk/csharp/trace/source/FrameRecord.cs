@@ -25,8 +25,9 @@ namespace MB.FramePacing.Trace
     /// <summary>The most annotations a record has.</summary>
     public const int MaxAnnotationCount = 5;
 
-    private FrameRecord(in Payload payload)
+    private FrameRecord(in Payload payload, int lane)
     {
+      Lane = lane;
       RunId = payload.RunId;
       FrameIndex = payload.FrameIndex;
       StartTime = payload.CpuStartTime;
@@ -66,6 +67,12 @@ namespace MB.FramePacing.Trace
     public readonly NanosecondTickCount IntendedDisplayTime;
 
     /// <summary>
+    /// Which of the tracks named <see cref="FrameRecordText.TrackName"/> the slice goes on (<see cref="TrackLanes"/>): 0 unless records
+    /// overlap.
+    /// </summary>
+    public readonly int Lane;
+
+    /// <summary>
     /// The record of the marker <paramref name="payload"/> is drawn as; false, with an empty record, for a marker that gets none (a sync
     /// marker, or a CPU start time that is not greater than 0).
     /// </summary>
@@ -76,7 +83,22 @@ namespace MB.FramePacing.Trace
         record = default;
         return false;
       }
-      record = new FrameRecord(payload);
+      record = new FrameRecord(payload, 0);
+      return true;
+    }
+
+    /// <summary>
+    /// The same, with the record's lane from <paramref name="lanes"/> (<see cref="TrackLanes.Assign"/>), which keeps the frames' records
+    /// apart when they overlap (frames in flight). Keep one <see cref="TrackLanes"/> for the records of a run, and give it every record, in
+    /// the order they are made. A marker that gets no record takes no lane.
+    /// </summary>
+    public static bool TryCreate(in Payload payload, TrackLanes lanes, out FrameRecord record)
+    {
+      if (lanes == null)
+        throw new ArgumentNullException(nameof(lanes));
+      if (!TryCreate(payload, out record))
+        return false;
+      record = new FrameRecord(payload, lanes.Assign(record.StartTime, record.EndTime));
       return true;
     }
 
@@ -130,13 +152,14 @@ namespace MB.FramePacing.Trace
       && PreferredFrameTime == other.PreferredFrameTime
       && TargetFrameTime == other.TargetFrameTime
       && RefreshPeriod == other.RefreshPeriod
-      && IntendedDisplayTime == other.IntendedDisplayTime;
+      && IntendedDisplayTime == other.IntendedDisplayTime
+      && Lane == other.Lane;
 
     public override bool Equals(object obj) => obj is FrameRecord other && Equals(other);
 
     public override int GetHashCode()
     {
-      // Nine fields: more than HashCode.Combine takes
+      // Ten fields: more than HashCode.Combine takes
       var hash = new HashCode();
       hash.Add(RunId);
       hash.Add(FrameIndex);
@@ -147,6 +170,7 @@ namespace MB.FramePacing.Trace
       hash.Add(TargetFrameTime);
       hash.Add(RefreshPeriod);
       hash.Add(IntendedDisplayTime);
+      hash.Add(Lane);
       return hash.ToHashCode();
     }
 

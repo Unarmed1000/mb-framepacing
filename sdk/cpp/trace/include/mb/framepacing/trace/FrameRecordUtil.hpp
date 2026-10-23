@@ -5,6 +5,7 @@
 
 #include <mb/framepacing/marker/payload/Payload.hpp>
 #include <mb/framepacing/trace/FrameRecord.hpp>
+#include <mb/framepacing/trace/TrackLanes.hpp>
 
 //! The frame record of a marker's payload: what the application
 //! logs to its trace for the frame the marker is drawn in. It reads no clock, calls no tracing API and allocates nothing.
@@ -18,6 +19,11 @@ namespace MB::FramePacing::Trace::FrameRecordUtil
   //! busy time, and the annotations are its animation time, always, and its preferred frame time, target frame time and intended
   //! display time, each unless it is 0 ("not known"). Every value is the payload's, to the nanosecond, so after the payload's caps.
   [[nodiscard]] bool TryCreate(const Marker::Payload& payload, FrameRecord& rRecord) noexcept;
+
+  //! The same, with the record's lane from rLanes (TrackLanes::Assign), which keeps the frames' records apart when they overlap
+  //! (frames in flight). Keep one TrackLanes for the records of a run, and give it every record, in the order they are made. A marker
+  //! that gets no record takes no lane.
+  [[nodiscard]] bool TryCreate(const Marker::Payload& payload, TrackLanes& rLanes, FrameRecord& rRecord) noexcept;
 }
 
 #endif

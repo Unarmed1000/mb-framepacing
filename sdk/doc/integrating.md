@@ -11,7 +11,8 @@ This guide puts the marker into an application. There are four ways in:
 
 All four produce exactly the same pixels. The libraries are renderer independent: they give you pixel aligned geometry to draw with
 whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precise format is in [marker-format.md](marker-format.md);
-[Filling the marker fields](marker-fields.md) says where each field's value comes from and what the analysis does with it.
+[Filling the marker fields](marker-fields.md) says where each field's value comes from and what the analysis does with it, and
+[Logging with the marker](marker-logging.md) walks through a frame loop that fills every field.
 
 > **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame. Flickering patterns can trigger
 > seizures in people with photosensitive epilepsy. Draw it in test builds only, never in what players see, and read
@@ -310,7 +311,7 @@ the screen with a high speed camera, draw the sync marker as well and see the ve
 
 An application that records a [Perfetto](https://perfetto.dev) trace of a run can have the tools merge it with the capture:
 the capture's measurements as tracks in the trace, and what the trace says of each frame in the analysis. For that the
-application logs one slice per frame to its trace, [the frame record](trace-frame-record.md), with the values of the frame's
+application logs one slice per frame to its trace, [the frame record](trace-frame-record.md) ([with Perfetto, step by step](trace-logging.md)), with the values of the frame's
 marker. The SDK's trace module defines the record's strings and works out what to log from the payload you
 already make; you log it with your own tracing. It is needed for that merge only: a measurement needs nothing but the marker.
 Say in the run's start marker that you log it (`FM::MarkerFlags::FrameRecordLogged`, off unless you set it), so that whoever

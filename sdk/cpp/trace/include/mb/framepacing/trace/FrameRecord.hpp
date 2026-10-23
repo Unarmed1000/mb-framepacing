@@ -16,8 +16,8 @@
 namespace MB::FramePacing::Trace
 {
   //! What an application logs to its trace for one frame: a slice
-  //! with this name, in the category FrameRecordText::Category, on the track named FrameRecordText::TrackName, from StartTime for
-  //! Duration on the clock FrameRecordText::ClockId, with every entry of Annotations(). FrameRecordUtil::TryCreate makes it from
+  //! with this name, in the category FrameRecordText::Category, on the track named FrameRecordText::TrackName with the id Lane,
+  //! from StartTime for Duration on the clock FrameRecordText::ClockId, with every entry of Annotations(). FrameRecordUtil::TryCreate makes it from
   //! the payload the frame's marker is drawn from, so the record and the marker can not disagree. The application writes the
   //! slice with its own tracing: the SDK writes no trace.
   struct FrameRecord
@@ -35,6 +35,8 @@ namespace MB::FramePacing::Trace
     std::array<FrameRecordAnnotation, MaxAnnotationCount> AnnotationBuffer{};
     //! How many annotations the record has, at most MaxAnnotationCount.
     uint32_t AnnotationCount{0};
+    //! Which of the tracks named FrameRecordText::TrackName the slice goes on (TrackLanes): 0 unless records overlap.
+    uint32_t Lane{0};
 
     //! The record's annotations, in the order of the marker's fields.
     [[nodiscard]] constexpr std::span<const FrameRecordAnnotation> Annotations() const noexcept
