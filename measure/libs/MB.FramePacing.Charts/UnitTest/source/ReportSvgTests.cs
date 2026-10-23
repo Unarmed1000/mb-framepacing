@@ -452,6 +452,102 @@ namespace MB.FramePacing.Charts.UnitTest
       }
     }
 
+    /// <summary>A synthetic run whose frames' markers carry <paramref name="periodNanoseconds"/>, the user expecting <paramref name="expectedHz"/>.</summary>
+    private static ChartRun Marked(long periodNanoseconds, double? expectedHz = null)
+    {
+      var chart = Synthetic(600);
+      var run = chart.Run;
+      var frames = run.Frames.Select(f => f with { MarkerRefreshPeriod = NanosecondTimeDuration.FromNanoseconds(periodNanoseconds) }).ToList();
+      return chart with { Run = run with { Frames = frames, Pacing = run.Pacing! with { ExpectedRefreshHz = expectedHz } } };
+    }
+
+    /// <summary>
+    /// When the display and the capture disagree the card says so under its header, in a band with a sign and words: the facts (the
+    /// markers' rate and the frames that carry it, a rate the user expected, the capture's) and what to check; the display box shows the
+    /// rate in the warning colour and the markers' rate. Rates within 1 % and markers that say nothing give no warning; hidden, none.
+    /// </summary>
+    [Test]
+    public void Warning_TheDisplayAndTheCaptureDisagree()
+    {
+      // The synthetic run is a 240 Hz capture
+      foreach (long agreeing in new[] { 4_166_667, 4_200_000, 0 })
+      {
+        var agreed = ReportCard.Build(RunSection.Whole(Marked(agreeing)));
+        Assert.That(agreed.FlatShapes.OfType<RectShape>().Where(r => r.Class == "warn-band"), Is.Empty, agreeing.ToString());
+        var rate = agreed
+          .FlatShapes.OfType<TextRunsShape>()
+          .Single(t => t.Runs.Any(run => run.Text.Contains("fixed refresh", StringComparison.Ordinal)));
+        Assert.That(
+          rate.Runs.Select(run => (run.Text.Trim(), run.Class)),
+          Is.EqualTo(new[] { ("240 Hz", "tile-value"), ("fixed refresh (vsync)", "vsync-n") })
+        );
+      }
+
+      var drawing = ReportCard.Build(RunSection.Whole(Marked(16_666_667)));
+      var band = drawing.FlatShapes.OfType<RectShape>().Single(r => r.Class == "warn-band");
+      var texts = drawing.FlatShapes.OfType<TextShape>().Where(t => t.Class == "warn-text").Select(t => t.Content).ToList();
+      Assert.That(
+        texts,
+        Is.EqualTo(
+          new[]
+          {
+            "The markers say the application works with a 60 Hz display (600 frames), but the capture runs at 240 fps.",
+            "A capture card must capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application writes.",
+          }
+        )
+      );
+      var heading = drawing.FlatShapes.OfType<TextRunsShape>().Single(t => t.Runs.Any(run => run.Class == "warn-label"));
+      Assert.That(string.Concat(heading.Runs.Select(run => run.Text)), Is.EqualTo("\u26A0 WARNING   The display and the capture disagree"));
+      // Under the header and above the tiles
+      var tiles = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class == "tile" && r.Y.Value > band.Y.Value).ToList();
+      Assert.That(band.Y.Value + band.Height.Value, Is.LessThan(tiles.Min(t => t.Y.Value)));
+      // The display box: the capture's rate, in the warning colour, and what the markers say
+      var display = drawing
+        .FlatShapes.OfType<TextRunsShape>()
+        .Single(t => t.Runs.Any(run => run.Text.Contains("fixed refresh", StringComparison.Ordinal)));
+      Assert.That(
+        display.Runs.Select(run => (run.Text.Trim(), run.Class)),
+        Is.EqualTo(new[] { ("240 Hz", "tile-value warn"), ("fixed refresh (vsync), markers 60 Hz", "vsync-n") })
+      );
+
+      // A rate the user expected that is not the capture's: a line of its own
+      string expected = ReportCard.Render(RunSection.Whole(Marked(0, expectedHz: 120)));
+      Assert.That(expected, Does.Contain("A 120 Hz display was expected (--display-hz), but the capture runs at 240 fps."));
+      Assert.That(expected, Does.Not.Contain("The markers say"));
+
+      // Left out on request, and the card is that much shorter
+      string full = ReportCard.Render(RunSection.Whole(Marked(16_666_667)));
+      string hidden = ReportCard.Render(RunSection.Whole(Marked(16_666_667)), ReportOptions.Default.Hide(new[] { ReportItem.Warning }));
+      Assert.That(hidden, Does.Not.Contain("class=\"warn-band\""));
+      Assert.That(HeightOf(hidden), Is.LessThan(HeightOf(full)));
+    }
+
+    /// <summary>
+    /// Under the title only what the card shows and a pointer to the notes; the notes, the description's other lines, at the end of the
+    /// card under a label, after the last panel. Without the description, neither.
+    /// </summary>
+    [Test]
+    public void Notes_AreAtTheEndOfTheCard()
+    {
+      var drawing = ReportCard.Build(RunSection.Whole(Synthetic(600)));
+      var lines = drawing.FlatShapes.OfType<TextShape>().Where(t => t.Class == "sub").OrderBy(t => t.Y).ToList();
+      Assert.That(lines[0].Content, Does.StartWith("The whole run: "));
+      Assert.That(lines[1].Content, Is.EqualTo(ReportCard.NotesHint));
+      var label = drawing.FlatShapes.OfType<TextShape>().Single(t => t.Content == "NOTES");
+      var notes = lines.Skip(2).ToList();
+      Assert.That(
+        notes.Select(t => t.Content),
+        Is.EqualTo(new[] { "Resolution 4.2 ms (one capture period); error threshold 1 ms.", "Every frame is drawn." })
+      );
+      Assert.That(notes.All(t => t.Y > label.Y), "the notes under their label");
+      Assert.That(label.Y, Is.GreaterThan(drawing.Plots.Max(p => p.Bottom)), "after the last panel");
+      Assert.That(drawing.Height, Is.GreaterThan(notes[^1].Y), "inside the card");
+
+      string bare = ReportCard.Render(RunSection.Whole(Synthetic(600)), ReportOptions.Default.Hide(new[] { ReportItem.Description }));
+      Assert.That(bare, Does.Not.Contain(">NOTES<"));
+      Assert.That(bare, Does.Not.Contain(ReportCard.NotesHint));
+    }
+
     /// <summary>ShowOnly keeps just the items named: one panel is a card of that panel; one tile is a tiles row of it.</summary>
     [Test]
     public void Options_ShowOnly_KeepsJustThoseItems()

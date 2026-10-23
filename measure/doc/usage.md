@@ -94,6 +94,8 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
   capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application
   writes." It says that the two disagree, not which one is wrong, and it changes no number: the refresh period the analysis
   measures with stays the recording's.
+- Either disagreement is also on the report card (`--charts`, `render`, the GUI's **Save charts** and the playback page): a
+  warning band under its header with the same facts, and the DISPLAY box's rate in the warning colour with what the markers say.
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
 
@@ -268,7 +270,10 @@ mb-framepacing render capture-20260924-153000 --timeline --from 1.5 --to 1.86 --
 ```
 
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
-`--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description`, `display`, `tiles`
+`--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description` (the line under
+the title that says what the card shows, and the notes at the end of the card: the resolution, how the frames are drawn, static
+frames, capture gaps, a joined trace, the sequence id), `display`, `warning` (the band under the header when the display and the
+capture disagree), `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
 `error-p99`, `error-p999`, `worst-error`, `late-frames`), the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,
 `events`, and `frame-time-lines`: the target and preferred frame time as dashed lines on the display time step and frametime panels

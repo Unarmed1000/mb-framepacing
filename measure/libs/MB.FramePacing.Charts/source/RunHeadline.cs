@@ -174,13 +174,17 @@ namespace MB.FramePacing.Charts
       var pacing = chart.Run.Pacing;
       double refreshMs = (pacing?.RefreshPeriod ?? chart.CapturePeriod).Value.TotalMilliseconds;
       var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]).ToList();
-      bool mismatch = pacing?.MatchesExpectedRefresh == false;
+      bool expectedMismatch = pacing?.MatchesExpectedRefresh == false;
+      var marked = MarkedDisagreeing(section);
       string kind =
         pacing == null ? "unknown"
         : pacing.RefreshCalculated ? "calculated from the camera"
         : "fixed refresh (vsync)";
-      if (pacing?.ExpectedRefreshHz is { } expected && mismatch)
+      if (pacing?.ExpectedRefreshHz is { } expected && expectedMismatch)
         kind += $", expected {expected.ToString("0.##", CultureInfo.InvariantCulture)} Hz";
+      if (marked.Count > 0)
+        kind += $", markers {string.Join(", ", marked.Select(m => $"{Invariant(m.Hz, "0.##")} Hz"))}";
+      bool mismatch = expectedMismatch || marked.Count > 0;
 
       // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate,
       // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
@@ -197,6 +201,44 @@ namespace MB.FramePacing.Charts
         : refreshes.Length == 1 ? $", target {Refreshes(refreshes[0])} ({Invariant(1000 / (refreshes[0] * refreshMs), "0.#")} fps)"
         : $", target {refreshes[0]}–{Refreshes(refreshes[^1])}";
       return new DisplaySummary(Hz(pacing), kind, mismatch, $"{ReportCard.Ms1(refreshMs)} ms per refresh{target}", Wants(frames));
+    }
+
+    /// <summary>
+    /// The card's warning when the display and the capture disagree (<see cref="RefreshAgreement"/>, the analysis's rule): the section's
+    /// frames carry a refresh period in their markers that is not the refresh the analysis measured with, or the user expected another
+    /// display rate (--display-hz). The facts, then what to check; empty when they agree. It never says which side is wrong.
+    /// </summary>
+    public static IReadOnlyList<string> RefreshWarning(RunSection section)
+    {
+      var pacing = section.Run.Run.Pacing;
+      if (pacing == null)
+        return Array.Empty<string>();
+      string measured = pacing.RefreshCalculated
+        ? $"the frames give a {Invariant(pacing.RefreshHz, "0.##")} Hz display"
+        : $"the capture runs at {Invariant(pacing.RefreshHz, "0.##")} fps";
+      var lines = new List<string>();
+      var marked = MarkedDisagreeing(section);
+      if (marked.Count > 0)
+        lines.Add($"The markers say the application works with {RefreshAgreement.Displays(marked)}, but {measured}.");
+      if (pacing.MatchesExpectedRefresh == false && pacing.ExpectedRefreshHz is { } expected)
+        lines.Add($"A {Invariant(expected, "0.##")} Hz display was expected (--display-hz), but {measured}.");
+      if (lines.Count == 0)
+        return lines;
+      lines.Add(
+        pacing.RefreshCalculated
+          ? "Check the display's refresh rate, the camera's frame rate and the refresh period the application writes."
+          : "A capture card must capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application writes."
+      );
+      return lines;
+    }
+
+    /// <summary>The refresh periods the section's markers carry that do not agree with the refresh the analysis measured with.</summary>
+    private static IReadOnlyList<MarkedRefresh> MarkedDisagreeing(RunSection section)
+    {
+      if (section.Run.Run.Pacing is not { } pacing)
+        return Array.Empty<MarkedRefresh>();
+      var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]);
+      return RefreshAgreement.Disagreeing(RefreshAgreement.MarkerPeriods(frames), pacing.RefreshHz);
     }
 
     /// <summary>The refresh rate ("60 Hz"), "?? Hz" without pacing.</summary>

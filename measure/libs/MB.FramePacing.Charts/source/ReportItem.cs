@@ -19,6 +19,7 @@ namespace MB.FramePacing.Charts
     public const string Title = "title";
     public const string Description = "description";
     public const string Display = "display";
+    public const string Warning = "warning";
     public const string Tiles = "tiles";
     public const string AverageFps = "average-fps";
     public const string OnePercentLow = "one-percent-low";
@@ -43,8 +44,9 @@ namespace MB.FramePacing.Charts
     public static readonly IReadOnlyList<(string Id, string Description)> All = new[]
     {
       (Title, "the run's title"),
-      (Description, "the lines under the title"),
+      (Description, "the line under the title and the notes at the end of the card"),
       (Display, "the display box (refresh rate, time per refresh, target)"),
+      (Warning, "the warning under the header when the display and the capture disagree (refresh rates more than 1 % apart)"),
       (Tiles, "every headline tile"),
       (AverageFps, "tile: average fps (and the presented frames)"),
       (OnePercentLow, "tile: 1 % low"),

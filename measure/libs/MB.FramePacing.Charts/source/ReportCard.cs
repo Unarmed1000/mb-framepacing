@@ -161,14 +161,23 @@ namespace MB.FramePacing.Charts
       // The display box (RunHeadline, as the GUI's Display card); what the application wants gets a line of its own
       var display = options.IsShown(ReportItem.Display) ? RunHeadline.Display(section) : null;
       double displayH = display is { Wants.Length: > 0 } ? DisplayBoxH + DisplayLineH : DisplayBoxH;
-      var layout = Layout.For(options, description.Count, tiles.Count, displayH);
-      var parts = Header(title, options.IsShown(ReportItem.Description) ? description : Array.Empty<string>(), options.IsShown(ReportItem.Title));
-      // The augmented trace's line links to the file
-      int linked = augmentedLine != null ? parts.FindIndex(shape => shape is TextShape text && text.Content == augmentedLine) : -1;
-      if (linked >= 0)
-        parts[linked] = ((TextShape)parts[linked]) with { Link = options.AugmentedTraceFile! };
+      // Under the title what the card shows and, when there are more, a pointer to the notes at the card's end, which have the rest
+      var top = new List<string>();
+      var notes = new List<string>();
+      if (options.IsShown(ReportItem.Description))
+      {
+        top.Add(description[0]);
+        notes.AddRange(description.Skip(1));
+        if (notes.Count > 0)
+          top.Add(NotesHint);
+      }
+      var warning = options.IsShown(ReportItem.Warning) ? RunHeadline.RefreshWarning(section) : Array.Empty<string>();
+      var layout = Layout.For(options, top.Count, tiles.Count, displayH, warning.Count, notes.Count);
+      var parts = Header(title, top, options.IsShown(ReportItem.Title));
       if (display != null)
         DisplayBox(parts, display, width, displayH);
+      if (layout.WarningY is { } warningY)
+        WarningBand(parts, warning, warningY, width);
 
       Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRowFor(tiles.Count));
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
@@ -197,6 +206,12 @@ namespace MB.FramePacing.Charts
       Parallel.For(0, panels.Count, i => panels[i](drawn[i].Shapes, drawn[i].Plots));
       foreach (var (shapes, _) in drawn)
         parts.AddRange(shapes);
+      if (layout.NotesY is { } notesY)
+        Notes(parts, notes, notesY);
+      // The augmented trace's line links to the file
+      int linked = augmentedLine != null ? parts.FindIndex(shape => shape is TextShape text && text.Content == augmentedLine) : -1;
+      if (linked >= 0)
+        parts[linked] = ((TextShape)parts[linked]) with { Link = options.AugmentedTraceFile! };
 
       return new CardDrawing(title, width, layout.Height, parts, drawn.SelectMany(d => d.Plots).ToList());
     }
@@ -231,6 +246,7 @@ namespace MB.FramePacing.Charts
 
     /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
     private sealed record Layout(
+      double? WarningY,
       double TilesY,
       double? ErrorY,
       double? StepY,
@@ -238,10 +254,18 @@ namespace MB.FramePacing.Charts
       double? LateY,
       double? StripY,
       double? EventsY,
+      double? NotesY,
       double Height
     )
     {
-      public static Layout For(ReportOptions options, int descriptionLines, int tiles, double displayH = DisplayBoxH)
+      public static Layout For(
+        ReportOptions options,
+        int descriptionLines,
+        int tiles,
+        double displayH = DisplayBoxH,
+        int warningLines = 0,
+        int noteLines = 0
+      )
       {
         bool title = options.IsShown(ReportItem.Title);
         bool description = options.IsShown(ReportItem.Description) && descriptionLines > 0;
@@ -256,6 +280,13 @@ namespace MB.FramePacing.Charts
             : title ? 30
             : 0;
           cursor = Math.Max(text > 0 ? text + 31 : 0, display ? 14 + displayH + 20 : 0);
+          previous = "header";
+        }
+        double? warningY = null;
+        if (warningLines > 0)
+        {
+          warningY = previous == "start" ? cursor + 14 : cursor;
+          cursor = warningY.Value + WarningBandH(warningLines) + 20;
           previous = "header";
         }
         double tilesY = cursor;
@@ -287,8 +318,25 @@ namespace MB.FramePacing.Charts
         var lateY = Panel(ReportItem.LateShare, LateH);
         var stripY = Panel(ReportItem.RefreshStrip, StripH);
         var eventsY = Panel(ReportItem.Events, EventsH);
-        double height = previous == "panel" ? cursor + BottomAfterPanel : cursor + BottomMargin;
-        return new Layout(tilesY, errorY, stepY, frameTimeY, lateY, stripY, eventsY, height);
+        // The notes after everything else: their label clears the last panel's axis as the next panel's title would
+        double? notesY = null;
+        if (noteLines > 0)
+        {
+          notesY =
+            cursor
+            + (
+              previous == "panel" ? NotesAfterPanel
+              : previous == "start" ? 30
+              : 24
+            );
+          cursor = notesY.Value + NotesFirstLine + ((noteLines - 1) * NotesLineH);
+          previous = "notes";
+        }
+        double height =
+          previous == "panel" ? cursor + BottomAfterPanel
+          : previous == "notes" ? cursor + 26
+          : cursor + BottomMargin;
+        return new Layout(warningY, tilesY, errorY, stepY, frameTimeY, lateY, stripY, eventsY, notesY, height);
       }
     }
 
@@ -319,6 +367,47 @@ namespace MB.FramePacing.Charts
     // The display box's height, and one more line for what the application wants
     private const double DisplayBoxH = 68;
     private const double DisplayLineH = 16;
+
+    /// <summary>The line under the title that says the rest of the card's description is in its notes.</summary>
+    public const string NotesHint = "More about this run in the notes at the end of the card.";
+
+    /// <summary>
+    /// The warning across the card under its header (<see cref="RunHeadline.RefreshWarning"/>): an amber band with a sign and words, not a
+    /// colour alone, as the panels' colours are verdicts (red late, yellow delta time jitter).
+    /// </summary>
+    private static void WarningBand(List<CardShape> parts, IReadOnlyList<string> lines, double y, double width)
+    {
+      parts.Add(new RectShape("warn-band", N(20, 0), N(y, 1), N(width - 40, 0), N(WarningBandH(lines.Count), 0), "10"));
+      parts.Add(
+        new TextRunsShape(
+          34,
+          y + WarningFirstLine,
+          new[] { new TextRun("\u26A0 WARNING", "warn-label"), new TextRun("   The display and the capture disagree", "warn-title") }
+        )
+      );
+      for (int i = 0; i < lines.Count; ++i)
+        parts.Add(new TextShape(34, y + WarningFirstLine + WarningTitleGap + (i * WarningLineH), lines[i], "warn-text", "start"));
+    }
+
+    private static double WarningBandH(int lines) => WarningFirstLine + WarningTitleGap + ((lines - 1) * WarningLineH) + 14;
+
+    // The warning band's first baseline from its top, the gap to its first line and the line spacing
+    private const double WarningFirstLine = 26;
+    private const double WarningTitleGap = 24;
+    private const double WarningLineH = 19;
+
+    /// <summary>The notes at the end of the card: the description's lines but the first, under a label of their own.</summary>
+    private static void Notes(List<CardShape> parts, IReadOnlyList<string> notes, double y)
+    {
+      parts.Add(new TextShape(20, y, "NOTES", "label", "start"));
+      for (int i = 0; i < notes.Count; ++i)
+        parts.Add(new TextShape(20, y + NotesFirstLine + (i * NotesLineH), notes[i], "sub", "start"));
+    }
+
+    // The notes' label below the last panel (clear of its axis), its first line under the label and the line spacing
+    private const double NotesAfterPanel = 70;
+    private const double NotesFirstLine = 24;
+    private const double NotesLineH = 19;
 
     private static void Tiles(List<CardShape> parts, IReadOnlyList<HeadlineTile> tiles, double tilesY, double width, int perRow)
     {

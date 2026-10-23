@@ -22,7 +22,7 @@ namespace MB.FramePacing.Analysis
     private const int SlowCaptureMinFrames = 20;
 
     /// <summary>How far the refresh rate may differ from the expected or calibrated one before the analysis warns (relative).</summary>
-    public const double RefreshTolerance = 0.01;
+    public const double RefreshTolerance = RefreshAgreement.Tolerance;
 
     /// <summary>The default |animation error| above which a frame counts as off (<see cref="TimelineOptions.ErrorThreshold"/>): 1 ms.</summary>
     public static readonly NanosecondTimeDuration DefaultErrorThreshold = new NanosecondTimeDuration(NanosecondTimeSpan.FromMilliseconds(1));
@@ -511,8 +511,8 @@ namespace MB.FramePacing.Analysis
       if (period <= NanosecondTimeDuration.Zero)
         return null;
       double? expected = options.ExpectedRefreshHz is > 0 ? options.ExpectedRefreshHz : null;
-      var marked = MarkerRefreshPeriods(frames);
-      double? markedHz = marked.Count > 0 ? RateOf(marked[0].PeriodNanoseconds) : null;
+      var marked = RefreshAgreement.MarkerPeriods(frames);
+      double? markedHz = marked.Count > 0 ? marked[0].Hz : null;
       var refresh = period;
       if (camera)
       {
@@ -545,25 +545,25 @@ namespace MB.FramePacing.Analysis
               $"Camera capture: the frames' first-seen times are on no grid of refreshes the camera can see (it films about twice the refresh rate or less, or vsync is off), so the calculated display rate of {calculatedHz:0.##} Hz is unreliable. Film faster."
             )
           );
-        if (expected is { } expectedHz && !WithinTolerance(calculatedHz, expectedHz))
+        if (expected is { } expectedHz && !RefreshAgreement.Within(calculatedHz, expectedHz))
           warnings.Add(
             string.Create(
               CultureInfo.InvariantCulture,
               $"Camera capture: the frames give a {calculatedHz:0.##} Hz display, but {expectedHz:0.##} Hz was expected. Check the display's refresh rate (or the camera's frame rate, --recorded-fps for slow motion clips)."
             )
           );
-        else if (expected == null && markedHz is { } markerHz && !WithinTolerance(calculatedHz, markerHz))
+        else if (expected == null && markedHz is { } markerHz && !RefreshAgreement.Within(calculatedHz, markerHz))
           warnings.Add(
             string.Create(
               CultureInfo.InvariantCulture,
-              $"Camera capture: the frames give a {calculatedHz:0.##} Hz display, but the markers say the application works with {Displays(marked.Take(1))}. Check the display's refresh rate (or the camera's frame rate, --recorded-fps for slow motion clips) and the refresh period the application writes."
+              $"Camera capture: the frames give a {calculatedHz:0.##} Hz display, but the markers say the application works with {RefreshAgreement.Displays(marked.Take(1))}. Check the display's refresh rate (or the camera's frame rate, --recorded-fps for slow motion clips) and the refresh period the application writes."
             )
           );
         else if (
           expected == null
           && markedHz == null
           && options.CalibratedRefreshHz is > 0
-          && !WithinTolerance(calculatedHz, options.CalibratedRefreshHz.Value)
+          && !RefreshAgreement.Within(calculatedHz, options.CalibratedRefreshHz.Value)
         )
           warnings.Add(
             string.Create(
@@ -574,8 +574,8 @@ namespace MB.FramePacing.Analysis
       }
       else
       {
-        double captureHz = RateOf(period.Nanoseconds);
-        if (expected is { } expectedHz && !WithinTolerance(captureHz, expectedHz))
+        double captureHz = RefreshAgreement.RateOf(period);
+        if (expected is { } expectedHz && !RefreshAgreement.Within(captureHz, expectedHz))
           warnings.Add(
             string.Create(
               CultureInfo.InvariantCulture,
@@ -583,12 +583,12 @@ namespace MB.FramePacing.Analysis
             )
           );
         // Every rate the markers say that is not the capture's: a window that moved to another display has two
-        var different = marked.Where(m => !WithinTolerance(RateOf(m.PeriodNanoseconds), captureHz)).ToList();
+        var different = RefreshAgreement.Disagreeing(marked, captureHz);
         if (different.Count > 0)
           warnings.Add(
             string.Create(
               CultureInfo.InvariantCulture,
-              $"The markers say the application works with {Displays(different)}, but the capture runs at {captureHz:0.##} fps. A capture card must capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application writes."
+              $"The markers say the application works with {RefreshAgreement.Displays(different)}, but the capture runs at {captureHz:0.##} fps. A capture card must capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application writes."
             )
           );
       }
@@ -599,32 +599,6 @@ namespace MB.FramePacing.Analysis
         ExpectedRefreshHz = expected,
       };
     }
-
-    private static bool WithinTolerance(double actualHz, double expectedHz) => Math.Abs((actualHz / expectedHz) - 1) <= RefreshTolerance;
-
-    private static double RateOf(long periodNanoseconds) => NanosecondTimeSpan.NanosecondsPerSecond / (double)periodNanoseconds;
-
-    /// <summary>The refresh periods the frames' markers carry (0, unknown, left out) with how many frames carry each, the most first.</summary>
-    private static List<(long PeriodNanoseconds, int Frames)> MarkerRefreshPeriods(List<PresentedFrame> frames) =>
-      frames
-        .Where(frame => frame.MarkerRefreshPeriod != NanosecondTimeDuration.Zero)
-        .GroupBy(frame => frame.MarkerRefreshPeriod.Nanoseconds)
-        .Select(group => (PeriodNanoseconds: group.Key, Frames: group.Count()))
-        .OrderByDescending(marked => marked.Frames)
-        .ThenBy(marked => marked.PeriodNanoseconds)
-        .ToList();
-
-    /// <summary>"a 144 Hz display (1200 frames), a 60 Hz display (300 frames)".</summary>
-    private static string Displays(IEnumerable<(long PeriodNanoseconds, int Frames)> marked) =>
-      string.Join(
-        ", ",
-        marked.Select(m =>
-          string.Create(
-            CultureInfo.InvariantCulture,
-            $"a {RateOf(m.PeriodNanoseconds):0.##} Hz display ({m.Frames} frame{(m.Frames == 1 ? "" : "s")})"
-          )
-        )
-      );
 
     /// <summary>
     /// First-seen intervals a camera measured reliably, in nanoseconds (what RefreshEstimator takes): not across a tear or an

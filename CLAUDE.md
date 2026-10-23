@@ -655,6 +655,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       charts" write the SVG cards (`ChartFiles`: the report and every `DistributionCard`). Test chart changes with
       `ChartVideoClipTests`: every series of every chart is compared exactly with the test clips' manifests (`ClipManifest`, shared
       with `VideoClipTests` by linked source files).
+    - **The report card's header and notes** (the user, 2026-10-23, approved OLD vs NEW): under the title only the line that says
+      what the card shows and `ReportCard.NotesHint`; the description's other lines are the NOTES at the end of the card. When the
+      display and the capture disagree (`RunHeadline.RefreshWarning`, the analysis's rule from `RefreshAgreement`: the markers'
+      refresh period or `--display-hz` more than 1 % from the refresh measured with) an amber band with a sign and words goes under
+      the header (`warn-band`, item `warning`): amber, not red or yellow, which are verdict colours on the panels (explained's advice).
+      The DISPLAY box shows the rate in the warning colour and "markers N Hz". The timeline and distribution cards keep their
+      description under the title: explained's diagram slides rely on it.
     - The report card (`ReportCard`, `mb-framepacing render`) is a port of mb-framepacing-explained's `generate_charts.py`: its style sheet
       and `text()`/`ms()` helpers are verbatim in `SvgMarkup` (Python's half-to-even rounding included; `ReportSvgTests` pins their
       output). It draws from the analysis output (`AnalysisOutput` reads `summary.json` and the frames CSV back to the nanosecond), any section
