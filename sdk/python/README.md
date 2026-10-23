@@ -8,7 +8,9 @@ subpackages. Standard library only, Python 3.12 or later.
   error**: how far what the application animated is from what was actually shown on screen. It draws exactly the same pixels as the
   C++ and C# libraries: the tests check it against the golden images the C++ library writes (`test-data/markers`). The format is
   specified in [doc/marker-format.md](../doc/marker-format.md); what to write in each field is in
-  [Filling the marker fields](../doc/marker-fields.md).
+  [Filling the marker fields](../doc/marker-fields.md), and
+  [Logging with the marker: getting the most out of it](../doc/marker-logging.md) walks through a frame loop that fills every field (in C++; the values are the same in
+  Python).
 - **`mb_framepacing.data`** reads the data of the tools: the capture data (`captures.mbcd`,
   [format](../doc/capture-data-format.md)) and the analysis output (`summary.json`, `captures.csv`, `run-<id>-frames.csv`,
   [format](../doc/analysis-output-format.md)). It reads what the C# library reads: the tests check it against the same golden data

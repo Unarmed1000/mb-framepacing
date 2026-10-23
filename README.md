@@ -105,6 +105,8 @@ every time in the marker is a whole number of nanoseconds).
   `add_subdirectory` or `find_package`), choosing the size and position, and the start and end markers.
 - **C#:** the marker module [`sdk/csharp/marker`](sdk/csharp/marker/README.md) has the same API (`MarkerGenerator.TryGenerateModules`, `FrameMarker.ModulesToTriangles`).
 - **Unity:** the **[Unity package](sdk/doc/unity.md)** adds an overlay component that does all of this for you.
+- **Get the most out of it:** **[Logging with the marker: getting the most out of it](sdk/doc/marker-logging.md)**: the idea, a frame loop that fills every field, where
+  each value comes from on each platform, and how to check what you filled.
 - **Every field:** **[Filling the marker fields](sdk/doc/marker-fields.md)** says where each value comes from, when it changes and what
   the analysis does with it, with examples for typical frame pacers.
 - **Python:** [`sdk/python`](sdk/python/README.md) (`mb_framepacing.marker`), which also draws into pixel buffers.
@@ -224,11 +226,11 @@ diagrams and sources.
 
 ## Getting started
 
-| Step                               | Guide                                                                                                                                                            |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Install and build, per platform | **[Windows](measure/doc/install/windows.md)** · **[Ubuntu](measure/doc/install/ubuntu.md)** · **[macOS (Homebrew)](measure/doc/install/macos.md)**               |
-| 2. Put the marker into your app    | **[Integrating the marker](sdk/doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](sdk/doc/marker-fields.md)** |
-| 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (OBS and a capture card, video/image import, results, troubleshooting)                                          |
+| Step                               | Guide                                                                                                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Install and build, per platform | **[Windows](measure/doc/install/windows.md)** · **[Ubuntu](measure/doc/install/ubuntu.md)** · **[macOS (Homebrew)](measure/doc/install/macos.md)**                                                                                                     |
+| 2. Put the marker into your app    | **[Integrating the marker](sdk/doc/integrating.md)** (C++ library, size, position, start/end markers), **[Filling the marker fields](sdk/doc/marker-fields.md)**, **[Logging with the marker: getting the most out of it](sdk/doc/marker-logging.md)** |
+| 3. Take a measurement and read it  | **[Using mb-framepacing](measure/doc/usage.md)** (OBS and a capture card, video/image import, results, troubleshooting)                                                                                                                                |
 
 The platform guides cover ffmpeg, building the tools and putting them on your PATH, and building the C++ library. The short version is below. Possible next steps (HDR capture among them) are on the [roadmap](doc/roadmap.md): options, not promises.
 

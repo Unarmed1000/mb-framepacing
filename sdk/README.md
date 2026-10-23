@@ -27,18 +27,18 @@ Everything here is under the BSD 3-Clause License. The measuring tools themselve
 
 ## Where to start
 
-| You want to                                            | Start with                                                                                                                                                                  |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Put the marker into a C++, C# or Python app            | [Integrating the marker](doc/integrating.md), then the library's README below                                                                                               |
-| See it built into a real application                   | [A complete integration to look at](doc/integrating.md#a-complete-integration-to-look-at): every OpenGL ES and Vulkan sample of the author's unofficial gtec-demo-framework |
-| Put the marker into a Unity game                       | [Unity](doc/unity.md)                                                                                                                                                       |
-| Pace your frames and fill the marker from it           | [The frame pacer](doc/pacer.md) (experimental, off by default)                                                                                                              |
-| Have a trace of your application merged with a capture | [Logging to a trace](doc/trace-logging.md): the frame record with Perfetto, step by step; [the frame record](doc/trace-frame-record.md) is the reference                    |
-| Fill every marker field, and get the most out of it    | [Logging with the marker](doc/marker-logging.md): a frame loop that fills them all, where each value comes from on each platform                                            |
-| Know what to write in each marker field                | [Filling the marker fields](doc/marker-fields.md)                                                                                                                           |
-| Read the tools' results in your own code               | [The data module](#the-data-module), [the analysis output format](doc/analysis-output-format.md)                                                                            |
-| Implement the marker or a reader yourself              | [The marker format](doc/marker-format.md), [the capture data format](doc/capture-data-format.md), [the analysis output format](doc/analysis-output-format.md)               |
-| Know what the marker costs per frame                   | [Encoding performance](doc/encoding-performance.md), and the benchmarks in the [C++ README](cpp/README.md)                                                                  |
+| You want to                                            | Start with                                                                                                                                                                    |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Put the marker into a C++, C# or Python app            | [Integrating the marker](doc/integrating.md), then the library's README below                                                                                                 |
+| Get the most out of the marker                         | **[Logging with the marker: getting the most out of it](doc/marker-logging.md)**: the idea, a frame loop that fills every field, where each value comes from on each platform |
+| See it built into a real application                   | [A complete integration to look at](doc/integrating.md#a-complete-integration-to-look-at): every OpenGL ES and Vulkan sample of the author's unofficial gtec-demo-framework   |
+| Put the marker into a Unity game                       | [Unity](doc/unity.md)                                                                                                                                                         |
+| Pace your frames and fill the marker from it           | [The frame pacer](doc/pacer.md) (experimental, off by default)                                                                                                                |
+| Have a trace of your application merged with a capture | [Logging to a trace](doc/trace-logging.md): the frame record with Perfetto, step by step; [the frame record](doc/trace-frame-record.md) is the reference                      |
+| Know what to write in each marker field                | [Filling the marker fields](doc/marker-fields.md)                                                                                                                             |
+| Read the tools' results in your own code               | [The data module](#the-data-module), [the analysis output format](doc/analysis-output-format.md)                                                                              |
+| Implement the marker or a reader yourself              | [The marker format](doc/marker-format.md), [the capture data format](doc/capture-data-format.md), [the analysis output format](doc/analysis-output-format.md)                 |
+| Know what the marker costs per frame                   | [Encoding performance](doc/encoding-performance.md), and the benchmarks in the [C++ README](cpp/README.md)                                                                    |
 
 ## Pick a library
 

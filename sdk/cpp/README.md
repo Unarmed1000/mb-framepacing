@@ -22,7 +22,8 @@ output, analysed with the mb-framepacing tools, then shows the **animation error
 what was actually shown on screen. The format is specified in
 [marker-format.md](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/marker-format.md); the full guide is
 [Integrating the marker](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/integrating.md), and what to write in each
-field is in [Filling the marker fields](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/marker-fields.md) (all three
+field is in [Filling the marker fields](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/marker-fields.md), a frame loop that fills every field in
+[Logging with the marker: getting the most out of it](https://github.com/Unarmed1000/mb-framepacing/blob/master/sdk/doc/marker-logging.md) (all four
 are also in a release archive's `doc/` folder), and the shaders that draw it fastest in
 [`sdk/shaders`](https://github.com/Unarmed1000/mb-framepacing/tree/master/sdk/shaders) (a release archive's `shaders/`).
 

@@ -12,7 +12,8 @@ below use `mb-framepacing` / `mb-framepacing-gui`; when running from source, use
 
 - **ffmpeg** is installed and found. The GUI's setup dialog checks it; on the command line `mb-framepacing config` shows what is
   used.
-- **Your application draws the marker** ([Integrating the marker](../../sdk/doc/integrating.md)). mb-framepacing is a cooperative tool:
+- **Your application draws the marker** ([Integrating the marker](../../sdk/doc/integrating.md); every field filled:
+  [Logging with the marker: getting the most out of it](../../sdk/doc/marker-logging.md)). mb-framepacing is a cooperative tool:
   without the marker there is nothing to measure. The self-test below needs no application.
 - **Vsync is on at a fixed refresh rate** in the application, and G-Sync/FreeSync is off. Every displayed frame is then whole.
   With vsync off the marker only reports the frame at the top of the screen, and capture cards record variable refresh at a

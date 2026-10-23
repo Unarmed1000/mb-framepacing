@@ -7,7 +7,8 @@ tools, then shows the **animation error**: how far what the application animated
 `MB.FramePacing.Marker`, the SDK's C# marker module: .NET Standard 2.1, C# 9, no dependencies besides the SDK's core
 ([`MB.FramePacing`](../core/README.md)). It is the same API as the C++ marker
 module and draws exactly the same pixels (the tests check it against the golden images in [`test-data/markers`](../../test-data/markers)). The format is specified in
-[marker-format.md](../../doc/marker-format.md); what to write in each field is in [Filling the marker fields](../../doc/marker-fields.md).
+[marker-format.md](../../doc/marker-format.md); what to write in each field is in [Filling the marker fields](../../doc/marker-fields.md), and
+[Logging with the marker: getting the most out of it](../../doc/marker-logging.md) walks through a frame loop that fills every field (in C++; the values are the same in C#).
 
 > **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame, and flickering patterns can
 > trigger seizures in people with photosensitive epilepsy. Draw it in test builds only; see

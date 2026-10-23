@@ -12,7 +12,7 @@ This guide puts the marker into an application. There are four ways in:
 All four produce exactly the same pixels. The libraries are renderer independent: they give you pixel aligned geometry to draw with
 whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precise format is in [marker-format.md](marker-format.md);
 [Filling the marker fields](marker-fields.md) says where each field's value comes from and what the analysis does with it, and
-[Logging with the marker](marker-logging.md) walks through a frame loop that fills every field.
+**[Logging with the marker: getting the most out of it](marker-logging.md)** walks through a frame loop that fills every field.
 
 > **Photosensitivity warning.** The marker is a high-contrast pattern that changes every frame. Flickering patterns can trigger
 > seizures in people with photosensitive epilepsy. Draw it in test builds only, never in what players see, and read
