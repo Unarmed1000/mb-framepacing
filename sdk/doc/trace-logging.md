@@ -12,6 +12,19 @@ A capture and a trace see the same run from two sides. The capture sees the disp
 trace sees the device: the application's threads and their scheduling, its present calls, the system's compositor and its own
 account of every frame. Neither knows the other's frames, and their clocks are unrelated.
 
+```mermaid
+flowchart LR
+    subgraph app["Your application, every frame"]
+        P["The marker's payload"]
+    end
+    P -->|drawn into the frame| C["Capture:<br/>the display's side"]
+    P -->|"logged: slice 'mbfp frame 7 42'<br/>at the CPU start time"| T["Trace:<br/>the device's side"]
+    C --> J["The tools join them<br/>by the record's name"]
+    T --> J
+    J --> A["The analysis, with what the<br/>trace says of each frame"]
+    J --> X["The trace, with the capture's<br/>measurements as tracks"]
+```
+
 **The frame record is the bridge.** For every frame whose marker it draws, the application logs one slice named after the
 marker's two ids (`mbfp frame <run id> <frame index>`), starting at the marker's CPU start time. The tools find each captured
 frame's slice by its name, and place the whole run on the trace's clock by how far the slices start from the markers' CPU start
@@ -111,13 +124,28 @@ void LogFrameRecord(const FM::Payload& payload)
 
 - **The times are the marker's**, given to Perfetto as they are: the slice begins at the CPU start time and ends CPU busy later.
   The tools then find no difference at all between the record and the markers they decode ([checking it](#check-what-you-logged)).
-- **The lane keeps overlapping frames apart.** A track's slices must follow each other or nest: Perfetto pairs a slice's end with
+- **The lane keeps overlapping frames apart.** For example, a frame started every millisecond that takes 1.5 ms of CPU work:
+
+  ```mermaid
+  gantt
+      dateFormat x
+      axisFormat %-S.%L ms
+      section Lane 0
+      mbfp frame 7 1 :0, 1500
+      mbfp frame 7 3 :2000, 3500
+      section Lane 1
+      mbfp frame 7 2 :1000, 2500
+      mbfp frame 7 4 :3000, 4500
+  ```
+
+  Why it matters: a track's slices must follow each other or nest, since Perfetto pairs a slice's end with
   the slice opened last, so two slices that overlap on one track end each other's, the lengths come out wrong, and the trace
   processor counts no error. A loop that makes its frames one after the other never overlaps them, and every record gets lane 0:
   one track. A pipelined engine (the next frame's CPU work starts before this frame is presented) gets a further lane for each
   frame that overlaps, as `TrackLanes` works out ([the lanes](trace-frame-record.md#frames-that-overlap-the-lanes)). Perfetto's
   viewer shows the tracks of one name as one track, and the tools read the record from every track of that name. Should
   `g_recordLanes.Overflows()` ever be above 0, more than 16 frames overlapped at once.
+
 - **The names are the module's**: the slice's name (`mbfp frame <run id> <frame index>`, held inline in the record, nothing
   allocated) and the track's are string literals of `FrameRecordText`, so `StaticString` takes them, and so is every
   annotation's, which `AddDebugAnnotation` takes as it is.

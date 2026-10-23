@@ -22,6 +22,17 @@ application's word, drawn into the frame itself:
   shown, the display it works with) or did (when its CPU started on the frame and how long it worked), so the report can say
   **why** a frame was off, not only that it was.
 
+```mermaid
+flowchart LR
+    subgraph app["Your application, every frame"]
+        F["Render the frame"] --> M["Draw the marker last:<br/>frame index, animation time,<br/>what it intended, what it did"]
+    end
+    M -->|the frame, marker and all| D["Display"]
+    D --> C["Capture: when each frame<br/>appeared, for how long"]
+    C --> A["Analysis: the application's word<br/>against what was shown"]
+    A --> R["Animation error, late frames,<br/>and why: pacing, prediction, CPU"]
+```
+
 Because the values travel inside the frame, they can not go out of step with what was displayed: there is no log to fetch from the
 device and nothing to line up by hand. The [start and end markers](#the-run-start-and-end-markers) say which frames are the run.
 
@@ -63,6 +74,22 @@ Every time is a whole number of nanoseconds, and the fields come from two clocks
 ## The frame loop
 
 A frame loop that fills every field. Each numbered comment is explained below it; `Platform` stands for your engine's calls.
+When each value is read, in one frame:
+
+```mermaid
+sequenceDiagram
+    participant App as Frame loop
+    participant Clock as Steady clock
+    participant Marker
+    participant Display
+    App->>Clock: (1) CPU start time, before the frame's work
+    App->>App: (2) animation time, intended display time
+    Note over App: input, simulation, rendering
+    App->>Clock: (4) CPU busy = now - CPU start
+    App->>Marker: (3, 4) ids, flags, the frame times,<br/>refresh period: the payload
+    Marker->>Display: the frame is presented, marker drawn last
+    Note over Display: the capture sees it appear:<br/>its display time
+```
 
 ```cpp
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
