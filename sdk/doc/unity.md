@@ -14,7 +14,7 @@ Unity 2021.3 or newer (C# 9). The package contents are checked in a real Unity e
 **Package Manager → + → Add package from git URL**, then:
 
 ```text
-https://github.com/Unarmed1000/mb-framepacing.git#upm/v0.1.0-alpha.4
+https://github.com/Unarmed1000/mb-framepacing.git#upm/v0.1.0-alpha.5
 ```
 
 `upm/v<version>` tags are created by the SDK release workflow. To use an unreleased version, assemble the package yourself and
