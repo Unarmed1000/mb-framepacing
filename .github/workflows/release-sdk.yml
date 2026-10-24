@@ -222,7 +222,7 @@ jobs:
       - name: CMake 4 (the test package builds with it)
         uses: lukka/get-cmake@v4.4.4
       - name: uv (Python from .python-version, the dev tools from uv.lock)
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.1
       - name: The released archive through the recipe (the version is added here only; commit it with tools/add_conan_version.py)
         shell: bash
         env:
