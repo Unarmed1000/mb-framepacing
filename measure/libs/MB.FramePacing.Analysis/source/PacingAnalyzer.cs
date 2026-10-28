@@ -80,6 +80,7 @@ namespace MB.FramePacing.Analysis
       long late = 0;
       long counted = 0;
       var intendedPeriods = new NanosecondTimeDuration?[frames.Count];
+      var aims = new NanosecondList(frames.Count);
       for (int i = 0; i < frames.Count; ++i)
       {
         var frame = frames[i];
@@ -96,17 +97,18 @@ namespace MB.FramePacing.Analysis
         var markerWants = frame.MarkerPreferredFrameTime;
         var onDemandTime = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
         bool onDemand = markerTarget == onDemandTime || (markerTarget == NanosecondTimeDuration.Zero && markerWants == onDemandTime);
-        NanosecondTimeDuration? target =
+        NanosecondTimeDuration? aim =
           intendedStep is { } step ? WholeRefreshes(new NanosecondTimeDuration(step), refresh)
           : onDemand ? null
-          : NanosecondTimeDuration.FromNanoseconds(
-            (1 + dropped[i])
-              * (
-                markerTarget != NanosecondTimeDuration.Zero ? WholeRefreshes(markerTarget, refresh)
-                : markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh)
-                : givenTarget
-              ).Nanoseconds
-          );
+          : markerTarget != NanosecondTimeDuration.Zero ? WholeRefreshes(markerTarget, refresh)
+          : markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh)
+          : givenTarget;
+        NanosecondTimeDuration? target =
+          aim is { } frameAim && !intendedStep.HasValue ? NanosecondTimeDuration.FromNanoseconds((1 + dropped[i]) * frameAim.Nanoseconds) : aim;
+        // The run's target is what its frames aimed at: a frame after dropped ones is due later, but it aimed at the same interval (an
+        // application that renders faster than the display skips indices before nearly every frame)
+        if (frame.DisplayDelta.HasValue && aim is { } runAim)
+          aims.Add(runAim);
         // What the application wants: only its marker can say so (a lowered pacer and a 30 fps lock target the same); else the rate given
         // to the tools, else one refresh
         NanosecondTimeDuration? preferred =
@@ -162,21 +164,15 @@ namespace MB.FramePacing.Analysis
       }
 
       var (uneven, even) = Split(frames, half, errorThreshold, intendedPeriods);
-      var targets = new NanosecondList(frames.Count);
-      foreach (var frame in frames)
-      {
-        if (frame.DisplayDelta.HasValue && frame.TargetFrameTime is { } frameTarget)
-          targets.Add(frameTarget);
-      }
-      targets.Sort();
+      aims.Sort();
       pacingErrors.Sort();
       predictionErrors.Sort();
       return new RunPacing(
         refresh,
         refreshCalculated,
-        // The median, as a target a frame had: the lower of the two middle ones for an even number of frames
-        targets.Count > 0
-          ? NanosecondTimeDuration.FromNanoseconds(targets.Values[(targets.Count - 1) / 2])
+        // The median, as an aim a frame had: the lower of the two middle ones for an even number of frames
+        aims.Count > 0
+          ? NanosecondTimeDuration.FromNanoseconds(aims.Values[(aims.Count - 1) / 2])
           : givenTarget,
         source,
         late,

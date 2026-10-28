@@ -393,6 +393,8 @@ namespace MB.FramePacing.Analysis
         warnings.Add("The capture period could not be determined");
       if (SlowCaptureWarning(frames, period) is { } slowCapture)
         warnings.Add(slowCapture);
+      if (VsyncOffCheck.Warning(frames) is { } vsyncOff)
+        warnings.Add(vsyncOff);
       return new RunAnalysis(
         run.RunId,
         run.SequenceId,

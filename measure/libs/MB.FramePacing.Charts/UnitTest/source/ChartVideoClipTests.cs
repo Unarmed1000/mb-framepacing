@@ -887,6 +887,10 @@ namespace MB.FramePacing.Charts.UnitTest
         && manifest.PreferredRefreshes(frame) is { } preferred
         && manifest.DisplayStepRefreshes(frame) > preferred;
       var shares = new double[manifest.FrameCount];
+      // A window that reaches back before the first frame holds as many frames as the first 2 s, none of them late
+      int firstWindow = Enumerable
+        .Range(1, Math.Max(0, manifest.FrameCount - 1))
+        .Count(j => manifest.ShownNanoseconds(j) - manifest.ShownNanoseconds(0) < LateShare.Window.Nanoseconds);
       int start = 0;
       for (int i = 0; i < manifest.FrameCount; ++i)
       {
@@ -894,7 +898,8 @@ namespace MB.FramePacing.Charts.UnitTest
           ++start;
         var window = Enumerable.Range(start, i - start + 1).Where(j => j > 0).ToArray();
         int late = window.Count(j => manifest.IsLate(j) || Longer(j));
-        shares[i] = window.Length > 0 ? late / (double)window.Length * 100 : 0;
+        int whole = start == 0 ? Math.Max(window.Length, firstWindow) : window.Length;
+        shares[i] = whole > 0 ? late / (double)whole * 100 : 0;
       }
       return shares;
     }

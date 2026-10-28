@@ -70,6 +70,68 @@ namespace MB.FramePacing.Charts.UnitTest
       AssertFrames(data.RootElement, section);
     }
 
+    /// <summary>
+    /// The video frames' QR, read as the page reads it, is what every capture row says: the frame index the QR carries (an older frame that
+    /// came back included), none for a QR that was not decoded, a torn capture's sync marker, a capture index without a row. The golden
+    /// capture decoded every capture, so the other cases are made up in its rows.
+    /// </summary>
+    [TestCase(0.0, 100.0)]
+    [TestCase(2.0, 4.0)]
+    public void CaptureColumns_ReadBack_AreWhatEveryVideoFramesQrSays(double from, double to)
+    {
+      var golden = GoldenRun();
+      var rows = golden.Captures!.ToList();
+      int k = rows.Count / 2;
+      rows[k] = rows[k] with { FrameIndex = rows[k].FrameIndex - 3 };
+      rows[k + 5] = rows[k + 5] with { CaptureStatus = nameof(CaptureStatus.Undecodable), Kind = null, RunId = null, FrameIndex = null };
+      rows[k + 10] = rows[k + 10] with
+      {
+        CaptureStatus = nameof(CaptureStatus.Torn),
+        SyncRunId = rows[k + 10].RunId,
+        SyncFrameIndex = rows[k + 10].FrameIndex + 1,
+      };
+      rows[k + 12] = rows[k + 12] with { CaptureStatus = nameof(CaptureStatus.NotRecorded), Kind = null, RunId = null, FrameIndex = null };
+      long removed = rows[k + 15].CaptureIndex;
+      rows.RemoveAt(k + 15);
+      var chart = golden with { Captures = rows };
+      var section = RunSection.Create(chart, from, Math.Min(to, RunSection.Whole(chart).ToSeconds));
+      using var data = Data(section);
+
+      var (firstIndex, qr, sync, status) = PlaybackFrameColumns.ReadVideoFrames(data.RootElement)!.Value;
+      var byIndex = rows.ToDictionary(r => r.CaptureIndex);
+      // Every capture the section's video shows: from its first frame's first capture to its last frame's
+      var frames = section.Data.Frames;
+      Assert.That(firstIndex, Is.LessThanOrEqualTo(frames[section.Start].FirstCaptureIndex));
+      Assert.That(firstIndex + qr.Length - 1, Is.GreaterThanOrEqualTo(frames[section.End - 1].FirstCaptureIndex));
+      for (int i = 0; i < qr.Length; ++i)
+      {
+        long capture = firstIndex + i;
+        if (!byIndex.TryGetValue(capture, out var row))
+        {
+          Assert.That((qr[i], sync[i], status[i]), Is.EqualTo(((long?)null, (long?)null, "noCapture")), $"capture {capture}");
+          continue;
+        }
+        Assert.That(qr[i], Is.EqualTo((long?)row.FrameIndex), $"capture {capture}");
+        Assert.That(sync[i], Is.EqualTo(row.CaptureStatus == nameof(CaptureStatus.Torn) ? (long?)row.SyncFrameIndex : null), $"capture {capture}");
+        Assert.That(status[i], Is.EqualTo(JsonNamingPolicy.CamelCase.ConvertName(row.CaptureStatus)), $"capture {capture}");
+      }
+      if (from == 0)
+      {
+        Assert.That(status, Does.Contain("undecodable").And.Contain("torn").And.Contain("notRecorded").And.Contain("noCapture"));
+        int older = (int)(rows[k].CaptureIndex - firstIndex);
+        Assert.That(qr[older]!.Value, Is.LessThan(qr[older - 1]!.Value), "the older frame");
+        Assert.That(status[(int)(removed - firstIndex)], Is.EqualTo("noCapture"));
+      }
+    }
+
+    [Test]
+    public void CaptureColumns_WithoutCaptureRows_AreLeftOut()
+    {
+      var chart = GoldenRun() with { Captures = null };
+      using var data = Data(RunSection.Whole(chart));
+      Assert.That(PlaybackFrameColumns.ReadVideoFrames(data.RootElement), Is.Null);
+    }
+
     /// <summary>Every column of <paramref name="root"/>'s frames, read as the page reads them, is the section's frames as the analysis has them.</summary>
     private static void AssertFrames(JsonElement root, RunSection section)
     {

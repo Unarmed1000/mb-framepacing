@@ -97,6 +97,9 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
   measures with stays the recording's.
 - Either disagreement is also on the report card (`--charts`, `render`, the GUI's **Save charts** and the playback page): a
   warning band under its header with the same facts, and the DISPLAY box's rate in the warning colour with what the markers say.
+- A run where at least 90 % of the frames had frames before them that were never shown gets a warning, in the analysis and in the
+  same band: the application rendered faster than the display showed its frames, so vsync was probably off (or a present mode showed
+  the newest frame at each refresh). The frames are measured as they were presented; check the application's vsync setting.
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
 
@@ -193,7 +196,8 @@ counted in nanoseconds is not valid and must be made again.
 A playback report shows the recording a capture was imported from next to its report: play it, step it a video frame or an
 application frame at a time, slow it down, and see on every panel of the report where the frame on screen is. Click or drag on a
 panel to go to that moment; the readout says which frame is on screen, its display time step and animation error, and whether it
-was late or static. It is one HTML file that runs from the disk in any current browser (Edge, Chrome, Firefox, Safari): no server,
+was late or static. Its frame index is what the video frame's QR code says: an older frame that came back shows its own index (and
+the newest frame's), a torn video frame both markers' indices, and a QR code that was not decoded none. It is one HTML file that runs from the disk in any current browser (Edge, Chrome, Firefox, Safari): no server,
 nothing loaded from the network.
 
 ```sh
@@ -274,7 +278,7 @@ Times are seconds since the run's first frame, the Timeline's axis. Every item o
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description` (the line under
 the title that says what the card shows, and the notes at the end of the card: the resolution, how the frames are drawn, static
 frames, capture gaps, a joined trace, the sequence id), `display`, `warning` (the band under the header when the display and the
-capture disagree), `tiles`
+capture disagree or vsync was probably off), `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
 `error-p99`, `error-p999`, `worst-error`, `late-frames`), the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,
 `events`, and `frame-time-lines`: the target and preferred frame time as dashed lines on the display time step and frametime panels

@@ -10,6 +10,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using MB.FramePacing.MarkerDecoding;
 using NUnit.Framework;
@@ -447,6 +448,92 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Pacing.WorstLateShare, Is.GreaterThan(0.1), "the busy stretch stands out");
       var rolling = LateShare.Rolling(run.Frames, LateShare.Window);
       Assert.That(rolling[^1], Is.Zero, "the last 2 s are clean");
+    }
+
+    [Test]
+    public void LateShare_BeforeTheFirstWholeWindow_IsAShareOfAWholeWindow()
+    {
+      // Two late frames among the first four, then 5 s of steady frames at 62.5 Hz
+      var frames = new List<(int, long)> { (2, 16L), (1, 16L), (2, 16L), (1, 16L) };
+      frames.AddRange(Steady(300));
+      var run = Analyze(Rows(frames));
+      Assert.That(run.Pacing!.LateFrames, Is.EqualTo(2));
+
+      var rolling = LateShare.Rolling(run.Frames, LateShare.Window);
+      int firstWindow = LateShare.FirstWindowCount(run.Frames, LateShare.Window);
+      Assert.That(firstWindow, Is.GreaterThan(100), "about 2 s of frames");
+      int secondLate = run.Frames.ToList().FindLastIndex(IsLate);
+      // The time before the run holds no late frame: two late frames among a window of frames, not two among the four seen so far
+      Assert.That(rolling[secondLate], Is.EqualTo(2.0 / firstWindow));
+      Assert.That(rolling.Max(), Is.EqualTo(2.0 / firstWindow));
+      Assert.That(run.Pacing.WorstLateShare, Is.LessThanOrEqualTo(2.0 / firstWindow), "only whole windows count, as before");
+    }
+
+    [Test]
+    public void LateShare_OfARunShorterThanItsWindow_EndsAtTheWholeRunsShare()
+    {
+      var frames = new List<(int, long)> { (2, 16L), (1, 16L) };
+      frames.AddRange(Steady(40));
+      var run = Analyze(Rows(frames));
+      var rolling = LateShare.Rolling(run.Frames, LateShare.Window);
+      Assert.That(rolling[^1], Is.EqualTo(run.Pacing!.LateShare));
+      Assert.That(run.Pacing.WorstLateShare, Is.EqualTo(run.Pacing.LateShare));
+    }
+
+    /// <summary>The frames of <paramref name="rows"/> with frame indices skipped before them: frame n has index 100 + Σ steps.</summary>
+    private static List<CaptureRow> WithIndexSteps(List<CaptureRow> rows, Func<ulong, ulong> stepBefore)
+    {
+      var indices = new Dictionary<ulong, ulong>();
+      ulong index = 100;
+      foreach (ulong frame in rows.Where(r => r.Payload.Kind == MarkerKind.Frame).Select(r => r.Payload.FrameIndex).Distinct())
+      {
+        if (frame > 100)
+          index += stepBefore(frame - 100);
+        indices[frame] = index;
+      }
+      return rows.Select(row =>
+          row.Payload.Kind == MarkerKind.Frame ? row with { Payload = row.Payload with { FrameIndex = indices[row.Payload.FrameIndex] } } : row
+        )
+        .ToList();
+    }
+
+    [Test]
+    public void RunTarget_IsWhatTheFramesAimedAt_NotTheirDueTimeAfterDroppedFrames()
+    {
+      // An application that renders three frames per refresh and shows the newest: two indices skipped before every frame, no marker target
+      var run = Analyze(WithIndexSteps(Rows(Steady(60)), _ => 3));
+      var pacing = run.Pacing!;
+
+      Assert.That(run.Frames.Skip(1).All(f => f.SkippedBefore == 2));
+      Assert.That(run.Frames[1].TargetFrameTime!.Value.Nanoseconds, Is.EqualTo(3 * Refresh), "each frame is due its dropped frames' times later");
+      Assert.That(pacing.TargetFrameTime.Nanoseconds, Is.EqualTo(Refresh), "the run aimed at one refresh");
+      Assert.That(pacing.LateFrames, Is.Zero);
+    }
+
+    [TestCase(1, true)]
+    [TestCase(20, true)]
+    [TestCase(8, false)]
+    public void VsyncOff_IsWarnedAbout_WhenNearlyEveryFrameHadFramesDroppedBeforeIt(int consecutiveEvery, bool warned)
+    {
+      // Two indices skipped before every frame but every n-th (n = 1: before every frame)
+      var run = Analyze(WithIndexSteps(Rows(Steady(200)), frame => consecutiveEvery > 1 && frame % (ulong)consecutiveEvery == 0 ? 1UL : 3UL));
+      var (share, judged) = VsyncOffCheck.Share(run.Frames);
+
+      Assert.That(judged, Is.EqualTo(199));
+      Assert.That(share >= VsyncOffCheck.Threshold, Is.EqualTo(warned), share.ToString(CultureInfo.InvariantCulture));
+      Assert.That(run.Warnings.Any(w => w.Contains("Vsync is probably off")), Is.EqualTo(warned));
+      if (warned)
+        Assert.That(
+          VsyncOffCheck.Lines(run.Frames)[0],
+          Does.StartWith($"{share * 100:0} % of the frames had frames before them that were never shown")
+        );
+    }
+
+    [Test]
+    public void VsyncOff_SaysNothing_OfAShortRunOrAFullRateOne()
+    {
+      Assert.That(VsyncOffCheck.Warning(Analyze(WithIndexSteps(Rows(Steady(20)), _ => 3)).Frames), Is.Null, "too few frames to say anything");
+      Assert.That(VsyncOffCheck.Warning(Analyze(Rows(Steady(200))).Frames), Is.Null, "every frame shown");
     }
   }
 }

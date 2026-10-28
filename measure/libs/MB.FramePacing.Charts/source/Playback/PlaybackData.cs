@@ -13,7 +13,8 @@
 //*   (t[i] - t[i-1] - (capture[i] - capture[i-1]) * periodNs: the rounding of the recording's timestamps);
 //* - step: its difference from the time to the section's next frame (t[i+1] - t[i]; 0 for the last one), null as null;
 //* - error, hold, flags: as they are.
-//* Each column is then {"values": [...]}, or {"rle": [value, count, value, count, ...]} when that is fewer numbers.
+//* Each column is then {"values": [...]}, or {"rle": [value, count, value, count, ...]} when that is fewer numbers. videoFrames holds
+//* what each video frame's QR says in columns of the same form (WriteVideoFrames).
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -26,13 +27,17 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using MB.FramePacing.Analysis;
+using MB.FramePacing.Data;
 
 namespace MB.FramePacing.Charts.Playback
 {
   public static class PlaybackData
   {
-    /// <summary>The format of the data; the page's script reads this one. 3: every time is in nanoseconds (periodNs, originNs, ...).</summary>
-    public const int FormatVersion = 3;
+    /// <summary>
+    /// The format of the data; the page's script reads this one. 3: every time is in nanoseconds (periodNs, originNs, ...). 4: what every
+    /// video frame's QR says (videoFrames).
+    /// </summary>
+    public const int FormatVersion = 4;
 
     /// <summary>
     /// The data of <paramref name="section"/> drawn as <paramref name="cards"/> (the whole report, then the zoom steps), playing
@@ -139,6 +144,7 @@ namespace MB.FramePacing.Charts.Playback
 
         WriteVideo(json, video);
         WriteFrames(json, section);
+        WriteVideoFrames(json, section);
         json.WriteEndObject();
       }
     }
@@ -183,13 +189,20 @@ namespace MB.FramePacing.Charts.Playback
       long? Step(int i) => i + 1 < frames.Count ? frames[i + 1].DisplayDelta?.Nanoseconds : null;
       json.WriteStartObject("frames");
       // The page reads capture before t, and t before step: each is written against the one before it
-      WriteColumn(json, "capture", section, i => i == first ? frames[i].FirstCaptureIndex : CaptureStep(i));
-      WriteColumn(json, "index", section, i => i == first ? (long)frames[i].FrameIndex : (long)frames[i].FrameIndex - (long)frames[i - 1].FrameIndex);
-      WriteColumn(json, "t", section, i => i == first ? Time(i) : Time(i) - Time(i - 1) - (CaptureStep(i) * period));
-      WriteColumn(json, "step", section, i => Step(i) is { } step ? step - (i + 1 < section.End ? Time(i + 1) - Time(i) : 0) : null);
-      WriteColumn(json, "error", section, i => frames[i].AnimationError?.Nanoseconds);
-      WriteColumn(json, "hold", section, i => (long)holds[i]);
-      WriteColumn(json, "flags", section, i => (long)frames[i].Flags);
+      int end = section.End;
+      WriteColumn(json, "capture", first, end, i => i == first ? frames[i].FirstCaptureIndex : CaptureStep(i));
+      WriteColumn(
+        json,
+        "index",
+        first,
+        end,
+        i => i == first ? (long)frames[i].FrameIndex : (long)frames[i].FrameIndex - (long)frames[i - 1].FrameIndex
+      );
+      WriteColumn(json, "t", first, end, i => i == first ? Time(i) : Time(i) - Time(i - 1) - (CaptureStep(i) * period));
+      WriteColumn(json, "step", first, end, i => Step(i) is { } step ? step - (i + 1 < end ? Time(i + 1) - Time(i) : 0) : null);
+      WriteColumn(json, "error", first, end, i => frames[i].AnimationError?.Nanoseconds);
+      WriteColumn(json, "hold", first, end, i => (long)holds[i]);
+      WriteColumn(json, "flags", first, end, i => (long)frames[i].Flags);
       json.WriteEndObject();
 
       json.WriteStartArray("holdKinds");
@@ -203,18 +216,89 @@ namespace MB.FramePacing.Charts.Playback
     }
 
     /// <summary>
-    /// A column of the section's frames: its values, or runs of equal values (value, count) when that is fewer numbers. The values are
-    /// asked for twice (to count the runs, then to write), so nothing of an hour's column is kept.
+    /// What every video frame of the section's video shows, from captures.csv's rows (<see cref="ChartRun.Captures"/>): the captures from a
+    /// capture period before the section's start to a capture period after its end, and every capture index between them, with a row or
+    /// without one. The page shows what the QR says, never the frame the analysis holds on screen in its place. From the capture firstIndex
+    /// on, a value per capture index:
+    /// <list type="bullet">
+    /// <item>qr: the main marker's frame index, as its step from the last capture that had one (the first one as it is), null without one;</item>
+    /// <item>sync: a torn capture's sync marker's frame index, as its step from the capture's main marker's, else null;</item>
+    /// <item>status: an index into videoFrameStatuses (a capture index without a row: noCapture).</item>
+    /// </list>
+    /// Left out when the run's capture rows are not known.
     /// </summary>
-    private static void WriteColumn(Utf8JsonWriter json, string name, RunSection section, Func<int, long?> value)
+    private static void WriteVideoFrames(Utf8JsonWriter json, RunSection section)
     {
-      int count = section.End - section.Start;
+      var rows = section.Run.Captures;
+      if (rows == null)
+        return;
+      long period = section.Run.CapturePeriod.Nanoseconds;
+      long origin = section.Data.Origin.Nanoseconds;
+      long from = (long)Math.Floor(section.FromSeconds * NanosecondTimeSpan.NanosecondsPerSecond) - period;
+      long to = (long)Math.Ceiling(section.ToSeconds * NanosecondTimeSpan.NanosecondsPerSecond) + period;
+      long? firstIndex = null;
+      long lastIndex = 0;
+      foreach (var row in rows)
+      {
+        if (row.CaptureTime is not { } time || time.Nanoseconds - origin < from || time.Nanoseconds - origin > to)
+          continue;
+        firstIndex = Math.Min(firstIndex ?? row.CaptureIndex, row.CaptureIndex);
+        lastIndex = Math.Max(lastIndex, row.CaptureIndex);
+      }
+      if (firstIndex is not { } firstCapture)
+        return;
+      var byIndex = new Dictionary<long, CaptureCsvRow>();
+      foreach (var row in rows)
+      {
+        if (row.CaptureIndex >= firstCapture && row.CaptureIndex <= lastIndex)
+          byIndex[row.CaptureIndex] = row;
+      }
+      int count = (int)(lastIndex - firstCapture + 1);
+      CaptureCsvRow? Row(int i) => byIndex.GetValueOrDefault(firstCapture + i);
+      // The QR's frame index as a step from the last capture that had one, so a run of captures of one frame writes zeros
+      var qr = new long?[count];
+      long? last = null;
+      for (int i = 0; i < count; ++i)
+      {
+        if (Row(i)?.FrameIndex is not { } index)
+          continue;
+        qr[i] = last is { } before ? (long)index - before : (long)index;
+        last = (long)index;
+      }
+      var statuses = Enum.GetValues<CaptureStatus>();
+      long Status(int i) =>
+        Row(i) is { } row && Enum.TryParse<CaptureStatus>(row.CaptureStatus, out var status) ? Array.IndexOf(statuses, status) : statuses.Length;
+      long? Sync(int i) =>
+        Row(i) is { CaptureStatus: nameof(CaptureStatus.Torn), FrameIndex: { } main, SyncFrameIndex: { } sync } ? (long)sync - (long)main : null;
+
+      json.WriteStartObject("videoFrames");
+      json.WriteNumber("firstIndex", firstCapture);
+      WriteColumn(json, "qr", 0, count, i => qr[i]);
+      WriteColumn(json, "sync", 0, count, Sync);
+      WriteColumn(json, "status", 0, count, i => Status(i));
+      json.WriteEndObject();
+
+      json.WriteStartArray("videoFrameStatuses");
+      foreach (var status in statuses)
+        json.WriteStringValue(JsonNamingPolicy.CamelCase.ConvertName(status.ToString()));
+      json.WriteStringValue("noCapture");
+      json.WriteEndArray();
+    }
+
+    /// <summary>
+    /// A column of what <paramref name="value"/> gives for <paramref name="start"/> up to <paramref name="end"/>: its values, or runs of equal
+    /// values (value, count) when that is fewer numbers. The values are asked for twice (to count the runs, then to write), so nothing of an
+    /// hour's column is kept.
+    /// </summary>
+    private static void WriteColumn(Utf8JsonWriter json, string name, int start, int end, Func<int, long?> value)
+    {
+      int count = end - start;
       int runs = 0;
       long? previous = null;
-      for (int i = section.Start; i < section.End; ++i)
+      for (int i = start; i < end; ++i)
       {
         long? current = value(i);
-        if (i == section.Start || current != previous)
+        if (i == start || current != previous)
           ++runs;
         previous = current;
       }
@@ -235,7 +319,7 @@ namespace MB.FramePacing.Charts.Playback
       {
         json.WriteStartArray("rle");
         int length = 0;
-        for (int i = section.Start; i < section.End; ++i)
+        for (int i = start; i < end; ++i)
         {
           long? current = value(i);
           if (length > 0 && current != previous)
@@ -256,7 +340,7 @@ namespace MB.FramePacing.Charts.Playback
       else
       {
         json.WriteStartArray("values");
-        for (int i = section.Start; i < section.End; ++i)
+        for (int i = start; i < end; ++i)
           Number(value(i));
       }
       json.WriteEndArray();

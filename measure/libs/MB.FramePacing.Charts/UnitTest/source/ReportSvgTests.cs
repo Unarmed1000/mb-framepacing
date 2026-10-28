@@ -523,6 +523,42 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
+    /// A run with frames dropped before nearly every frame (VsyncOffCheck) says vsync is probably off, in the same band: on a section of
+    /// the run too, as the setup is the run's; after the display and the capture disagreeing when both apply.
+    /// </summary>
+    [Test]
+    public void Warning_VsyncIsProbablyOff()
+    {
+      static ChartRun Skipping(ChartRun chart) =>
+        chart with
+        {
+          Run = chart.Run with { Frames = chart.Run.Frames.Select((f, i) => i == 0 ? f : f with { SkippedBefore = 2 }).ToList() },
+        };
+      static string Heading(CardDrawing drawing) =>
+        string.Concat(
+          drawing.FlatShapes.OfType<TextRunsShape>().Single(t => t.Runs.Any(run => run.Class == "warn-label")).Runs.Select(run => run.Text)
+        );
+      static string[] Texts(CardDrawing drawing) =>
+        drawing.FlatShapes.OfType<TextShape>().Where(t => t.Class == "warn-text").Select(t => t.Content).ToArray();
+
+      var off = Skipping(Synthetic(600));
+      var lines = VsyncOffCheck.Lines(off.Run.Frames);
+      Assert.That(lines, Has.Count.EqualTo(2));
+      Assert.That(lines[0], Does.StartWith("100 % of the frames had frames before them that were never shown"));
+      foreach (var section in new[] { RunSection.Whole(off), RunSection.Create(off, 0.5, 1.0) })
+      {
+        var drawing = ReportCard.Build(section);
+        Assert.That(Heading(drawing), Is.EqualTo("⚠ WARNING   Vsync is probably off"));
+        Assert.That(Texts(drawing), Is.EqualTo(lines));
+      }
+
+      var both = ReportCard.Build(RunSection.Whole(Skipping(Marked(16_666_667))));
+      Assert.That(Heading(both), Is.EqualTo("⚠ WARNING   The display and the capture disagree, and vsync is probably off"));
+      Assert.That(Texts(both), Has.Length.EqualTo(4));
+      Assert.That(Texts(both)[2..], Is.EqualTo(lines));
+    }
+
+    /// <summary>
     /// Under the title only what the card shows and a pointer to the notes; the notes, the description's other lines, at the end of the
     /// card under a label, after the last panel. Without the description, neither.
     /// </summary>

@@ -51,6 +51,7 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<WaveletMatrix> m_allFrameTimesAndCpuBusy;
     private readonly Lazy<FrameSequence> m_drift;
     private readonly Lazy<LateShareData?> m_lateShare;
+    private readonly Lazy<IReadOnlyList<string>> m_vsyncOff;
     private readonly Lazy<int[]> m_segmentEnds;
     private readonly Lazy<RunEvents> m_events;
     private readonly Lazy<ReferenceStretch[]> m_stepReferences;
@@ -220,6 +221,7 @@ namespace MB.FramePacing.Charts
       m_allFrameTimesAndCpuBusy = Once(() => FrameTimesAndCpuBusyOf(withStatic: true));
       m_drift = Once(() => new FrameSequence(count, i => Frames[i].Drift.Nanoseconds));
       m_lateShare = Once(() => run.Run.Pacing is { } pacing ? LateShareData.Create(Frames, pacing) : null);
+      m_vsyncOff = Once(() => VsyncOffCheck.Lines(run.Run.Frames));
       m_segmentEnds = Once(() => Enumerable.Range(0, count).Where(i => !HasNext(i)).ToArray());
       m_events = Once(() => RunEvents.Of(this));
 
@@ -377,6 +379,9 @@ namespace MB.FramePacing.Charts
 
     /// <summary>The late share over the whole run, when it has pacing information.</summary>
     public LateShareData? LateShare => m_lateShare.Value;
+
+    /// <summary>The run's vsync warning (<see cref="VsyncOffCheck.Lines"/>): no lines when nearly every frame was not after dropped ones.</summary>
+    public IReadOnlyList<string> VsyncOff => m_vsyncOff.Value;
 
     /// <summary>The display time step panel's reference lines: stretches of holds with one target and preferred frame time, in whole refreshes.</summary>
     public IReadOnlyList<ReferenceStretch> StepReferences => m_stepReferences.Value;

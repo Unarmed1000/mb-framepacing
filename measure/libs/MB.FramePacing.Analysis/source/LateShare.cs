@@ -20,11 +20,14 @@ namespace MB.FramePacing.Analysis
 
     /// <summary>
     /// Per presented frame: the share of late frames (0..1) among the frames with a display time step first seen in the window that ends at this
-    /// frame. Frames without a display time step (the first of a segment) count in neither.
+    /// frame. Frames without a display time step (the first of a segment) count in neither. A window that reaches back before the run's first
+    /// frame is still a whole window: the time before the run holds no late frame, and the frames it holds are as many as the run's first
+    /// window (<see cref="FirstWindowCount"/>), so a late frame among the first few is not a large share.
     /// </summary>
     public static double[] Rolling(IReadOnlyList<PresentedFrame> frames, NanosecondTimeDuration window)
     {
       var shares = new double[frames.Count];
+      int firstWindow = FirstWindowCount(frames, window);
       int start = 0;
       int counted = 0;
       int late = 0;
@@ -33,9 +36,25 @@ namespace MB.FramePacing.Analysis
         Add(frames[i], 1, ref counted, ref late);
         while (frames[i].FirstSeenTime - frames[start].FirstSeenTime >= window)
           Add(frames[start++], -1, ref counted, ref late);
-        shares[i] = counted > 0 ? late / (double)counted : 0;
+        int whole = start == 0 ? Math.Max(counted, firstWindow) : counted;
+        shares[i] = whole > 0 ? late / (double)whole : 0;
       }
       return shares;
+    }
+
+    /// <summary>
+    /// The frames that count (<see cref="Counts"/>) first seen within <paramref name="window"/> of the run's first frame: what a window that
+    /// reaches back before the run holds.
+    /// </summary>
+    public static int FirstWindowCount(IReadOnlyList<PresentedFrame> frames, NanosecondTimeDuration window)
+    {
+      int count = 0;
+      for (int i = 0; i < frames.Count && frames[i].FirstSeenTime - frames[0].FirstSeenTime < window; ++i)
+      {
+        if (Counts(frames[i]))
+          ++count;
+      }
+      return count;
     }
 
     /// <summary>The highest <see cref="Rolling"/> share over the windows that lie completely inside the run; the whole run's share if it is shorter.</summary>

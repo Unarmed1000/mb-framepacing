@@ -187,12 +187,13 @@ namespace MB.FramePacing.Charts
       bool mismatch = expectedMismatch || marked.Count > 0;
 
       // What the frames targeted, in whole refreshes: the target frame time the marker carries (a pacer that adapts its rate,
-      // targets several), else the target each frame was measured against. Not the schedule's step, which is longer after a late frame.
+      // targets several), else the preferred frame time, as the reference lines show it. Not the schedule's step, which is longer after a
+      // late frame, and not a frame's due time after frames the target dropped (an application faster than the display skips before most)
       var refreshes = frames
-        .Where(f => f.DisplayDelta.HasValue && (Known(f.MarkerTargetFrameTime) || f.TargetFrameTime.HasValue))
-        .Select(f =>
-          (int)Math.Round((Known(f.MarkerTargetFrameTime) ? f.MarkerTargetFrameTime.Value : f.TargetFrameTime!.Value).TotalMilliseconds / refreshMs)
-        )
+        .Where(f => f.DisplayDelta.HasValue)
+        .Select(FrameReference.Target)
+        .OfType<NanosecondTimeDuration>()
+        .Select(target => (int)Math.Round(target.Value.TotalMilliseconds / refreshMs))
         .Distinct()
         .Order()
         .ToArray();
@@ -230,6 +231,21 @@ namespace MB.FramePacing.Charts
           : "A capture card must capture at the display's refresh rate: check the card's mode, the display's refresh rate and the refresh period the application writes."
       );
       return lines;
+    }
+
+    /// <summary>
+    /// The card's warning band: its title and lines, the display and the capture disagreeing (<see cref="RefreshWarning"/>) first, then the
+    /// run's vsync warning (<see cref="VsyncOffCheck"/>: the setup is the run's, so a section shows it too). No lines when neither applies.
+    /// </summary>
+    public static (string Title, IReadOnlyList<string> Lines) Warning(RunSection section)
+    {
+      var refresh = RefreshWarning(section);
+      var vsyncOff = section.Data.VsyncOff;
+      string title =
+        refresh.Count > 0 && vsyncOff.Count > 0 ? "The display and the capture disagree, and vsync is probably off"
+        : refresh.Count > 0 ? "The display and the capture disagree"
+        : "Vsync is probably off";
+      return (title, refresh.Concat(vsyncOff).ToArray());
     }
 
     /// <summary>The refresh periods the section's markers carry that do not agree with the refresh the analysis measured with.</summary>

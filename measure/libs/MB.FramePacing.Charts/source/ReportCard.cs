@@ -171,13 +171,13 @@ namespace MB.FramePacing.Charts
         if (notes.Count > 0)
           top.Add(NotesHint);
       }
-      var warning = options.IsShown(ReportItem.Warning) ? RunHeadline.RefreshWarning(section) : Array.Empty<string>();
+      var (warningTitle, warning) = options.IsShown(ReportItem.Warning) ? RunHeadline.Warning(section) : (string.Empty, Array.Empty<string>());
       var layout = Layout.For(options, top.Count, tiles.Count, displayH, warning.Count, notes.Count);
       var parts = Header(title, top, options.IsShown(ReportItem.Title));
       if (display != null)
         DisplayBox(parts, display, width, displayH);
       if (layout.WarningY is { } warningY)
-        WarningBand(parts, warning, warningY, width);
+        WarningBand(parts, warningTitle, warning, warningY, width);
 
       Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRowFor(tiles.Count));
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
@@ -372,18 +372,14 @@ namespace MB.FramePacing.Charts
     public const string NotesHint = "More about this run in the notes at the end of the card.";
 
     /// <summary>
-    /// The warning across the card under its header (<see cref="RunHeadline.RefreshWarning"/>): an amber band with a sign and words, not a
+    /// The warning across the card under its header (<see cref="RunHeadline.Warning"/>): an amber band with a sign and words, not a
     /// colour alone, as the panels' colours are verdicts (red late, yellow delta time jitter).
     /// </summary>
-    private static void WarningBand(List<CardShape> parts, IReadOnlyList<string> lines, double y, double width)
+    private static void WarningBand(List<CardShape> parts, string title, IReadOnlyList<string> lines, double y, double width)
     {
       parts.Add(new RectShape("warn-band", N(20, 0), N(y, 1), N(width - 40, 0), N(WarningBandH(lines.Count), 0), "10"));
       parts.Add(
-        new TextRunsShape(
-          34,
-          y + WarningFirstLine,
-          new[] { new TextRun("\u26A0 WARNING", "warn-label"), new TextRun("   The display and the capture disagree", "warn-title") }
-        )
+        new TextRunsShape(34, y + WarningFirstLine, new[] { new TextRun("\u26A0 WARNING", "warn-label"), new TextRun("   " + title, "warn-title") })
       );
       for (int i = 0; i < lines.Count; ++i)
         parts.Add(new TextShape(34, y + WarningFirstLine + WarningTitleGap + (i * WarningLineH), lines[i], "warn-text", "start"));

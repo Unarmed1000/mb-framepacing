@@ -35,6 +35,31 @@ namespace MB.FramePacing.Charts.UnitTest
       return columns;
     }
 
+    /// <summary>
+    /// What every video frame's QR says, as the page's script reads it (readVideoFrames): from the capture index <c>FirstIndex</c> on, the main
+    /// marker's frame index, a torn capture's sync marker's and the capture's status by name. Null when the data has none.
+    /// </summary>
+    public static (long FirstIndex, long?[] Qr, long?[] Sync, string[] Status)? ReadVideoFrames(JsonElement root)
+    {
+      if (!root.TryGetProperty("videoFrames", out var videoFrames))
+        return null;
+      var names = root.GetProperty("videoFrameStatuses").EnumerateArray().Select(n => n.GetString()!).ToArray();
+      var qr = Values(videoFrames.GetProperty("qr"));
+      var sync = Values(videoFrames.GetProperty("sync"));
+      long? last = null;
+      for (int i = 0; i < qr.Length; ++i)
+      {
+        if (qr[i] is not { } step)
+          continue;
+        qr[i] = last is { } before ? before + step : step;
+        last = qr[i];
+        if (sync[i] is { } syncStep)
+          sync[i] = qr[i] + syncStep;
+      }
+      var status = Values(videoFrames.GetProperty("status")).Select(s => names[(int)s!.Value]).ToArray();
+      return (videoFrames.GetProperty("firstIndex").GetInt64(), qr, sync, status);
+    }
+
     /// <summary>How a column is written: "values" or "rle".</summary>
     public static string FormOf(JsonElement root, string name) => root.GetProperty("frames").GetProperty(name).EnumerateObject().Single().Name;
 

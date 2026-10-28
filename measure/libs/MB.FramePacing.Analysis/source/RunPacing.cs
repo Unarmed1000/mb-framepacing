@@ -22,8 +22,8 @@ namespace MB.FramePacing.Analysis
   /// </param>
   /// <param name="RefreshCalculated">True when the refresh was calculated from a camera capture's frames.</param>
   /// <param name="TargetFrameTime">
-  /// The frame time the run is measured against, in whole refreshes: the median of every frame's target (the lower of the two middle ones
-  /// for an even number of frames, so it is always a target a frame had).
+  /// The frame time the run is measured against, in whole refreshes: the median of what every frame aimed at, its target without the frames
+  /// the target dropped before it (the lower of the two middle ones for an even number of frames, so it is always an aim a frame had).
   /// </param>
   /// <param name="Source">Where the targets come from: the pacer's schedule or target frame time in the markers, a given target frame rate, or
   /// the display's native refresh rate.</param>

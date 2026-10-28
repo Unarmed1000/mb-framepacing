@@ -952,7 +952,10 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           <div class="pb-card">
             <div class="pb-card-head">
               <span class="pb-label">Frame on screen</span>
-              <span class="pb-pills" id="pb-pills" aria-live="polite"></span>
+              <span class="pb-pills">
+                <span class="pb-pills" id="pb-qr-pills"></span>
+                <span class="pb-pills" id="pb-pills" aria-live="polite"></span>
+              </span>
             </div>
             <dl class="pb-readout">
               <div>
@@ -1042,6 +1045,14 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
         const $ = (id) => document.getElementById(id);
         const data = JSON.parse($("pb-data").textContent);
 
+        /** A column's values, from the values or the runs of equal values it is written as (PlaybackData.cs). */
+        function values(column) {
+          if (!column.rle) return column.values;
+          const out = [];
+          for (let i = 0; i < column.rle.length; i += 2) for (let n = column.rle[i + 1]; n > 0; --n) out.push(column.rle[i]);
+          return out;
+        }
+
         /**
          * The frame columns as plain arrays, from the small form the data holds them in (PlaybackData.cs): each column its values or
          * runs of equal values; capture and index as steps from the frame before; t as what is left of its step after its captures'
@@ -1051,12 +1062,6 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
          * added to these, only to a time that is then turned into the video's seconds (mediaTimeOf, captureOfMediaTime).
          */
         function readFrames(columns, periodNs) {
-          const values = (column) => {
-            if (!column.rle) return column.values;
-            const out = [];
-            for (let i = 0; i < column.rle.length; i += 2) for (let n = column.rle[i + 1]; n > 0; --n) out.push(column.rle[i]);
-            return out;
-          };
           const capture = values(columns.capture);
           const index = values(columns.index);
           const t = values(columns.t);
@@ -1078,6 +1083,31 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           };
         }
         const frames = readFrames(data.frames, data.periodNs);
+
+        /**
+         * What every video frame's QR says, a value per capture index from firstIndex on (PlaybackData.cs): qr the main marker's frame
+         * index (written as a step from the last capture that had one), sync a torn capture's sync marker's index (written as a step from
+         * its qr), status a name of data.videoFrameStatuses. Null when the data has none (the page then shows the frame on screen's index).
+         */
+        function readVideoFrames(columns) {
+          if (!columns) return null;
+          const qr = values(columns.qr);
+          const sync = values(columns.sync);
+          let last = null;
+          for (let i = 0; i < qr.length; ++i) {
+            if (qr[i] === null) continue;
+            if (last !== null) qr[i] += last;
+            last = qr[i];
+            if (sync[i] !== null) sync[i] += qr[i];
+          }
+          return {
+            firstIndex: columns.firstIndex,
+            qr,
+            sync,
+            status: values(columns.status).map((s) => data.videoFrameStatuses[s]),
+          };
+        }
+        const qrs = readVideoFrames(data.videoFrames);
         const frameCount = frames.t.length;
         const flag = data.flagBits;
         const holdKinds = data.holdKinds;
@@ -1458,11 +1488,10 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           shownFrame = frame;
           pills.replaceChildren();
           if (frame < 0) {
-            for (const id of ["pb-r-frame", "pb-r-time", "pb-r-step", "pb-r-error", "pb-r-hold"]) $(id).textContent = "–";
+            for (const id of ["pb-r-time", "pb-r-step", "pb-r-error", "pb-r-hold"]) $(id).textContent = "–";
             return;
           }
           const flags = frames.flags[frame];
-          $("pb-r-frame").textContent = number(frames.index[frame], 0);
           $("pb-r-time").textContent = seconds(frames.t[frame]);
           const step = frames.step[frame];
           const stepNode = $("pb-r-step");
@@ -1485,6 +1514,36 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
             pills.append(pill("On time", "green"));
         }
 
+        // The frame index is what the video frame's QR says, never the frame the analysis holds on screen in its place: an older frame
+        // that came back shows its own index, a QR that was not decoded none
+        const qrPills = $("pb-qr-pills");
+        const qrStatusText = { undecodable: "QR not decoded", notRecorded: "not recorded", noCapture: "no capture" };
+        function showQr(capture, frame) {
+          const node = $("pb-r-frame");
+          qrPills.replaceChildren();
+          if (!qrs) {
+            node.textContent = frame < 0 ? "–" : number(frames.index[frame], 0);
+            return;
+          }
+          const i = capture - qrs.firstIndex;
+          const inData = i >= 0 && i < qrs.qr.length;
+          const index = inData ? qrs.qr[i] : null;
+          const status = inData ? qrs.status[i] : "noCapture";
+          if (index === null) {
+            node.textContent = "–";
+            node.append(element("small", "", qrStatusText[status] ?? status));
+            if (status === "undecodable") qrPills.append(pill("QR not decoded", "grey"));
+            return;
+          }
+          node.textContent = number(index, 0);
+          if (status === "torn" && qrs.sync[i] !== null)
+            node.append(element("small", "", `torn; sync ${number(qrs.sync[i], 0)}`));
+          else if (frame >= 0 && index < frames.index[frame]) {
+            node.append(element("small", "", `newest ${number(frames.index[frame], 0)}`));
+            qrPills.append(pill("An older frame came back", "pink"));
+          }
+        }
+
         function show(capture) {
           current = capture;
           const ns = nsOfCapture(capture);
@@ -1494,6 +1553,7 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           $("pb-time-now").textContent = number(ns / NS_PER_SECOND, 3);
           $("pb-r-capture").textContent = number(capture, 0);
           showFrame(frame);
+          showQr(capture, frame);
           drawOverlay(ns, frame);
         }
         $("pb-time-total").textContent = " / " + number(data.section.to, 3) + " s";

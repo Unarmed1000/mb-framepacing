@@ -567,7 +567,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **100 % opt-in:** `--playback` on `import`/`analyze`/`render`, the GUI's **Save playback page**; never by `--charts` or Save charts.
   - **One HTML page that runs from the disk** (`PlaybackPage.html`, an embedded resource: markup, CSS, vanilla JS; no network): the
     report card inline (its title and tiles in the page's header), the data inline (`PlaybackData`: the card's `CardPlot`s, the
-    section's frames as columns of whole nanoseconds; `PlaybackData.FormatVersion` 3: `periodNs`, `originNs`, `firstNs`, `lastNs`), a
+    section's frames as columns of whole nanoseconds; `PlaybackData.FormatVersion` 4: `periodNs`, `originNs`, `firstNs`, `lastNs`, and `videoFrames`, what every video frame's QR says, from captures.csv: the readout's frame index is always that, never the frame the analysis holds on screen), a
     player bar, a playhead on every panel. The frame columns are written small, in whole
     numbers the page's `readFrames` turns back exactly (the file's header comment has the form: steps from the frame before, the
     time as what is left after its captures' whole periods, runs of equal values as value and count): about 5 bytes a frame on a
@@ -801,7 +801,12 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       frame rate (`--target-fps`, GUI "Target frame rate", stored in capture.json, overridable at analysis time), and otherwise one
       refresh (the native rate). Without a schedule, a frame after frames the target dropped (`DroppedFrames`) is due one target per
       frame later (1 + dropped): dropped, not off its target. The synthetic game writes a schedule; its prediction error is 0 by
-      construction.
+      construction. **The run's target** (`RunPacing.TargetFrameTime`, `pacing.targetFrameNs`, "measured against a ... target") is
+      the median of what the frames aimed at, without the 1 + dropped (the user, 2026-10-28: an unpaced 50 Hz run read 40 ms), and
+      the DISPLAY box's "target N refreshes" is `FrameReference.Target`'s.
+    - **Vsync probably off** (the user, 2026-10-28, skips only, not tearing): `VsyncOffCheck`, at least 90 % of the judged frames
+      (and 30 of them) with frames dropped before them: a run warning and a line in the card's band (`RunHeadline.Warning`,
+      `RunChartData.VsyncOff`, the run's frames on any section). The skipped frames keep their "dropped by the target" labelling.
 - **Markers (format version 1, `sdk/doc/marker-format.md`):** a 57 byte header shared by frame, start and end, its fields grouped by
   category: format (magic, version, kind), which run and frame (run id, frame index), what the frame shows (flags, animation time),
   pacing (preferred frame time, target frame time, refresh period, intended display time), the CPU's work (CPU start time and CPU busy, named as
@@ -866,6 +871,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     description and the statistics tables say "excluding N static frames" (`RunHeadline.ExcludedStatic`).
   - **Late share:** amber = on screen at least half a refresh longer than the preferred frame time (the marker's, else
     `--target-fps`, else one refresh) without being late; never for static steps or on-demand frames (`LateShareData`, `PresentedFrame.PreferredFrameTime`).
+    A window that reaches back before the run's first frame is still a whole window (the user, 2026-10-28): nothing before the run
+    is late, and it holds as many frames as the run's first 2 s (`LateShare.FirstWindowCount`), so a late frame among the first few
+    is not a large share (`LateShare.Rolling`, `LateShareData.Create`; `Worst` still takes whole windows only).
   - The start marker (85 bytes) carries a 16 byte opaque sequence id (`SequenceId`: a UUID or a text tag of at
     most 16 ASCII characters, shown as text or UUID hex), not a name. Format version 1 is the baseline for all data (markers,
     captures.mbcd, analysis output): change it in place, no version bump, until there are users. The sync marker (kind 3, 20 bytes: the header's start, run id and frame index, and the CRC; matched to its main marker by both) is QR version 2 (25×25), drawn

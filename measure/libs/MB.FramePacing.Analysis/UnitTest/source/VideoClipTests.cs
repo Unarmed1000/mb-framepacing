@@ -164,6 +164,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(manifest.ExpectedSkippedFrameIndices), $"{clip}: frame indices never presented");
       Assert.That(run.Counts.OutOfOrderCaptures, Is.EqualTo(manifest.ExpectedOutOfOrderCaptures), $"{clip}: captures out of order");
       Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule), "the markers carry the pacer's schedule");
+      Assert.That(run.Warnings, Has.None.Contains("Vsync is probably off"), $"{clip}: every clip is presented with vsync");
       long refresh = run.Pacing.RefreshPeriod.Nanoseconds;
       Assert.That(refresh, Is.AnyOf(16_666_666L, 16_666_667L), "the refresh is the capture period: 1/60 s to the nanosecond");
 

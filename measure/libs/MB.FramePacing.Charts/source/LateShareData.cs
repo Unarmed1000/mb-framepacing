@@ -4,8 +4,8 @@
 //* The late share of a whole run, computed once: per frame, over the frames with a display time step in the 2 s window that ends at it,
 //* the share of frames late (later than their target: the pacer's intent in the markers, else one refresh) or held longer than a refresh as
 //* the pacer intended, and whether any was late and any held longer (the line's red, amber or green). The window reaches back before any
-//* section's start, so a section shows the run's own values. Per pixel column: the shares' range from a wavelet matrix, the colours from
-//* rank bits. Immutable.
+//* section's start, so a section shows the run's own values; before the run's start it holds as many frames as the run's first window,
+//* none late (LateShare.Rolling). Per pixel column: the shares' range from a wavelet matrix, the colours from rank bits. Immutable.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -73,6 +73,8 @@ namespace MB.FramePacing.Charts
       var percent = new double[frames.Count];
       var anyLate = new bool[frames.Count];
       var anyHeld = new bool[frames.Count];
+      // A window that reaches back before the run's first frame holds as many frames as the run's first window, none of them late or held
+      int firstWindow = Analysis.LateShare.FirstWindowCount(frames, Analysis.LateShare.Window);
       int start = 0;
       int counted = 0;
       int late = 0;
@@ -92,7 +94,8 @@ namespace MB.FramePacing.Charts
         Add(i, 1);
         while (frames[i].FirstSeenTime - frames[start].FirstSeenTime >= Analysis.LateShare.Window)
           Add(start++, -1);
-        percent[i] = (counted > 0 ? (late + heldCount) / (double)counted : 0) * 100;
+        int whole = start == 0 ? Math.Max(counted, firstWindow) : counted;
+        percent[i] = (whole > 0 ? (late + heldCount) / (double)whole : 0) * 100;
         anyLate[i] = late > 0;
         anyHeld[i] = heldCount > 0;
       }
