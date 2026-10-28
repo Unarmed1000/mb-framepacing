@@ -76,7 +76,7 @@ jobs:
       # A capture joined with a Perfetto trace. The tools start the user's own trace processor and never download one;
       # here Perfetto's Python package fetches the copy it is pinned to, and the tests that read a trace must find it
       - name: uv (for Perfetto's Python package)
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.1
       # The path is the last line the script prints (the download before it may print too), without Windows' carriage return
       - name: Perfetto's trace processor (for the trace tests)
         shell: bash
@@ -129,7 +129,7 @@ jobs:
       - name: License identifier in every source file
         run: python3 tools/check_license_headers.py
       - name: uv (Python from .python-version, the dev tools from uv.lock)
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.1
       - name: Python dev tools (pyproject.toml, uv.lock; the group trace is what tools/trace_augment.py needs)
         run: |
           uv sync --locked --group trace
@@ -198,7 +198,7 @@ jobs:
       - name: CMake 4
         uses: lukka/get-cmake@v4.4.4
       - name: uv (Python from .python-version, the dev tools from uv.lock)
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.1
       - name: Python dev tools (clang-format, clang-tidy)
         run: |
           uv sync --locked
@@ -257,7 +257,7 @@ jobs:
       - name: CMake 4 (the test packages build with it)
         uses: lukka/get-cmake@v4.4.4
       - name: uv (Python from .python-version, the dev tools from uv.lock)
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.1
       - name: The recipe, built from this checkout (sdk/cpp/conan as a local-recipes-index remote)
         shell: bash
         run: |
