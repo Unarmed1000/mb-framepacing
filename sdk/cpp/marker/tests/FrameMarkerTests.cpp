@@ -485,6 +485,22 @@ TEST(Payload, AStartMarkerSaysTheApplicationLogsTheFrameRecord)
   EXPECT_FALSE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticBefore));
 }
 
+TEST(Payload, AFrameSaysThePresentOfTheFrameBeforeFailed)
+{
+  // Bit 4 of the flags byte, on the frame after the one whose present failed
+  static_assert(static_cast<uint8_t>(FM::MarkerFlags::PresentFailedBefore) == 0x10u);
+  const FM::Payload failed(FM::MarkerKind::Frame, 7u, 12u, FM::MarkerFlags::PresentFailedBefore | FM::MarkerFlags::Paced, FP::NanosecondTimeSpan{0});
+  std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
+  const std::size_t byteCount = FM::EncodePayload(failed, {}, buffer);
+  ASSERT_GT(byteCount, 0u);
+  EXPECT_EQ(buffer[16], 0x18u);
+  FM::Payload decoded{};
+  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+  EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::PresentFailedBefore));
+  EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::Paced));
+  EXPECT_FALSE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticAfter));
+}
+
 TEST(Payload, AFrameSaysAPacerOrALimiterHeldIt)
 {
   // Bit 3 of the flags byte. Only the application sets it: a payload made without it does not carry it

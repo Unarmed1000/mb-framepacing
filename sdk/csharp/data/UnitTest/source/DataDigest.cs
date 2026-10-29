@@ -140,6 +140,7 @@ namespace MB.FramePacing.Data.UnitTest
                   ["frameRecordLogged"] = r.FrameRecordLogged,
                   ["presentedFrames"] = r.Counts.PresentedFrames,
                   ["droppedFrames"] = r.Counts.DroppedFrames,
+                  ["presentFailedFrames"] = r.Counts.PresentFailedFrames,
                   ["sourceDroppedFrames"] = r.Counts.SourceDroppedFrames,
                   ["missedCaptures"] = r.Counts.MissedCaptures,
                   ["captures"] = r.Counts.Captures,

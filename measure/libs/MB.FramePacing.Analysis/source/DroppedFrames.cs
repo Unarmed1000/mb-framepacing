@@ -17,10 +17,32 @@ namespace MB.FramePacing.Analysis
 {
   public static class DroppedFrames
   {
-    /// <summary>Per frame, how many frames the target dropped just before it (0 after a capture gap: unknown).</summary>
-    public static long[] Before(IReadOnlyList<PresentedFrame> frames)
+    /// <summary>
+    /// Per frame, how many frames just before it were rendered and never on screen (0 after a capture gap: unknown): dropped by the target,
+    /// and the one whose present failed (<see cref="PresentFailedBefore"/>). The pacing measures a frame after them against their frame
+    /// times either way.
+    /// </summary>
+    public static long[] Before(IReadOnlyList<PresentedFrame> frames) => Count(frames).Before;
+
+    /// <summary>
+    /// Per frame, 1 when the frame just before it (frame index - 1) is one of those never on screen and the frame's marker says that
+    /// frame's present failed (<see cref="PresentedFrameFlags.PresentFailedBefore"/>), else 0.
+    /// </summary>
+    public static long[] PresentFailedBefore(IReadOnlyList<PresentedFrame> frames) => Count(frames).PresentFailed;
+
+    /// <summary>Per frame, how many frames the target dropped just before it: those never on screen, less the one whose present failed.</summary>
+    public static long[] ByTargetBefore(IReadOnlyList<PresentedFrame> frames)
+    {
+      var (before, failed) = Count(frames);
+      for (int i = 0; i < before.Length; ++i)
+        before[i] -= failed[i];
+      return before;
+    }
+
+    private static (long[] Before, long[] PresentFailed) Count(IReadOnlyList<PresentedFrame> frames)
     {
       var dropped = new long[frames.Count];
+      var failed = new long[frames.Count];
       int segmentStart = 0;
       for (int i = 0; i <= frames.Count; ++i)
       {
@@ -43,10 +65,15 @@ namespace MB.FramePacing.Analysis
           int lo = LowerBound(shownOlder, from);
           int hi = LowerBound(shownOlder, frame.FrameIndex);
           dropped[k] = (long)frame.SkippedBefore - (hi - lo);
+          // The frame index just before it was one of them (it never came back) and its present failed, as this frame's marker says
+          ulong previous = frame.FrameIndex - 1;
+          bool previousShown = LowerBound(shownOlder, previous) < shownOlder.Length && shownOlder[LowerBound(shownOlder, previous)] == previous;
+          if (dropped[k] > 0 && (frame.Flags & PresentedFrameFlags.PresentFailedBefore) != 0 && !previousShown)
+            failed[k] = 1;
         }
         segmentStart = i;
       }
-      return dropped;
+      return (dropped, failed);
     }
 
     private static int LowerBound(ulong[] sorted, ulong value)

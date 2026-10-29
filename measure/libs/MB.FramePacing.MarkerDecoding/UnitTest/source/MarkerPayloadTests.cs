@@ -146,6 +146,22 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       Assert.That(new MarkerPayload(kind, 1, 2, MB.FramePacing.Marker.MarkerFlags.StaticAfter, NanosecondTimeSpan.Zero).IsPaced, Is.False);
     }
 
+    /// <summary>The present-failed flag (bit 4), kept with the other flags and read back.</summary>
+    [Test]
+    public void PresentFailedBeforeFlag_RoundTrips()
+    {
+      var flags = MB.FramePacing.Marker.MarkerFlags.PresentFailedBefore | MB.FramePacing.Marker.MarkerFlags.Paced;
+      var payload = new MarkerPayload(MarkerKind.Frame, 1, 12, flags, NanosecondTimeSpan.Zero);
+      Assert.That(payload.IsPresentFailedBefore, Is.True);
+      Assert.That(MarkerPayload.TryDecode(payload.Encode(), out var decoded, out _), Is.True);
+      Assert.That(decoded.IsPresentFailedBefore, Is.True);
+      Assert.That(decoded.IsPaced, Is.True);
+      Assert.That(
+        new MarkerPayload(MarkerKind.Frame, 1, 12, MB.FramePacing.Marker.MarkerFlags.Paced, NanosecondTimeSpan.Zero).IsPresentFailedBefore,
+        Is.False
+      );
+    }
+
     [TestCase(0L, 0u, 0u, 0u)]
     [TestCase(123_456_789_012_345L, 16_666_667u, 33_333_333u, 8_000_001u)]
     [TestCase(long.MaxValue, MaxFrameNanoseconds, 1u, MaxCpuBusyNanoseconds)]

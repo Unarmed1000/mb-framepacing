@@ -867,9 +867,15 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       reads as a dot at the card's size) and what the frames are measured against (`RunHeadline.TargetSource`, also `analyze`'s
       words). Every clip of mb-framepacing-explained writes intended display times, the naive ones too (on purpose: they fill
       every field).
-    - **Next (agreed 2026-10-29, not built):** a flag on the next frame that the frame before was not presented because its
-      present call failed (`VK_ERROR_OUT_OF_DATE_KHR`, a DXGI error, `eglSwapBuffers` false; not `VK_SUBOPTIMAL_KHR`), so the
-      analysis can tell it from a frame the target dropped.
+    - **Bit 4, `PresentFailedBefore`** (the user, 2026-10-29: one bit, "only previous frame failed, we cant support multiple or
+      dropped frames"): on the frame after one whose present call failed (it did not queue the frame: `VK_ERROR_OUT_OF_DATE_KHR`,
+      a DXGI error, `eglSwapBuffers` false; not `VK_SUBOPTIMAL_KHR` or `DXGI_STATUS_OCCLUDED`). It speaks for frame index - 1 only.
+      No Unity provider (Unity gives scripts no present result). The tools keep it as `PresentedFrameFlags.PresentFailedBefore`;
+      `DroppedFrames.Before` stays every frame never shown (the pacing's 1 + dropped), `PresentFailedBefore` is that one frame
+      and `ByTargetBefore` the rest: summary.json `counts.droppedFrames` is by the target, `counts.presentFailedFrames` (required)
+      the failed ones, and the vsync-off check counts by the target only. The report: `HoldKind.PresentFailed`,
+      `RunEventKind.PresentFailed`, the strip's last refreshes before the next frame, all tan (`#c69c6d`, `*-failed`,
+      `key-tan`), the frames dropped tile's "· N present failed", the counts line, the hover and the playback page's pill.
   - **Assumed static** (`TimelineOptions.AssumeStatic`, on by default; `analyze --no-static-guess`, the GUI's "Guess static",
     `GuiSettings.AssumeStatic`): `TimelineAnalyzer.AssumeStatic` flags a frame `StaticAfter | StaticAssumed` when a frame the target
     dropped took the rest's flag: the next presented frame carries `StaticBefore` for a frame never shown, or (the flag lost) the run

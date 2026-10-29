@@ -16,6 +16,9 @@ namespace MB.FramePacing.Charts
     /// <summary>Frames the target rendered that never reached the display (RunChartData.DroppedBeforeFrame), where they were due.</summary>
     FramesDropped,
 
+    /// <summary>A frame that was not presented because its present failed (RunChartData.PresentFailedBeforeFrame), where it was due.</summary>
+    PresentFailed,
+
     /// <summary>A refresh that showed an older frame again after a newer one (PresentedFrame.OlderFrames).</summary>
     OutOfOrder,
 

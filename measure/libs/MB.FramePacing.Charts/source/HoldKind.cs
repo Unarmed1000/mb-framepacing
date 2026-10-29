@@ -23,6 +23,12 @@ namespace MB.FramePacing.Charts
     /// <summary>While this frame was the newest, the display showed an older frame again (frames presented out of order).</summary>
     OlderFrameBack,
 
+    /// <summary>
+    /// The frame just before the next one was rendered and not presented: its present failed, as the next frame's marker says. Frames the
+    /// target dropped may come before it too.
+    /// </summary>
+    PresentFailed,
+
     /// <summary>Frames the target rendered after this one never reached the display before the next (captured without a gap).</summary>
     FramesDropped,
 

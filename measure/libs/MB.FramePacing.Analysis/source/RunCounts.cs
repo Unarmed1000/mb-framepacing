@@ -23,6 +23,8 @@ namespace MB.FramePacing.Analysis
     long SkippedFrameIndices,
     // Frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order (DroppedFrames)
     long DroppedFrames,
+    // Frames not presented because their present call failed: the skipped frame index before a frame whose marker says so
+    long PresentFailedFrames,
     long OutOfOrderCaptures,
     int Segments
   );

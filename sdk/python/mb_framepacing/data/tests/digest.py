@@ -128,6 +128,7 @@ def _summary(summary: AnalysisSummary) -> dict[str, JsonValue]:
                 "frameRecordLogged": run.frame_record_logged,
                 "presentedFrames": run.counts.presented_frames,
                 "droppedFrames": run.counts.dropped_frames,
+                "presentFailedFrames": run.counts.present_failed_frames,
                 "sourceDroppedFrames": run.counts.source_dropped_frames,
                 "missedCaptures": run.counts.missed_captures,
                 "captures": run.counts.captures,

@@ -35,6 +35,7 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<HoldKind[]> m_holdKinds;
     private readonly Dictionary<HoldKind, Lazy<FrameSequence>> m_holdsByKind;
     private readonly Lazy<long[]> m_droppedBefore;
+    private readonly Lazy<long[]> m_presentFailedBefore;
     private readonly Lazy<RankBits> m_uncertainSteps;
     private readonly Lazy<RankBits> m_staticSteps;
     private readonly Lazy<FrameSequence> m_animationHolds;
@@ -138,7 +139,8 @@ namespace MB.FramePacing.Charts
       m_frameTimes = Once(() => new FrameSequence(count, i => Frames[i].FrameTime?.Nanoseconds is > 0 and var t ? t : null));
       m_cpuBusy = Once(() => new FrameSequence(count, i => Frames[i].CpuBusy.Nanoseconds > 0 ? Frames[i].CpuBusy.Nanoseconds : null));
       m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTime?.Nanoseconds is > 0 || Frames[i].CpuBusy.Nanoseconds > 0));
-      m_droppedBefore = Once(() => DroppedFrames.Before(Frames));
+      m_droppedBefore = Once(() => DroppedFrames.ByTargetBefore(Frames));
+      m_presentFailedBefore = Once(() => DroppedFrames.PresentFailedBefore(Frames));
       m_holdKinds = Once(() =>
       {
         // A hold's kind, the first that applies: not known (a capture gap made the next step uncertain), an older frame came back while
@@ -154,6 +156,7 @@ namespace MB.FramePacing.Charts
             (next.Flags & PresentedFrameFlags.UncertainStep) != 0 ? HoldKind.Unknown
             : Frames[i].OlderFrames is { Count: > 0 } ? HoldKind.OlderFrameBack
             : (next.Flags & PresentedFrameFlags.Late) != 0 ? HoldKind.Late
+            : PresentFailedBeforeFrame[i + 1] > 0 ? HoldKind.PresentFailed
             : DroppedBeforeFrame[i + 1] > 0 ? HoldKind.FramesDropped
             : HoldKind.AsPlanned;
         }
@@ -329,6 +332,12 @@ namespace MB.FramePacing.Charts
     /// order later in the segment), 0 when a capture gap came before it (they may have been shown in the refreshes the capture missed).
     /// </summary>
     public IReadOnlyList<long> DroppedBeforeFrame => m_droppedBefore.Value;
+
+    /// <summary>
+    /// Per frame, 1 when the frame just before it was not presented because its present failed, as the frame's marker says
+    /// (DroppedFrames.PresentFailedBefore): one of the frames never on screen, not counted in <see cref="DroppedBeforeFrame"/>.
+    /// </summary>
+    public IReadOnlyList<long> PresentFailedBeforeFrame => m_presentFailedBefore.Value;
 
     /// <summary>The frames whose display time step a capture gap made uncertain (not judged); a static frame's is counted as static.</summary>
     public RankBits UncertainSteps => m_uncertainSteps.Value;

@@ -100,6 +100,7 @@ namespace MB.FramePacing.Charts
           PresentedFrames = frames.Count,
           SkippedFrameIndices = frames.Sum(f => (long)f.SkippedBefore),
           DroppedFrames = Enumerable.Range(Start, FrameCount).Sum(i => Data.DroppedBeforeFrame[i]),
+          PresentFailedFrames = Enumerable.Range(Start, FrameCount).Sum(i => Data.PresentFailedBeforeFrame[i]),
           OutOfOrderCaptures = frames.Sum(f => (long)(f.OlderFrames?.Count ?? 0)),
         },
         Pacing = Run.Run.Pacing is { } pacing ? SectionPacing(pacing, frames) : null,

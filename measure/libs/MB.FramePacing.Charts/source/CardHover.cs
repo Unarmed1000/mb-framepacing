@@ -86,6 +86,7 @@ namespace MB.FramePacing.Charts
       return kind switch
       {
         RunEventKind.FramesDropped => $"{Count("a frame", "frames")} dropped before frame {e.FrameIndex}",
+        RunEventKind.PresentFailed => $"frame {e.FrameIndex - 1} not presented: its present failed",
         RunEventKind.OutOfOrder => $"an older frame, {e.FrameIndex}, shown again (out of order)",
         RunEventKind.Torn => e.OtherFrameIndex is { } other ? $"torn: frames {e.FrameIndex} and {other}" : $"torn: frame {e.FrameIndex}",
         RunEventKind.NotRecorded => "a capture not recorded",
@@ -170,6 +171,8 @@ namespace MB.FramePacing.Charts
         );
       if (frame.SkippedBefore > 0)
         notes.Add($"{frame.SkippedBefore} frame indices skipped before it");
+      if ((frame.Flags & PresentedFrameFlags.PresentFailedBefore) != 0)
+        notes.Add($"frame {frame.FrameIndex - 1} not presented: its present failed");
       return $"Frame {frame.FrameIndex} at {Invariant(seconds, "0.000")} s" + (notes.Count > 0 ? $" ({string.Join(", ", notes)})" : string.Empty);
     }
 

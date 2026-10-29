@@ -546,6 +546,16 @@ class PayloadTests(unittest.TestCase):
         assert decoded is not None
         self.assertEqual(decoded[0].flags, MarkerFlags.FRAME_RECORD_LOGGED | MarkerFlags.STATIC_AFTER)
 
+    def test_a_frame_says_the_present_of_the_frame_before_failed(self) -> None:
+        # Bit 4 of the flags byte, on the frame after the one whose present failed
+        self.assertEqual(int(MarkerFlags.PRESENT_FAILED_BEFORE), 0x10)
+        failed = Payload(MarkerKind.FRAME, 7, 12, MarkerFlags.PRESENT_FAILED_BEFORE | MarkerFlags.PACED, 0)
+        encoded = encode_payload(failed)
+        self.assertEqual(encoded[16], 0x18)
+        decoded = try_decode_payload(encoded)
+        assert decoded is not None
+        self.assertEqual(decoded[0].flags, MarkerFlags.PRESENT_FAILED_BEFORE | MarkerFlags.PACED)
+
     def test_a_frame_says_a_pacer_or_a_limiter_held_it(self) -> None:
         # Bit 3 of the flags byte. Only the application sets it: a payload made without it does not carry it
         self.assertEqual(int(MarkerFlags.PACED), 0x08)

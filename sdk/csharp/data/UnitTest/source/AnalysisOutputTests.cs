@@ -31,7 +31,7 @@ namespace MB.FramePacing.Data.UnitTest
 
     private const string Counts = """
       "counts": { "captures": 10, "decoded": 9, "undecodable": 1, "torn": 0, "notRecorded": 0, "sourceDroppedFrames": 0, "missedCaptures": 0,
-        "presentedFrames": 8, "skippedFrameIndices": 0, "droppedFrames": 0, "outOfOrderCaptures": 0, "segments": 1 }
+        "presentedFrames": 8, "skippedFrameIndices": 0, "droppedFrames": 0, "presentFailedFrames": 0, "outOfOrderCaptures": 0, "segments": 1 }
       """;
 
     private const string Values = """{ "count": 3, "min": -1.5, "mean": 0.25, "stdDev": 1.25, "p50": 0, "p95": 2, "p99": 2.5, "max": 3 }""";
@@ -235,6 +235,11 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(() => AnalysisSummary.Parse(MinimalWithout("capturePeriodNs")), Throws.InstanceOf<InvalidDataException>(), "no capture period");
       Assert.That(() => AnalysisSummary.Parse(MinimalWithout("errorThresholdNs")), Throws.InstanceOf<InvalidDataException>(), "no error threshold");
       Assert.That(() => AnalysisSummary.Parse(OneRun(RunStart, Statistics)), Throws.InstanceOf<InvalidDataException>(), "no counts");
+      Assert.That(
+        () => AnalysisSummary.Parse(OneRun(RunStart, Counts.Replace("\"presentFailedFrames\": 0, ", string.Empty), Statistics)),
+        Throws.InstanceOf<InvalidDataException>(),
+        "counts without the present failed frames"
+      );
       Assert.That(() => AnalysisSummary.Parse(OneRun(RunStart, Counts)), Throws.InstanceOf<InvalidDataException>(), "no statistics");
       Assert.That(() => AnalysisSummary.Parse(OneRun(Counts, Statistics)), Throws.InstanceOf<InvalidDataException>(), "no run id");
       Assert.That(

@@ -20,7 +20,13 @@ namespace MB.FramePacing.Charts
   public sealed class RunEvents
   {
     /// <summary>The kinds of the frames lane, the one that outweighs the others in a column first.</summary>
-    public static readonly IReadOnlyList<RunEventKind> FrameKinds = new[] { RunEventKind.FramesDropped, RunEventKind.OutOfOrder, RunEventKind.Torn };
+    public static readonly IReadOnlyList<RunEventKind> FrameKinds = new[]
+    {
+      RunEventKind.PresentFailed,
+      RunEventKind.FramesDropped,
+      RunEventKind.OutOfOrder,
+      RunEventKind.Torn,
+    };
 
     /// <summary>The kinds of the capture lane, the one that outweighs the others in a column first.</summary>
     public static readonly IReadOnlyList<RunEventKind> CaptureKinds = new[]
@@ -118,6 +124,9 @@ namespace MB.FramePacing.Charts
         // Where the dropped frames were due: the refresh before the frame after them
         if (data.DroppedBeforeFrame[i] is > 0 and var dropped)
           Add(RunEventKind.FramesDropped, new RunEvent(frame.FirstSeenTime - period, dropped, frame.FrameIndex));
+        // Where the frame whose present failed was due: the refresh before the frame after it
+        if (data.PresentFailedBeforeFrame[i] > 0)
+          Add(RunEventKind.PresentFailed, new RunEvent(frame.FirstSeenTime - period, 1, frame.FrameIndex));
         if (frame.OlderFrames is { } older)
         {
           foreach (var capture in older)

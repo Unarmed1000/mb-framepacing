@@ -40,7 +40,7 @@ class MarkerKind(IntEnum):
 
 
 class MarkerFlags(IntFlag):
-    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 4 to 7 are reserved: write 0; a decoded payload keeps whatever it
+    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 5 to 7 are reserved: write 0; a decoded payload keeps whatever it
     carried."""
 
     NO_FLAGS = 0
@@ -58,6 +58,10 @@ class MarkerFlags(IntFlag):
     """A pacer or a frame limiter held this frame's start to a plan (it waited, or set when the frame began); a present that blocks until
     the display takes it (vsync alone) is not that. The application sets it on every such frame, from its own pacer or limiter; it is off
     unless set. A start or end marker carries the value of the frame that shows it."""
+    PRESENT_FAILED_BEFORE = 16
+    """The frame just before this one (frame index - 1) was not presented: its present call failed (it did not queue the frame:
+    VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_SURFACE_LOST_KHR, a DXGI error, eglSwapBuffers false; VK_SUBOPTIMAL_KHR and
+    DXGI_STATUS_OCCLUDED presented). Known after that present, so it goes on the next frame. It speaks for that one frame only."""
 
 
 @dataclass(frozen=True, slots=True)

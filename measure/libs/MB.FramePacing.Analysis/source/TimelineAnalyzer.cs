@@ -228,6 +228,7 @@ namespace MB.FramePacing.Analysis
       public bool StaticBefore;
       public bool StaticAssumed;
       public bool Paced;
+      public bool PresentFailedBefore;
       public long FirstCaptureIndex;
       public NanosecondTickCount FirstSeenTime;
       public NanosecondTickCount LastSeenTime;
@@ -341,6 +342,7 @@ namespace MB.FramePacing.Analysis
           StaticAfter = payload.IsStaticAfter,
           StaticBefore = payload.IsStaticBefore,
           Paced = payload.IsPaced,
+          PresentFailedBefore = payload.IsPresentFailedBefore,
           FirstCaptureIndex = row.CaptureIndex,
           FirstSeenTime = row.CaptureTime,
           LastSeenTime = row.CaptureTime,
@@ -387,7 +389,8 @@ namespace MB.FramePacing.Analysis
         missed,
         frames.Count,
         frames.Aggregate(0L, (sum, f) => sum + (long)f.SkippedBefore),
-        DroppedFrames.Before(frames).Sum(),
+        DroppedFrames.ByTargetBefore(frames).Sum(),
+        DroppedFrames.PresentFailedBefore(frames).Sum(),
         outOfOrder,
         frames.Count > 0 ? frames[^1].Segment + 1 : 0
       );
@@ -811,6 +814,8 @@ namespace MB.FramePacing.Analysis
           flags |= PresentedFrameFlags.UncertainStep;
         if (b.Paced)
           flags |= PresentedFrameFlags.Paced;
+        if (b.PresentFailedBefore)
+          flags |= PresentedFrameFlags.PresentFailedBefore;
 
         frames.Add(
           new PresentedFrame(

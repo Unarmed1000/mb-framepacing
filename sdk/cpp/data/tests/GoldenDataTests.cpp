@@ -169,6 +169,7 @@ namespace
         {"frameRecordLogged", run.FrameRecordLogged},
         {"presentedFrames", run.Counts.PresentedFrames},
         {"droppedFrames", run.Counts.DroppedFrames},
+        {"presentFailedFrames", run.Counts.PresentFailedFrames},
         {"sourceDroppedFrames", run.Counts.SourceDroppedFrames},
         {"missedCaptures", run.Counts.MissedCaptures},
         {"captures", run.Counts.Captures},

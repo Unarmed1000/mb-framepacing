@@ -48,9 +48,9 @@ namespace MB::FramePacing::Data
 
   //! Parse summary.json's text (C#'s AnalysisSummary.Parse). A file without formatVersion is format 1 and unknown fields are ignored.
   //! Throws DataFormatError for text that is not a summary: the fields every summary has are required (capturePeriodNs,
-  //! errorThresholdNs, and a run's runId, hasStartMarker, hasEndMarker, frameRecordLogged, framesFile, counts and statistics; doc/analysis-output-format.md
-  //! marks them), and a value must have its field's type and fit its range: a time ("...Ns") is a whole number of nanoseconds, and
-  //! never a negative one (each is a length of time: capturePeriodNs, measurementResolutionNs, errorThresholdNs, and a run's
+  //! errorThresholdNs, and a run's runId, hasStartMarker, hasEndMarker, frameRecordLogged, framesFile, counts and statistics;
+  //! doc/analysis-output-format.md marks them), and a value must have its field's type and fit its range: a time ("...Ns") is a whole number of
+  //! nanoseconds, and never a negative one (each is a length of time: capturePeriodNs, measurementResolutionNs, errorThresholdNs, and a run's
   //! pacing.refreshPeriodNs and pacing.targetFrameNs). An optional field the file lacks is empty or 0. A summary from before the
   //! nanoseconds (its times in ticks of 100 ns, "...Ticks") lacks the required fields and is refused.
   AnalysisSummary ParseSummary(std::string_view json);

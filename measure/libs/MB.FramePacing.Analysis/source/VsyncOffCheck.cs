@@ -29,7 +29,8 @@ namespace MB.FramePacing.Analysis
     /// </summary>
     public static (double Share, int Judged) Share(IReadOnlyList<PresentedFrame> frames)
     {
-      var dropped = DroppedFrames.Before(frames);
+      // Frames the target dropped, not those whose present failed: that is no sign of vsync off
+      var dropped = DroppedFrames.ByTargetBefore(frames);
       int judged = 0;
       int afterDrops = 0;
       for (int i = 0; i < frames.Count; ++i)

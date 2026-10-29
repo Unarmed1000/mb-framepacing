@@ -87,7 +87,7 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   - bit 1, **static before**, on the next frame: the application only knows once it renders that frame (it woke up on input after
     waiting).
 - **Value:** set whichever bit the application knows, or both; they are independent flags. Inside a static stretch that is rendered
-  every refresh, a frame carries both. Bit 2 is the start marker's frame record flag and bit 3 the paced flag (the next sections). Bits 4 to 7 are reserved:
+  every refresh, a frame carries both. Bit 2 is the start marker's frame record flag, bit 3 the paced flag and bit 4 present failed before (the next sections). Bits 5 to 7 are reserved:
   write `0`.
 - **What the analysis does:** either bit makes the step from the static frame to the next a **static step**.
   - Its animation error is not judged (and it has no prediction error), so an animation clock that pauses while idle does not look like
@@ -147,6 +147,23 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   schedule and a frame limiter a target frame time. Nothing is measured or judged by the flag.
 - **Goes wrong when:** it is set for frames that only vsync held (the report says paced where nothing planned), or left out while a
   pacer runs (the report says not paced).
+
+### Flags: present failed before
+
+- **Means:** the frame just before this one (frame index − 1) was rendered and its present was called, but the call failed and did
+  not queue the frame, so it never reached the display. Failed means the result says so: `VK_ERROR_OUT_OF_DATE_KHR`,
+  `VK_ERROR_SURFACE_LOST_KHR` or another error from `vkQueuePresentKHR`, a DXGI error from `Present`, `eglSwapBuffers` returning
+  false. `VK_SUBOPTIMAL_KHR` and `DXGI_STATUS_OCCLUDED` did present: they are not failures.
+- **Value:** bit 4 of the flags byte (`MarkerFlags::PresentFailedBefore`), on the next frame, as the result is known only once that
+  present returns. Keep the last present's result and set the bit on the frame after it.
+- **Changes:** only on the frame after a failed present. Of several failures in a row only the last is said: the frames before it
+  read as dropped by the target.
+- **Unknown (`0`):** the default: the frame before was presented, or its result is not known.
+- **What the analysis does:** the skipped frame index before such a frame counts as **not presented: its present failed**, in the
+  counts, the report's events and refresh strip, and the frames CSV, instead of as dropped by the target. Its timing is judged as
+  for any frame that was not shown: the next frame is due a frame time later.
+- **Goes wrong when:** it is set for a present that succeeded (the report blames a failure that did not happen), or set on the
+  failed frame's own marker (that marker is never on screen, so nothing reads it).
 
 ### Animation time
 

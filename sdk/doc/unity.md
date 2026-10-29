@@ -92,6 +92,9 @@ overlay.CpuStartTimeProvider = () => pacer.CpuStartTime; // a NanosecondTickCoun
 overlay.CpuBusyProvider = () => pacer.CpuBusy; // optional, a NanosecondTimeDuration
 ```
 
+The marker's **present failed before** flag has no provider: Unity presents the frame itself and gives scripts no result of the
+present call, so the overlay never sets it.
+
 The **target frame time** without a provider is what Unity's settings aim for: on Android and iOS `Application.targetFrameRate`
 (30 fps while it is unset; they ignore `QualitySettings.vSyncCount`); elsewhere the refresh rate divided by
 `QualitySettings.vSyncCount` while vsync is on (`Application.targetFrameRate` is then ignored), else `Application.targetFrameRate`,

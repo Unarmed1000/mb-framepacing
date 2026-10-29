@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The payload's flags byte. See doc/marker-format.md "Flags". Bits 4 to 7 are reserved: write 0; a decoded payload keeps whatever it
+//* The payload's flags byte. See doc/marker-format.md "Flags". Bits 5 to 7 are reserved: write 0; a decoded payload keeps whatever it
 //* carried, so values without a name here survive a round trip.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -43,5 +43,12 @@ namespace MB.FramePacing.Marker
     /// unless set. A start or end marker carries the value of the frame that shows it.
     /// </summary>
     Paced = 1 << 3,
+
+    /// <summary>
+    /// The frame just before this one (frame index - 1) was not presented: its present call failed (it did not queue the frame:
+    /// VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_SURFACE_LOST_KHR, a DXGI error, eglSwapBuffers false; VK_SUBOPTIMAL_KHR and
+    /// DXGI_STATUS_OCCLUDED presented). Known after that present, so it goes on the next frame. It speaks for that one frame only.
+    /// </summary>
+    PresentFailedBefore = 1 << 4,
   }
 }

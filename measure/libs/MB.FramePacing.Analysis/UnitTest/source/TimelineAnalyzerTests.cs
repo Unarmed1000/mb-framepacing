@@ -273,6 +273,32 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
+    /// Frames 3 and 4 were rendered and never shown; frame 5's marker says the present of the frame before it, 4, failed. Frame 3 is
+    /// dropped by the target, frame 4 not presented as its present failed: two frames never shown before frame 5 either way, which its
+    /// timing is measured with. The flag on a frame whose frame before was shown says nothing, and the flag keeps its name in the CSV.
+    /// </summary>
+    [Test]
+    public void PresentFailedBefore_TellsTheFrameBeforeFromFramesTheTargetDropped()
+    {
+      var failed = MB.FramePacing.Marker.MarkerFlags.PresentFailedBefore;
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(5, 64, 4, flags: failed).Show(6, 80, 4, flags: failed).Show(7, 96, 4);
+      rows.End(1);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+      var frames = run.Frames;
+      Assert.That(frames.Select(f => f.FrameIndex), Is.EqualTo(new ulong[] { 1, 2, 5, 6, 7 }));
+      Assert.That(DroppedFrames.Before(frames), Is.EqualTo(new long[] { 0, 0, 2, 0, 0 }), "never shown: the pacing's count");
+      Assert.That(DroppedFrames.PresentFailedBefore(frames), Is.EqualTo(new long[] { 0, 0, 1, 0, 0 }), "frame 6's flag speaks for frame 5, shown");
+      Assert.That(DroppedFrames.ByTargetBefore(frames), Is.EqualTo(new long[] { 0, 0, 1, 0, 0 }));
+      Assert.That(run.Counts.DroppedFrames, Is.EqualTo(1));
+      Assert.That(run.Counts.PresentFailedFrames, Is.EqualTo(1));
+      Assert.That(frames[2].Flags.HasFlag(PresentedFrameFlags.PresentFailedBefore));
+      Assert.That(frames[2].ToRow().Flags, Has.Member("PresentFailedBefore"));
+      Assert.That(run.ToSummary("f").ToRun(frames).Counts.PresentFailedFrames, Is.EqualTo(1), "summary.json keeps the count");
+    }
+
+    /// <summary>
     /// The paced flag is the frame's own marker's word, kept on the frame it came with: paced frames, then a stretch the application did not
     /// pace. It judges nothing (the same steps either way), and a frames CSV row writes it by name and reads it back.
     /// </summary>

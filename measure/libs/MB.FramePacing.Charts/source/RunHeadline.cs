@@ -45,10 +45,12 @@ namespace MB.FramePacing.Charts
           ReportItem.FramesDropped,
           "Frames dropped",
           Number(c.DroppedFrames),
-          c.PresentedFrames + c.DroppedFrames > 0 ? Percent(c.DroppedFrames / (double)(c.PresentedFrames + c.DroppedFrames)) : string.Empty,
-          c.DroppedFrames > 0,
+          (c.PresentedFrames + c.DroppedFrames > 0 ? Percent(c.DroppedFrames / (double)(c.PresentedFrames + c.DroppedFrames)) : string.Empty)
+            + (c.PresentFailedFrames > 0 ? $" · {Number(c.PresentFailedFrames)} present failed" : string.Empty),
+          c.DroppedFrames > 0 || c.PresentFailedFrames > 0,
           "Frames the application rendered that never reached the display: frame indices skipped while the capture missed nothing, and never "
-            + "shown later. Underneath, their share of the rendered frames. A capture gap is never counted as dropped."
+            + "shown later. Underneath, their share of the rendered frames, and how many more were not presented because their present failed "
+            + "(the markers say so; not counted as dropped). A capture gap is never counted as dropped."
         ),
         new HeadlineTile(
           ReportItem.OutOfOrder,
@@ -116,7 +118,7 @@ namespace MB.FramePacing.Charts
     /// </summary>
     public static IReadOnlyList<HeadlineTile> Shown(ChartRun chart, ReportOptions options)
     {
-      bool anyFault = chart.Run.Counts.DroppedFrames > 0 || chart.Run.Counts.OutOfOrderCaptures > 0;
+      bool anyFault = chart.Run.Counts.DroppedFrames > 0 || chart.Run.Counts.PresentFailedFrames > 0 || chart.Run.Counts.OutOfOrderCaptures > 0;
       return Tiles(chart)
         .Where(t => options.IsShown(t.Id) && (t.HasValue || !options.HideEmpty))
         .Where(t => anyFault || !ReportItem.AutoTiles.Contains(t.Id) || options.Shown.Contains(t.Id))
@@ -158,7 +160,9 @@ namespace MB.FramePacing.Charts
       var c = run.Counts;
       return $"{c.PresentedFrames} presented frames from {c.Captures} captures: {c.Decoded} decoded, {c.Undecodable} undecodable, {c.Torn} torn, "
         + $"{c.NotRecorded} not recorded; {c.SourceDroppedFrames} dropped by the source, {c.MissedCaptures} missed. "
-        + $"{c.SkippedFrameIndices} frame indices never captured, {c.Segments} segment(s).";
+        + $"{c.SkippedFrameIndices} frame indices never captured, "
+        + (c.PresentFailedFrames > 0 ? $"{c.PresentFailedFrames} of them not presented as their present failed, " : string.Empty)
+        + $"{c.Segments} segment(s).";
     }
 
     /// <summary>Which cause of animation error dominates, with the counts behind it ("mostly bad pacing: ... (3 error frame(s) ...).").</summary>

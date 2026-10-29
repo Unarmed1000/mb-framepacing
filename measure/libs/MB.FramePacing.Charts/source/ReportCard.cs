@@ -593,13 +593,21 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>The kinds that colour a column of holds, the first one the column has: a late hold outweighs the others.</summary>
-    private static readonly HoldKind[] g_holdPriority = { HoldKind.Late, HoldKind.OlderFrameBack, HoldKind.FramesDropped, HoldKind.Unknown };
+    private static readonly HoldKind[] g_holdPriority =
+    {
+      HoldKind.Late,
+      HoldKind.OlderFrameBack,
+      HoldKind.PresentFailed,
+      HoldKind.FramesDropped,
+      HoldKind.Unknown,
+    };
 
     /// <summary>The key entries of the hold kinds besides "as planned", in the key's order.</summary>
     private static readonly (HoldKind Kind, string Text)[] g_holdKeys =
     {
       (HoldKind.Late, "held: the next frame was late"),
       (HoldKind.OlderFrameBack, "held: an older frame came back"),
+      (HoldKind.PresentFailed, "held: a present failed before the next"),
       (HoldKind.FramesDropped, "held: frames never shown before the next"),
       (HoldKind.Unknown, "not known: a capture gap"),
     };
@@ -610,6 +618,7 @@ namespace MB.FramePacing.Charts
       {
         HoldKind.Late => prefix + "-late",
         HoldKind.OlderFrameBack => prefix + "-older",
+        HoldKind.PresentFailed => prefix + "-failed",
         HoldKind.FramesDropped => prefix + "-dropped",
         HoldKind.Unknown => prefix + "-unknown",
         _ => prefix,
@@ -625,9 +634,11 @@ namespace MB.FramePacing.Charts
       ["held-late"] = "key-red",
       ["held-older"] = "key-pink",
       ["held-dropped"] = "key-orange",
+      ["held-failed"] = "key-tan",
       ["held-unknown"] = "key-unknown",
       ["strip-older"] = "key-pink",
       ["strip-dropped"] = "key-orange",
+      ["strip-failed"] = "key-tan",
       ["step-line"] = "key-blue",
       ["frametime"] = "key-blue",
       ["cpu-busy"] = "key-blue-faint",
@@ -643,6 +654,7 @@ namespace MB.FramePacing.Charts
       ["ref-target"] = "key-light",
       ["ref-preferred"] = "key-amber",
       ["event-dropped"] = "key-orange",
+      ["event-failed"] = "key-tan",
       ["event-older"] = "key-pink",
       ["event-torn"] = "key-cyan",
       ["event-gap"] = "key-unknown",
@@ -1471,6 +1483,7 @@ namespace MB.FramePacing.Charts
       bool anyJitter = false;
       bool anyOlder = false;
       bool anyDropped = false;
+      bool anyFailed = false;
       for (int i = section.Start; i < section.End; ++i)
       {
         var frame = frames[i];
@@ -1497,13 +1510,19 @@ namespace MB.FramePacing.Charts
           : i % 2 == 0 ? "strip-a"
           : "strip-b";
         double x0 = view.XOfFrame(i);
-        // Frames the target dropped before the next one: the refreshes at the end of this frame's hold where they were due repeat this
-        // frame; each dropped frame was due one target frame time (in whole refreshes) after the one before it
+        // Frames never shown before the next one: the refreshes at the end of this frame's hold where they were due repeat this frame;
+        // each was due one target frame time (in whole refreshes) after the one before it. The last of them is the one whose present
+        // failed, when the next frame's marker says so; the frames the target dropped come before it
         int repeats = 0;
-        if (i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment && view.Data.DroppedBeforeFrame[i + 1] is > 0 and var dropped)
+        int failedRepeats = 0;
+        if (i + 1 < frames.Count && frames[i + 1].Segment == frame.Segment)
         {
+          long dropped = view.Data.DroppedBeforeFrame[i + 1];
+          long failed = view.Data.PresentFailedBeforeFrame[i + 1];
           var target = frames[i + 1].TargetFrameTime is { } t && t > NanosecondTimeDuration.Zero ? t : refresh;
-          repeats = (int)Math.Min(seen - 1, dropped * Math.Max(1, Cells(target)));
+          int perFrame = Math.Max(1, Cells(target));
+          repeats = (int)Math.Min(seen - 1, (dropped + failed) * perFrame);
+          failedRepeats = (int)Math.Min(repeats, failed * perFrame);
         }
         for (int c = 0; c < cells; ++c)
         {
@@ -1517,9 +1536,11 @@ namespace MB.FramePacing.Charts
           string cell =
             older ? "strip-older"
             : c >= seen ? "neutral"
+            : c >= seen - failedRepeats ? "strip-failed"
             : c >= seen - repeats ? "strip-dropped"
             : cls;
           anyDropped |= cell == "strip-dropped";
+          anyFailed |= cell == "strip-failed";
           anyOlder |= older;
           anyUnknown |= cell == "neutral";
           view.Move(
@@ -1540,6 +1561,8 @@ namespace MB.FramePacing.Charts
         panelKey.Add((new[] { "strip-static-a", "strip-static-b" }, "static", false));
       if (anyDropped)
         panelKey.Add((new[] { "strip-dropped" }, "a dropped frame was due (repeat)", false));
+      if (anyFailed)
+        panelKey.Add((new[] { "strip-failed" }, "a frame whose present failed was due (repeat)", false));
       if (anyOlder)
         panelKey.Add((new[] { "strip-older" }, "an older frame (out of order)", false));
       if (anyUnknown)
@@ -1553,6 +1576,7 @@ namespace MB.FramePacing.Charts
     private static readonly Dictionary<RunEventKind, (string Class, string Text)> g_eventKinds = new Dictionary<RunEventKind, (string, string)>
     {
       [RunEventKind.FramesDropped] = ("event-dropped", "dropped"),
+      [RunEventKind.PresentFailed] = ("event-failed", "present failed"),
       [RunEventKind.OutOfOrder] = ("event-older", "out of order"),
       [RunEventKind.Torn] = ("event-torn", "torn"),
       [RunEventKind.NotRecorded] = ("event-gap", "not recorded"),

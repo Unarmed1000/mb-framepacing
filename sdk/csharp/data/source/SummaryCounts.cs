@@ -22,6 +22,7 @@ namespace MB.FramePacing.Data
     [property: JsonRequired] long PresentedFrames,
     [property: JsonRequired] long SkippedFrameIndices,
     [property: JsonRequired] long DroppedFrames,
+    [property: JsonRequired] long PresentFailedFrames,
     [property: JsonRequired] long OutOfOrderCaptures,
     [property: JsonRequired] int Segments
   );

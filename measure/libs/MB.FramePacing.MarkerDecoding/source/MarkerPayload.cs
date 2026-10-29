@@ -73,6 +73,9 @@ namespace MB.FramePacing.MarkerDecoding
     /// </summary>
     public bool IsPaced => (Flags & FM.MarkerFlags.Paced) != 0;
 
+    /// <summary>The frame just before this one (frame index - 1) was not presented: its present call failed. The application's word.</summary>
+    public bool IsPresentFailedBefore => (Flags & FM.MarkerFlags.PresentFailedBefore) != 0;
+
     /// <summary>
     /// A start marker says the application logs the frame record of the run to its own trace: a trace of the run exists.
     /// The application's word, read from the start marker only; the bit means nothing on another kind of marker.

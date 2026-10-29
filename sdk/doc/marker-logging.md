@@ -123,6 +123,10 @@ void Frame()
   {
     flags = flags | FM::MarkerFlags::Paced;
   }
+  if (m_lastPresentFailed)                                                         // the frame before never reached the display
+  {
+    flags = flags | FM::MarkerFlags::PresentFailedBefore;
+  }
   if (kind == FM::MarkerKind::SequenceStart && Trace::IsLogging())
   {
     flags = flags | FM::MarkerFlags::FrameRecordLogged;
@@ -139,7 +143,8 @@ void Frame()
   Renderer::DrawMarker(m_matrix);                                   // integrating.md, step 3
   Trace::LogFrameRecord(payload);                                   // optional: trace-logging.md
 
-  Platform::Present(intendedDisplay);
+  // Failed: the call did not queue the frame (VK_ERROR_OUT_OF_DATE_KHR, a DXGI error, ...; VK_SUBOPTIMAL_KHR presented)
+  m_lastPresentFailed = !Platform::Present(intendedDisplay);
 }
 ```
 
@@ -181,6 +186,8 @@ prediction error is then 0, and every error the analysis finds is pacing.
   Pause the animation clock **after** the last frame that moves.
 - **Paced** goes on every frame whose start your pacer or frame limiter held (it waited, or set when the frame began); not when
   only a blocking present held it. With the SDK's pacer it is `FrameSchedule::Paced`.
+- **Present failed before** goes on the frame after one whose present call failed (it did not queue the frame): that frame's own
+  marker never reaches the screen, so the next one says it. Keep the last present's result for it.
 - **Frame record logged** goes on the run's **start marker** when the run's frames are logged to a trace
   ([Logging to a trace](trace-logging.md)).
 
@@ -242,16 +249,17 @@ Start and end markers carry the values of the frame that shows them: build them 
 
 Analyse a short recording (`mb-framepacing import recording.mkv --analyze --charts`) and look:
 
-| Field                       | Where to see it                                                                                                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Frame index                 | No dropped frames on a run you know presented every frame; a run that counted refreshes shows frames dropped that never were                                     |
-| Animation time              | A steady scene at a steady rate shows animation errors near 0; errors as large as a frame on every frame mean the time is read from another clock                |
-| Preferred and target time   | `analyze` prints the target and where it comes from ("Target 16.7 ms (the pacer's schedule in the markers)"); the card's display box says "preferred N fps"      |
-| Intended display time       | `analyze` prints the pacing and prediction error; `latenessNs` in the frames CSV                                                                                 |
-| CPU start time and CPU busy | The card's frametime panel, and `render --timeline --from <s>` draws each frame's CPU box, placed on the capture's clock                                         |
-| Refresh period              | `markerRefreshPeriodNs` in the frames CSV; no warning on the card when it agrees with the capture                                                                |
-| Static flags                | Violet stretches on the card, and "excluding N static frames" on the frame rates                                                                                 |
-| Paced flag                  | The card's PACER band under its panels and the GUI's "Pacer or limiter:" line: "yes (the markers say so)" or the share of the frames; "no" when no frame sets it |
+| Field                       | Where to see it                                                                                                                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frame index                 | No dropped frames on a run you know presented every frame; a run that counted refreshes shows frames dropped that never were                                                              |
+| Animation time              | A steady scene at a steady rate shows animation errors near 0; errors as large as a frame on every frame mean the time is read from another clock                                         |
+| Preferred and target time   | `analyze` prints the target and where it comes from ("Target 16.7 ms (the pacer's schedule in the markers)"); the card's display box says "preferred N fps"                               |
+| Intended display time       | `analyze` prints the pacing and prediction error; `latenessNs` in the frames CSV                                                                                                          |
+| CPU start time and CPU busy | The card's frametime panel, and `render --timeline --from <s>` draws each frame's CPU box, placed on the capture's clock                                                                  |
+| Refresh period              | `markerRefreshPeriodNs` in the frames CSV; no warning on the card when it agrees with the capture                                                                                         |
+| Static flags                | Violet stretches on the card, and "excluding N static frames" on the frame rates                                                                                                          |
+| Paced flag                  | The card's PACER band under its panels and the GUI's "Pacer or limiter:" line: "yes (the markers say so)" or the share of the frames; "no" when no frame sets it                          |
+| Present failed before       | The frames dropped tile and the notes: frames not presented because their present failed, apart from those the target dropped; the events panel and the refresh strip where they were due |
 
 The frames CSV (`analysis/run-<id>-frames.csv`) has every marker value as the marker carried it (`markerTargetNs`,
 `markerPreferredNs`, `markerRefreshPeriodNs`, `intendedDisplayNs`, `cpuStartNs`, `cpuBusyNs`), so a value can be checked against

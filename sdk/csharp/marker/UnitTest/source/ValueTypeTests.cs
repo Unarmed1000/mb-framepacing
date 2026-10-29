@@ -89,6 +89,19 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     [Test]
+    public void Payload_AFrameSaysThePresentOfTheFrameBeforeFailed()
+    {
+      // Bit 4 of the flags byte, on the frame after the one whose present failed
+      Assert.That((byte)MarkerFlags.PresentFailedBefore, Is.EqualTo(0x10));
+      var failed = new Payload(MarkerKind.Frame, 7, 12, MarkerFlags.PresentFailedBefore | MarkerFlags.Paced, NanosecondTimeSpan.Zero);
+      var bytes = new byte[Payload.MaxEncodedByteCount];
+      int count = FrameMarker.EncodePayload(failed, default, bytes);
+      Assert.That(bytes[16], Is.EqualTo(0x18));
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
+      Assert.That(decoded.Flags, Is.EqualTo(MarkerFlags.PresentFailedBefore | MarkerFlags.Paced));
+    }
+
+    [Test]
     public void Payload_AFrameSaysAPacerOrALimiterHeldIt()
     {
       // Bit 3 of the flags byte. Only the application sets it: a payload made without it does not carry it

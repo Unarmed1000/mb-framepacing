@@ -162,6 +162,7 @@ class SummaryCounts:
     presented_frames: int
     skipped_frame_indices: int
     dropped_frames: int
+    present_failed_frames: int
     out_of_order_captures: int
     segments: int
 
@@ -378,6 +379,7 @@ def _counts(value: _Object) -> SummaryCounts:
         presented_frames=value.integer("presentedFrames"),
         skipped_frame_indices=value.integer("skippedFrameIndices"),
         dropped_frames=value.integer("droppedFrames"),
+        present_failed_frames=value.integer("presentFailedFrames"),
         out_of_order_captures=value.integer("outOfOrderCaptures"),
         segments=value.integer("segments"),
     )

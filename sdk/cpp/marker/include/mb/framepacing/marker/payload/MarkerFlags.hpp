@@ -7,7 +7,7 @@
 
 namespace MB::FramePacing::Marker
 {
-  //! The payload's flags byte. See doc/marker-format.md "Flags". Bits 4 to 7 are reserved: write 0; a decoded payload keeps whatever it
+  //! The payload's flags byte. See doc/marker-format.md "Flags". Bits 5 to 7 are reserved: write 0; a decoded payload keeps whatever it
   //! carried, so values without a name here survive a round trip.
   enum class MarkerFlags : uint8_t
   {
@@ -28,6 +28,10 @@ namespace MB::FramePacing::Marker
     //! limiter or from the SDK's pacer (Pacer::FrameSchedule::Paced); it is off unless set. A start or end marker carries the value
     //! of the frame that shows it.
     Paced = 1u << 3u,
+    //! The frame just before this one (frame index - 1) was not presented: its present call failed (it did not queue the frame:
+    //! VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_SURFACE_LOST_KHR, a DXGI error, eglSwapBuffers false; VK_SUBOPTIMAL_KHR and
+    //! DXGI_STATUS_OCCLUDED presented). Known after that present, so it goes on the next frame. It speaks for that one frame only.
+    PresentFailedBefore = 1u << 4u,
   };
 
   constexpr MarkerFlags operator|(const MarkerFlags lhs, const MarkerFlags rhs) noexcept

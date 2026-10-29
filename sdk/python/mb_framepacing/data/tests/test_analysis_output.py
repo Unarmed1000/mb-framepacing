@@ -40,7 +40,7 @@ MINIMAL_SUMMARY = """
 """
 
 COUNTS = """"counts": { "captures": 10, "decoded": 9, "undecodable": 1, "torn": 0, "notRecorded": 0, "sourceDroppedFrames": 0,
-    "missedCaptures": 0, "presentedFrames": 8, "skippedFrameIndices": 0, "droppedFrames": 0, "outOfOrderCaptures": 0, "segments": 1 }"""
+    "missedCaptures": 0, "presentedFrames": 8, "skippedFrameIndices": 0, "droppedFrames": 0, "presentFailedFrames": 0, "outOfOrderCaptures": 0, "segments": 1 }"""
 
 VALUES = '{ "count": 3, "min": -1.5, "mean": 0.25, "stdDev": 1.25, "p50": 0, "p95": 2, "p99": 2.5, "max": 3 }'
 
@@ -208,6 +208,7 @@ class SummaryTests(unittest.TestCase):
 
     def test_a_run_without_what_every_run_has_is_not_a_summary(self) -> None:
         self.refused(one_run(RUN_START, statistics()), "no counts")
+        self.refused(one_run(RUN_START, replaced(COUNTS, '"presentFailedFrames": 0, ', ""), statistics()), "counts without the present failed frames")
         self.refused(one_run(RUN_START, COUNTS), "no statistics")
         self.refused(one_run(RUN_START, '"counts": 3', statistics()), "counts that are a number")
         self.refused(one_run(RUN_START, COUNTS, '"statistics": []'), "statistics that are an array")
@@ -221,7 +222,10 @@ class SummaryTests(unittest.TestCase):
             "a frame record flag that is a number",
         )
         self.refused(one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false', COUNTS, statistics()), "no frames file")
-        self.refused(one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": null', COUNTS, statistics()), "null is absent")
+        self.refused(
+            one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": null', COUNTS, statistics()),
+            "null is absent",
+        )
 
     def test_histograms_and_the_camera_are_read_whole(self) -> None:
         def histograms(error: str, display: str) -> str:

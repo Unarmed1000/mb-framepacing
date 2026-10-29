@@ -110,6 +110,8 @@ faster still.
   `MarkerFlags::FrameRecordLogged` when the application logs the run's [frame record](../doc/trace-frame-record.md)
   to a trace: only you can say so, it is off unless set. `MarkerFlags::Paced` on every frame whose start your pacer or frame
   limiter held (not vsync alone; the experimental pacer's `FrameSchedule::Paced`), so the report can say the frames were paced.
+  `MarkerFlags::PresentFailedBefore` on the frame after one whose present call failed, so that frame counts as not presented, not as
+  dropped by the target.
 - **Animation time:** the moment the frame shows, as the application animated it, a `NanosecondTimeSpan` (`FromSeconds(seconds)` from
   an animation clock in seconds). Every time in the payload is in nanoseconds.
 - **Frame pacing (optional):** `PreferredFrameTime` (a `NanosecondTimeDuration`: the interval the application wants to run at; it differs

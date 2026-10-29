@@ -39,6 +39,7 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
         --pb-amber: #d29922;
         --pb-violet: #bc8cff;
         --pb-orange: #f0883e;
+        --pb-tan: #c69c6d;
         --pb-pink: #db61a2;
         --pb-grey: #8b949e;
         --pb-track: rgba(240, 246, 252, 0.14);
@@ -69,6 +70,7 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           --pb-amber: #9a6700;
           --pb-violet: #8250df;
           --pb-orange: #bc4c00;
+          --pb-tan: #8a6236;
           --pb-pink: #bf3989;
           --pb-grey: #59636e;
           --pb-track: rgba(31, 35, 40, 0.14);
@@ -93,6 +95,7 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
         --pb-amber: #9a6700;
         --pb-violet: #8250df;
         --pb-orange: #bc4c00;
+        --pb-tan: #8a6236;
         --pb-pink: #bf3989;
         --pb-grey: #59636e;
         --pb-track: rgba(31, 35, 40, 0.14);
@@ -687,6 +690,9 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
       }
       .pb-pill-orange {
         --pb-pill: var(--pb-orange);
+      }
+      .pb-pill-tan {
+        --pb-pill: var(--pb-tan);
       }
       .pb-pill-pink {
         --pb-pill: var(--pb-pink);
@@ -1536,6 +1542,7 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           asPlanned: ["As planned", "green"],
           late: ["Next frame late", "red"],
           olderFrameBack: ["An older frame came back", "pink"],
+          presentFailed: ["A frame not presented: its present failed", "tan"],
           framesDropped: ["Frames dropped by the target", "orange"],
           unknown: ["Not judged: capture gap", "grey"],
         };
@@ -1567,6 +1574,7 @@ Required Notice: Copyright (c) 2026 Mana Battery ApS (https://github.com/Unarmed
           if (flags & flag.late) pills.append(pill("Late", "red"));
           if (flags & flag.staticAfter) pills.append(pill(flags & flag.staticAssumed ? "Static (assumed)" : "Static", "violet"));
           if (flags & flag.skippedBefore) pills.append(pill("Frames skipped before", "orange"));
+          if (flags & flag.presentFailedBefore) pills.append(pill("The frame before: its present failed", "tan"));
           if (flags & (flag.uncertainStep | flag.uncertainStart)) pills.append(pill("Uncertain", "grey"));
           if (!(flags & (flag.late | flag.staticAfter | flag.skippedBefore | flag.uncertainStep | flag.uncertainStart)))
             pills.append(pill("On time", "green"));

@@ -23,6 +23,8 @@ namespace MB::FramePacing::Data
     int64_t SkippedFrameIndices{0};
     //! Frames the target dropped: skipped frame indices over a capture without gaps that never came back out of order.
     int64_t DroppedFrames{0};
+    //! Frames not presented because their present call failed (the marker's PresentFailedBefore on the frame after).
+    int64_t PresentFailedFrames{0};
     int64_t OutOfOrderCaptures{0};
     int64_t Segments{0};
 

@@ -69,5 +69,12 @@ namespace MB.FramePacing.Analysis
     /// a run where some frame carries it, a frame without it was not paced.
     /// </summary>
     Paced = 512,
+
+    /// <summary>
+    /// The frame's own marker says the frame just before it (frame index - 1) was not presented: its present call failed. When that frame
+    /// index was skipped, it counts as not presented because its present failed, not as dropped by the target
+    /// (<see cref="DroppedFrames.PresentFailedBefore"/>).
+    /// </summary>
+    PresentFailedBefore = 1024,
   }
 }
