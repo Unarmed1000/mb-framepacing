@@ -52,7 +52,7 @@ namespace MB.FramePacing.Data.UnitTest
       + ", \"framesWithAnimationError\": 2, \"errorPerFrameMs\": 0.5, \"percentError\": 25, \"excludedStaticFrames\": 0, \"uncertainSteps\": 0 }";
 
     private const string RunStart = """
-      "runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "run-7-frames.csv"
+      "runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "run-7-frames.csv"
       """;
 
     private const string FrameColumns =
@@ -238,13 +238,41 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(() => AnalysisSummary.Parse(OneRun(RunStart, Counts)), Throws.InstanceOf<InvalidDataException>(), "no statistics");
       Assert.That(() => AnalysisSummary.Parse(OneRun(Counts, Statistics)), Throws.InstanceOf<InvalidDataException>(), "no run id");
       Assert.That(
-        () => AnalysisSummary.Parse(OneRun("\"runId\": 7, \"hasStartMarker\": true, \"hasEndMarker\": false", Counts, Statistics)),
+        () =>
+          AnalysisSummary.Parse(
+            OneRun("\"runId\": 7, \"hasStartMarker\": true, \"hasEndMarker\": false, \"frameRecordLogged\": false", Counts, Statistics)
+          ),
         Throws.InstanceOf<InvalidDataException>(),
         "no frames file"
       );
       Assert.That(
         () =>
-          AnalysisSummary.Parse(OneRun("\"runId\": 7, \"hasStartMarker\": true, \"hasEndMarker\": false, \"framesFile\": null", Counts, Statistics)),
+          AnalysisSummary.Parse(OneRun("\"runId\": 7, \"hasStartMarker\": true, \"hasEndMarker\": false, \"framesFile\": \"f\"", Counts, Statistics)),
+        Throws.InstanceOf<InvalidDataException>(),
+        "no frame record flag"
+      );
+      Assert.That(
+        AnalysisSummary
+          .Parse(
+            OneRun(
+              "\"runId\": 7, \"hasStartMarker\": true, \"hasEndMarker\": false, \"frameRecordLogged\": true, \"framesFile\": \"f\"",
+              Counts,
+              Statistics
+            )
+          )
+          .Runs[0]
+          .FrameRecordLogged,
+        Is.True
+      );
+      Assert.That(
+        () =>
+          AnalysisSummary.Parse(
+            OneRun(
+              "\"runId\": 7, \"hasStartMarker\": true, \"hasEndMarker\": false, \"frameRecordLogged\": false, \"framesFile\": null",
+              Counts,
+              Statistics
+            )
+          ),
         Throws.InstanceOf<InvalidDataException>(),
         "null is absent"
       );
@@ -280,7 +308,11 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(
         () =>
           AnalysisSummary.Parse(
-            OneRun("\"runId\": -1, \"hasStartMarker\": true, \"hasEndMarker\": false, \"framesFile\": \"f\"", Counts, Statistics)
+            OneRun(
+              "\"runId\": -1, \"hasStartMarker\": true, \"hasEndMarker\": false, \"frameRecordLogged\": false, \"framesFile\": \"f\"",
+              Counts,
+              Statistics
+            )
           ),
         Throws.InstanceOf<InvalidDataException>(),
         "a run id below 0"
@@ -288,7 +320,11 @@ namespace MB.FramePacing.Data.UnitTest
       Assert.That(
         () =>
           AnalysisSummary.Parse(
-            OneRun("\"runId\": 4294967296, \"hasStartMarker\": true, \"hasEndMarker\": false, \"framesFile\": \"f\"", Counts, Statistics)
+            OneRun(
+              "\"runId\": 4294967296, \"hasStartMarker\": true, \"hasEndMarker\": false, \"frameRecordLogged\": false, \"framesFile\": \"f\"",
+              Counts,
+              Statistics
+            )
           ),
         Throws.InstanceOf<InvalidDataException>(),
         "a run id beyond 32 bits"

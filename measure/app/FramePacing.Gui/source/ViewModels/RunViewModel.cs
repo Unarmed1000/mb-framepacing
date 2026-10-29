@@ -10,6 +10,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using MB.FramePacing.Analysis;
 using MB.FramePacing.Charts;
 
@@ -31,12 +32,9 @@ namespace MB.FramePacing.Gui.ViewModels
       Tiles = RunHeadline.Shown(chart, ReportOptions.Default);
       TileColumns = ReportOptions.Default.TilesPerRowFor(Tiles.Count);
       Display = RunHeadline.Display(RunSection.Whole(chart));
-      var c = run.Counts;
+      Pacing = RunHeadline.Pacing(RunSection.Whole(chart));
       StartText = run.StartTimeUtc is { } start ? $"Started {start.ToLocalTime():yyyy-MM-dd HH:mm:ss}" : "No start time";
-      CountsText =
-        $"{c.PresentedFrames} presented frames from {c.Captures} captures: {c.Decoded} decoded, {c.Undecodable} undecodable, {c.Torn} torn, "
-        + $"{c.NotRecorded} not recorded; {c.SourceDroppedFrames} dropped by the source, {c.MissedCaptures} missed. "
-        + $"{c.SkippedFrameIndices} frame indices never captured, {c.Segments} segment(s).";
+      CountsText = RunHeadline.Counts(run);
       ErrorFramesText =
         $"{run.Statistics.FramesWithAnimationError} frame(s) with |animation error| above {errorThresholdMs.ToString("0.###", CultureInfo.InvariantCulture)} ms";
       var s = run.Statistics;
@@ -117,6 +115,15 @@ namespace MB.FramePacing.Gui.ViewModels
 
     /// <summary>The Display card has a line for what the application wants.</summary>
     public bool HasWants => Display.Wants.Length > 0;
+
+    /// <summary>What the markers say about pacing (the report's pacer band): whether a pacer or limiter held the frames, a checkbox per pacing field.</summary>
+    public PacingSummary Pacing { get; }
+
+    /// <summary>
+    /// The pacer band as one caption line: whether a pacer or a frame limiter held the frames, as the paced flag says, then each pacing
+    /// field's checkbox (what the frames are measured against is the target line's).
+    /// </summary>
+    public string PacingText => $"Pacer or limiter: {Pacing.Value} ({Pacing.Basis}).   " + string.Join("   ", Pacing.Rows.Select(r => r.Text));
     public string VerdictText { get; } = string.Empty;
     public string Title { get; }
 

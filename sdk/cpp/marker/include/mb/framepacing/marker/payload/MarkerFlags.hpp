@@ -7,7 +7,7 @@
 
 namespace MB::FramePacing::Marker
 {
-  //! The payload's flags byte. See doc/marker-format.md "Flags". Bits 3 to 7 are reserved: write 0; a decoded payload keeps whatever it
+  //! The payload's flags byte. See doc/marker-format.md "Flags". Bits 4 to 7 are reserved: write 0; a decoded payload keeps whatever it
   //! carried, so values without a name here survive a round trip.
   enum class MarkerFlags : uint8_t
   {
@@ -23,6 +23,11 @@ namespace MB::FramePacing::Marker
     //! doc/trace-frame-record.md), so there is a trace the capture of the run can be merged with. Only the application knows: it sets
     //! the flag itself and nothing in the SDK does, so it is off unless set. It says nothing on a frame, end or sync marker.
     FrameRecordLogged = 1u << 2u,
+    //! A pacer or a frame limiter held this frame's start to a plan (it waited, or set when the frame began); a present that blocks
+    //! until the display takes it (vsync alone) is not that. The application sets it on every such frame, from its own pacer or
+    //! limiter or from the SDK's pacer (Pacer::FrameSchedule::Paced); it is off unless set. A start or end marker carries the value
+    //! of the frame that shows it.
+    Paced = 1u << 3u,
   };
 
   constexpr MarkerFlags operator|(const MarkerFlags lhs, const MarkerFlags rhs) noexcept

@@ -66,7 +66,7 @@ namespace
     const FM::Payload payload{FM::MarkerKind::Frame,
                               1u,
                               frameIndex,
-                              FM::MarkerFlags::NoFlags,
+                              schedule.Paced ? FM::MarkerFlags::Paced : FM::MarkerFlags::NoFlags,
                               schedule.AnimationTime,
                               schedule.PreferredFrameTime,
                               schedule.TargetFrameTime,
@@ -82,7 +82,7 @@ namespace
                 static_cast<long long>(payload.CpuBusy().Nanoseconds()));
     return encoded && tier == PC::PacerTier::TimerPeriodOnly && schedule.SwapInterval == 2u &&
            payload.TargetFrameTime().Nanoseconds() == 33'333'333 && payload.RefreshPeriod().Nanoseconds() == 16'666'667 &&
-           payload.CpuBusy().Nanoseconds() == 4'000'000;
+           payload.CpuBusy().Nanoseconds() == 4'000'000 && FM::HasFlag(payload.Flags(), FM::MarkerFlags::Paced);
   }
 }
 #endif

@@ -118,6 +118,10 @@ namespace MB.FramePacing.Charts
           + $"{Ms(chart.ErrorThreshold.Value.TotalMilliseconds)} ms.",
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
+      // The analysis of the run as the GUI's Analyze page says it: which cause of animation error dominates and what the captures held
+      if (pacing != null)
+        description.Add((section.IsWholeRun ? "Cause: " : "Cause over the whole run: ") + RunHeadline.Cause(pacing));
+      description.Add((section.IsWholeRun ? string.Empty : "Over the whole run, ") + RunHeadline.Counts(run));
       // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
       int excluded = section.Data.StaticSteps.CountIn(section.Start, section.End);
       if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)
@@ -141,6 +145,11 @@ namespace MB.FramePacing.Charts
                 : "."
             )
         );
+      // The run's warnings and the note of its start marker's frame record flag, as the GUI lists them under the run
+      foreach (string runWarning in run.Warnings)
+        description.Add("Warning: " + runWarning);
+      if (FrameRecordNote.Of(run, chart.Trace != null) is { } recordNote)
+        description.Add(recordNote);
       // A Perfetto trace of the run was joined. What it has for these frames, and what its times rest on
       string? augmentedLine = null;
       if (section.Data.TraceFrames is { } trace)
@@ -167,17 +176,20 @@ namespace MB.FramePacing.Charts
       if (options.IsShown(ReportItem.Description))
       {
         top.Add(description[0]);
-        notes.AddRange(description.Skip(1));
+        notes.AddRange(description.Skip(1).SelectMany(WrapNote));
         if (notes.Count > 0)
           top.Add(NotesHint);
       }
       var (warningTitle, warning) = options.IsShown(ReportItem.Warning) ? RunHeadline.Warning(section) : (string.Empty, Array.Empty<string>());
-      var layout = Layout.For(options, top.Count, tiles.Count, displayH, warning.Count, notes.Count);
+      var pacingBand = options.IsShown(ReportItem.Pacing) ? RunHeadline.Pacing(section) : null;
+      var layout = Layout.For(options, top.Count, tiles.Count, displayH, warning.Count, notes.Count, pacingBand != null);
       var parts = Header(title, top, options.IsShown(ReportItem.Title));
       if (display != null)
         DisplayBox(parts, display, width, displayH);
       if (layout.WarningY is { } warningY)
         WarningBand(parts, warningTitle, warning, warningY, width);
+      if (layout.PacingY is { } pacingY && pacingBand != null)
+        PacingBand(parts, pacingBand, pacingY, width);
 
       Tiles(parts, tiles, layout.TilesY, width, options.TilesPerRowFor(tiles.Count));
       // The panels only read the section: each draws into shapes of its own, on the thread pool, joined in the card's order
@@ -247,6 +259,7 @@ namespace MB.FramePacing.Charts
     /// <summary>Where the shown items go, top to bottom, and the card's height.</summary>
     private sealed record Layout(
       double? WarningY,
+      double? PacingY,
       double TilesY,
       double? ErrorY,
       double? StepY,
@@ -264,7 +277,8 @@ namespace MB.FramePacing.Charts
         int tiles,
         double displayH = DisplayBoxH,
         int warningLines = 0,
-        int noteLines = 0
+        int noteLines = 0,
+        bool pacingBand = false
       )
       {
         bool title = options.IsShown(ReportItem.Title);
@@ -318,6 +332,20 @@ namespace MB.FramePacing.Charts
         var lateY = Panel(ReportItem.LateShare, LateH);
         var stripY = Panel(ReportItem.RefreshStrip, StripH);
         var eventsY = Panel(ReportItem.Events, EventsH);
+        // The pacer band under the report, clear of the last panel's axis; then the notes
+        double? pacingY = null;
+        if (pacingBand)
+        {
+          pacingY =
+            cursor
+            + (
+              previous == "panel" ? PacingBandAfterPanel
+              : previous == "start" ? 14
+              : 0
+            );
+          cursor = pacingY.Value + PacingBandH;
+          previous = "band";
+        }
         // The notes after everything else: their label clears the last panel's axis as the next panel's title would
         double? notesY = null;
         if (noteLines > 0)
@@ -327,6 +355,7 @@ namespace MB.FramePacing.Charts
             + (
               previous == "panel" ? NotesAfterPanel
               : previous == "start" ? 30
+              : previous == "band" ? 36
               : 24
             );
           cursor = notesY.Value + NotesFirstLine + ((noteLines - 1) * NotesLineH);
@@ -336,7 +365,7 @@ namespace MB.FramePacing.Charts
           previous == "panel" ? cursor + BottomAfterPanel
           : previous == "notes" ? cursor + 26
           : cursor + BottomMargin;
-        return new Layout(warningY, tilesY, errorY, stepY, frameTimeY, lateY, stripY, eventsY, notesY, height);
+        return new Layout(warningY, pacingY, tilesY, errorY, stepY, frameTimeY, lateY, stripY, eventsY, notesY, height);
       }
     }
 
@@ -385,6 +414,38 @@ namespace MB.FramePacing.Charts
         parts.Add(new TextShape(34, y + WarningFirstLine + WarningTitleGap + (i * WarningLineH), lines[i], "warn-text", "start"));
     }
 
+    /// <summary>
+    /// The pacer band under the report (<see cref="RunHeadline.Pacing"/>): whether a pacer or a frame limiter held the frames, as the markers'
+    /// paced flag says, what they are measured against on the right, then a checkbox per pacing field.
+    /// </summary>
+    private static void PacingBand(List<CardShape> parts, PacingSummary pacing, double y, double width)
+    {
+      parts.Add(new RectShape("tile pacing-band", N(20, 0), N(y, 0), N(width - 40, 0), N(PacingBandH, 0), "10"));
+      var answer = new List<TextRun>
+      {
+        new TextRun("PACER", "label"),
+        new TextRun("   pacer or limiter: " + pacing.Value, "vsync-target"),
+        new TextRun("   " + pacing.Basis, "vsync-n"),
+      };
+      parts.Add(new TextRunsShape(34, y + 21, answer));
+      if (pacing.MeasuredAgainst.Length > 0)
+        parts.Add(new TextShape(width - 34, y + 21, "measured against " + pacing.MeasuredAgainst, "vsync-n", "end"));
+      var rows = new List<TextRun>();
+      foreach (var row in pacing.Rows)
+      {
+        // No-break spaces between the checkboxes: an SVG text collapses a run of plain ones into one
+        rows.Add(
+          new TextRun((rows.Count > 0 ? "\u00A0\u00A0\u00A0\u00A0\u00A0 " : string.Empty) + row.Mark, row.Mark == "–" ? "vsync-n" : "vsync-target")
+        );
+        rows.Add(new TextRun(row.Text[row.Mark.Length..], "vsync-n"));
+      }
+      parts.Add(new TextRunsShape(34, y + 41, rows));
+    }
+
+    // The pacer band's height (two lines), and its gap from the last panel: clear of that panel's axis labels
+    private const double PacingBandH = 52;
+    private const double PacingBandAfterPanel = 48;
+
     private static double WarningBandH(int lines) => WarningFirstLine + WarningTitleGap + ((lines - 1) * WarningLineH) + 14;
 
     // The warning band's first baseline from its top, the gap to its first line and the line spacing
@@ -393,6 +454,27 @@ namespace MB.FramePacing.Charts
     private const double WarningLineH = 19;
 
     /// <summary>The notes at the end of the card: the description's lines but the first, under a label of their own.</summary>
+    /// <summary>
+    /// A note as the lines it takes on the card: broken between words before <see cref="NoteLineLength"/> characters, which fit its width (a
+    /// run's warning is a few sentences). A shorter note is one line, as it is (the augmented trace's line is found by its text).
+    /// </summary>
+    internal static IEnumerable<string> WrapNote(string note)
+    {
+      string rest = note;
+      while (rest.Length > NoteLineLength)
+      {
+        int space = rest.LastIndexOf(' ', NoteLineLength);
+        if (space <= 0)
+          break;
+        yield return rest[..space];
+        rest = rest[(space + 1)..];
+      }
+      yield return rest;
+    }
+
+    // The longest note line, in characters: the notes' font takes about 5.6 px a character, so 180 fill about 1010 of the card's 1140
+    internal const int NoteLineLength = 180;
+
     private static void Notes(List<CardShape> parts, IReadOnlyList<string> notes, double y)
     {
       parts.Add(new TextShape(20, y, "NOTES", "label", "start"));

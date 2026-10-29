@@ -844,14 +844,29 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `StaticAfter` says it on the frame (known upfront: no pending work), bit 1 `StaticBefore` on the next frame (known in hindsight,
     only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and
     `StaticBefore` on the next: that static step gets no animation or prediction error (the drift sums only judged errors), the step
-    into the static frame is judged. Independent flags, not an enum; bits 3 to 7 are reserved (write 0, decoders keep them).
+    into the static frame is judged. Independent flags, not an enum; bits 4 to 7 are reserved (write 0, decoders keep them).
     - **Bit 2, `FrameRecordLogged`** (the user, 2026-10-13: "just so we know it exists"): on a **start marker**, the
       application's word that it logs the run's frame record to a trace. **The application sets it; the SDK never does** (the trace
       module writes no trace, so it can not know) and it is off unless set. Read from the start marker only
       (`MarkerPayload.IsFrameRecordLogged`, `RunAnalysis.FrameRecordLogged`); on another marker it says nothing. The tools **note**
       it and judge nothing by it (`FrameRecordNote`: a line in `analyze`'s output and under the GUI's run, and a line more in the
-      warning of a trace that was given and not joined). For now a note only: not in `summary.json`. A trace is joined with or
+      warning of a trace that was given and not joined). A note only, judged by nothing; `summary.json` keeps it (`runs[].frameRecordLogged`, required, since 2026-10-29) so that a card from the files has the note too. A trace is joined with or
       without it. Not offered by the Unity helper: the trace module is not in the Unity package.
+    - **Bit 3, `Paced`** (the user, 2026-10-29: "a pacer or a frame limiter held this frame's start"; vsync alone is not that):
+      per frame, set by the application (Unity's `PacedProvider`, the experimental pacer's `FrameSchedule::Paced`, true in the
+      two loops that place frames, false in `FreeRunLoop`). The tools keep it as `PresentedFrameFlags.Paced` (the frames CSV's flag
+      `Paced`) and judge nothing by it. **The report's pacer band** (`RunHeadline.Pacing` → `PacingSummary`, `ReportItem.Pacing`,
+      a full-width band under the panels, labelled PACER so it is not read as "pacing was fine"; the GUI's "Pacer or limiter:"
+      caption line) answers from the flag only: in a run where any frame carries it, a frame without it was not held ("the markers
+      say so"); a run where none does is "not said". **Never guess it from the other fields** (the user, 2026-10-29: "stop
+      guessing now we have a bit"; a vsync loop that knows its refresh writes a schedule, a frame limiter a target). Then a
+      checkbox per pacing field (✓ every frame, the share as the mark when some frames carry it, – none: a half-filled circle
+      reads as a dot at the card's size) and what the frames are measured against (`RunHeadline.TargetSource`, also `analyze`'s
+      words). Every clip of mb-framepacing-explained writes intended display times, the naive ones too (on purpose: they fill
+      every field).
+    - **Next (agreed 2026-10-29, not built):** a flag on the next frame that the frame before was not presented because its
+      present call failed (`VK_ERROR_OUT_OF_DATE_KHR`, a DXGI error, `eglSwapBuffers` false; not `VK_SUBOPTIMAL_KHR`), so the
+      analysis can tell it from a frame the target dropped.
   - **Assumed static** (`TimelineOptions.AssumeStatic`, on by default; `analyze --no-static-guess`, the GUI's "Guess static",
     `GuiSettings.AssumeStatic`): `TimelineAnalyzer.AssumeStatic` flags a frame `StaticAfter | StaticAssumed` when a frame the target
     dropped took the rest's flag: the next presented frame carries `StaticBefore` for a frame never shown, or (the flag lost) the run

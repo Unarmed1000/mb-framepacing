@@ -131,6 +131,21 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       Assert.That(start, kind == MarkerKind.SequenceStart ? Is.EqualTo(StartMetadata.Empty) : Is.Null);
     }
 
+    /// <summary>The paced flag (bit 3) on any kind of marker, kept with the other flags and read back as the application's word.</summary>
+    [TestCase(MarkerKind.Frame)]
+    [TestCase(MarkerKind.SequenceStart)]
+    [TestCase(MarkerKind.SequenceEnd)]
+    public void PacedFlag_RoundTrips(MarkerKind kind)
+    {
+      var flags = MB.FramePacing.Marker.MarkerFlags.Paced | MB.FramePacing.Marker.MarkerFlags.StaticAfter;
+      var payload = new MarkerPayload(kind, 1, 2, flags, NanosecondTimeSpan.Zero);
+      Assert.That(payload.IsPaced, Is.True);
+      Assert.That(MarkerPayload.TryDecode(payload.Encode(), out var decoded, out _), Is.True);
+      Assert.That(decoded.IsPaced, Is.True);
+      Assert.That(decoded.IsStaticAfter, Is.True);
+      Assert.That(new MarkerPayload(kind, 1, 2, MB.FramePacing.Marker.MarkerFlags.StaticAfter, NanosecondTimeSpan.Zero).IsPaced, Is.False);
+    }
+
     [TestCase(0L, 0u, 0u, 0u)]
     [TestCase(123_456_789_012_345L, 16_666_667u, 33_333_333u, 8_000_001u)]
     [TestCase(long.MaxValue, MaxFrameNanoseconds, 1u, MaxCpuBusyNanoseconds)]

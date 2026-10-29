@@ -38,7 +38,7 @@ namespace MB::FramePacing::Data
     std::optional<NanosecondTimeSpan> AnimationDelta;
     std::optional<NanosecondTimeSpan> AnimationError;
     NanosecondTimeSpan Drift;
-    //! SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep, StaticAssumed, DeltaTimeJitter.
+    //! SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep, StaticAssumed, DeltaTimeJitter, Paced.
     std::vector<std::string> Flags;
     std::optional<NanosecondTickCount> IntendedDisplayTime;
     //! The marker's target frame time; Marker::Payload::OnDemandFrameTime on demand.

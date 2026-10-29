@@ -546,6 +546,20 @@ class PayloadTests(unittest.TestCase):
         assert decoded is not None
         self.assertEqual(decoded[0].flags, MarkerFlags.FRAME_RECORD_LOGGED | MarkerFlags.STATIC_AFTER)
 
+    def test_a_frame_says_a_pacer_or_a_limiter_held_it(self) -> None:
+        # Bit 3 of the flags byte. Only the application sets it: a payload made without it does not carry it
+        self.assertEqual(int(MarkerFlags.PACED), 0x08)
+        plain = Payload(MarkerKind.FRAME, 7, 1, MarkerFlags.NO_FLAGS, 0)
+        self.assertEqual(plain.flags & MarkerFlags.PACED, MarkerFlags.NO_FLAGS)
+
+        # It is one of the byte's independent flags, and read back as it was written
+        paced = Payload(MarkerKind.FRAME, 7, 1, MarkerFlags.PACED | MarkerFlags.STATIC_AFTER, 0)
+        encoded = encode_payload(paced)
+        self.assertEqual(encoded[16], 0x09)
+        decoded = try_decode_payload(encoded)
+        assert decoded is not None
+        self.assertEqual(decoded[0].flags, MarkerFlags.PACED | MarkerFlags.STATIC_AFTER)
+
     def test_the_start_time_is_in_date_time_ticks(self) -> None:
         time = datetime(2026, 1, 1, tzinfo=UTC)
         self.assertEqual(to_date_time_ticks(time), 639_028_224_000_000_000)

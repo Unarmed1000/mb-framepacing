@@ -15,6 +15,7 @@ namespace MB.FramePacing.Data
 {
   /// <param name="Name">The name the user gave the capture (capture.json, or the analysis), else null.</param>
   /// <param name="SequenceId">The start marker's sequence id, as text or UUID, else null.</param>
+  /// <param name="FrameRecordLogged">The run's start marker says the application logged the run's frame record to a trace.</param>
   /// <param name="FramesFile">The run's frames CSV, next to summary.json.</param>
   /// <param name="Pacing">How the run was paced; null in output written before pacing was measured.</param>
   /// <param name="Camera">EXPERIMENTAL camera captures only.</param>
@@ -25,6 +26,7 @@ namespace MB.FramePacing.Data
     DateTime? StartTimeUtc,
     [property: JsonRequired] bool HasStartMarker,
     [property: JsonRequired] bool HasEndMarker,
+    [property: JsonRequired] bool FrameRecordLogged,
     [property: JsonRequired] string FramesFile,
     [property: JsonRequired] SummaryCounts Counts,
     [property: JsonRequired] SummaryStatistics Statistics,

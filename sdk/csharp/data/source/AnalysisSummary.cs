@@ -75,7 +75,7 @@ namespace MB.FramePacing.Data
 
     /// <summary>
     /// Parse summary.json. Throws <see cref="InvalidDataException"/> for a newer format version and for text that is not a summary: not
-    /// JSON, a required field missing (capturePeriodNs, errorThresholdNs, and a run's runId, hasStartMarker, hasEndMarker, framesFile,
+    /// JSON, a required field missing (capturePeriodNs, errorThresholdNs, and a run's runId, hasStartMarker, hasEndMarker, frameRecordLogged, framesFile,
     /// counts and statistics; doc/analysis-output-format.md marks them), or a value that is not of its field's type or outside its range.
     /// </summary>
     public static AnalysisSummary Parse(string json)

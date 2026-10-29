@@ -16,6 +16,7 @@
 namespace MB::FramePacing::Data
 {
   //! One measured run. FramesFile is the run's frames CSV, next to summary.json. Times are ISO 8601 text as written.
+  //! FrameRecordLogged: the run's start marker says the application logged the run's frame record to a trace.
   struct SummaryRun
   {
     uint32_t RunId{0};
@@ -24,6 +25,7 @@ namespace MB::FramePacing::Data
     std::optional<std::string> StartTimeUtc;
     bool HasStartMarker{false};
     bool HasEndMarker{false};
+    bool FrameRecordLogged{false};
     std::string FramesFile;
     SummaryCounts Counts;
     SummaryStatistics Statistics;

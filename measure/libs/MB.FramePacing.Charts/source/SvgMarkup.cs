@@ -132,6 +132,7 @@ namespace MB.FramePacing.Charts
       + "  .clip-text { font-size: 11px; fill: #e6edf3; }\n"
       + "  .warn { fill: #d29922; }\n"
       + "  .warn-band { fill: #d29922; fill-opacity: 0.1; stroke: #d29922; stroke-opacity: 0.9; stroke-width: 1.5; }\n"
+      + "  .pacing-band { fill-opacity: 0.03; }\n"
       + "  .warn-label { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; fill: #d29922; }\n"
       + "  .warn-title { font-size: 14px; font-weight: 600; }\n"
       + "  .warn-text { fill: #e6edf3; }\n"

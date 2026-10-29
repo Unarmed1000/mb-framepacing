@@ -166,6 +166,7 @@ namespace
         {"framesFile", run.FramesFile},
         {"hasStartMarker", run.HasStartMarker},
         {"hasEndMarker", run.HasEndMarker},
+        {"frameRecordLogged", run.FrameRecordLogged},
         {"presentedFrames", run.Counts.PresentedFrames},
         {"droppedFrames", run.Counts.DroppedFrames},
         {"sourceDroppedFrames", run.Counts.SourceDroppedFrames},

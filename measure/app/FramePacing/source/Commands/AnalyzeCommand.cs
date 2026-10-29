@@ -245,7 +245,7 @@ namespace MB.FramePacing.App.Commands
         if (run.Pacing is { } pacing)
         {
           AnsiConsole.MarkupLineInterpolated(
-            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), each shown half a refresh or more later than it was animated for and than its intended period. Target {pacing.TargetFrameTime.Value.TotalMilliseconds:0.##} ms ({TargetReason(pacing)})."
+            $"{pacing.LateFrames} late frame(s) ({pacing.LateShare:P1}; worst {LateShare.WindowSeconds:0} s: {pacing.WorstLateShare:P1}), each shown half a refresh or more later than it was animated for and than its intended period. Target {pacing.TargetFrameTime.Value.TotalMilliseconds:0.##} ms ({RunHeadline.TargetSource(pacing.Source)})."
           );
           AnsiConsole.MarkupLineInterpolated($"{RefreshText(pacing)}");
           if (pacing.PacingErrorMs is { } pacingError && pacing.PredictionErrorMs is { } predictionError)
@@ -272,16 +272,6 @@ namespace MB.FramePacing.App.Commands
         );
       return text + ".";
     }
-
-    private static string TargetReason(RunPacing pacing) =>
-      pacing.Source switch
-      {
-        PacingSource.Schedule => "the pacer's schedule in the markers",
-        PacingSource.TargetFrameTime => "the pacer's target frame time in the markers",
-        PacingSource.PreferredFrameTime => "the preferred frame time in the markers",
-        PacingSource.GivenTarget => "the given target frame rate",
-        _ => "no pacing information: the display's native refresh rate",
-      };
 
     private static void AddRow(Table table, string name, Statistics stats)
     {

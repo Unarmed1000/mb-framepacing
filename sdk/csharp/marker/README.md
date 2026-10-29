@@ -49,7 +49,8 @@ This is the most efficient way without a dedicated shader; the shaders (1 and 2 
 - **Flags:** `MarkerFlags.NoFlags`, or `MarkerFlags.StaticAfter` on a frame when nothing animates while it is on screen, or `MarkerFlags.StaticBefore`
   on the next frame when that is only known then (the analysis does not judge the step out of the static frame). On a start marker,
   `MarkerFlags.FrameRecordLogged` when the application logs the run's
-  [frame record](../../doc/trace-frame-record.md) to a trace: only you can say so, it is off unless set.
+  [frame record](../../doc/trace-frame-record.md) to a trace: only you can say so, it is off unless set. `MarkerFlags.Paced` on every
+  frame whose start your pacer or frame limiter held (not vsync alone), so the report can say the frames were paced.
 - **Animation time:** the moment the frame shows, as the application animated it, a `NanosecondTimeSpan`
   (`NanosecondTimeSpan.FromSeconds(seconds)` from an animation clock in seconds). Every time in the payload is in nanoseconds.
 - **Frame pacing (optional):** `preferredFrameTime` (a `NanosecondTimeDuration`: the interval the application wants to run at; it

@@ -180,6 +180,7 @@ TEST(NotPacing, EveryCallGivesNothingToCarryOutAndTheFramesGoOn)
         ASSERT_EQ(schedule.PreferredFrameTime.Nanoseconds(), 2 * Period) << frame;
         ASSERT_EQ(schedule.RefreshPeriod.Nanoseconds(), Period) << frame;
         ASSERT_EQ(schedule.Change, PC::SwapIntervalChange::Unchanged) << frame;
+        ASSERT_FALSE(schedule.Paced) << frame;
         // Nothing to wait for before the present, and nothing to give it
         ASSERT_EQ(loop.Present.FrameId, schedule.FrameId) << frame;
         ASSERT_FALSE(loop.Present.WaitsForPresentTime()) << frame;
@@ -207,6 +208,7 @@ TEST(NotPacing, EveryCallGivesNothingToCarryOutAndTheFramesGoOn)
       EXPECT_EQ(schedule.AnimationStep.Nanoseconds(), 2 * Period);
       EXPECT_NE(schedule.IntendedDisplayTime, FP::NanosecondTickCount());
       EXPECT_EQ(schedule.TargetFrameTime.Nanoseconds(), 2 * Period);
+      EXPECT_TRUE(schedule.Paced);
       EXPECT_EQ(loop.Pacer.FrameWindow().Frames, window.Frames);
       EXPECT_EQ(loop.Pacer.FrameWindow().LateFrames, 0u);
       for (int32_t frame = 0; frame < 40; ++frame)
@@ -292,6 +294,7 @@ TEST(NotPacing, TheSwitchTakesEffectWhenTheOpenFrameHasEnded)
   PC::FrameSchedule free = loop.Frame();
   EXPECT_EQ(free.FrameId, schedule.FrameId + 1u);
   EXPECT_EQ(free.TargetFrameTime, FP::NanosecondTimeDuration());
+  EXPECT_FALSE(free.Paced);
 
   // Switched on inside a frame that is not paced: that frame ends with nothing to carry out, and the next one is paced
   const PC::FrameSchedule open = loop.Pacer.BeginFrame(At(loop.Now));
@@ -306,6 +309,7 @@ TEST(NotPacing, TheSwitchTakesEffectWhenTheOpenFrameHasEnded)
   free = loop.Frame();
   EXPECT_EQ(free.FrameId, open.FrameId + 1u);
   EXPECT_EQ(free.TargetFrameTime.Nanoseconds(), 2 * Period);
+  EXPECT_TRUE(free.Paced);
 
   // Switched off and on again before a frame was made: nothing changed, and the same once more says nothing new
   loop.Pacer.SetPacing(false);

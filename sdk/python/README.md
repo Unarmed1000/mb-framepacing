@@ -92,6 +92,8 @@ payload = Payload(
   `MarkerFlags.STATIC_BEFORE` on the next frame when that is only known then (the analysis does not judge the step out of the static
   frame). On a start marker, `MarkerFlags.FRAME_RECORD_LOGGED` (experimental) when the application logs the run's
   [frame record](../doc/trace-frame-record.md) to a trace: only the application can say so, it is off unless set.
+  `MarkerFlags.PACED` on every frame whose start the application's pacer or frame limiter held (not vsync alone), so the report can
+  say the frames were paced.
 - **Animation time:** the moment the frame shows, as the application animated it, in nanoseconds (`seconds_to_ns` for a clock in
   seconds, truncated to the nanosecond: 1/60 s is `16_666_666`).
 - **Frame pacing (optional):** when the application paces its frames, `preferred_frame_ns`, `target_frame_ns` and

@@ -485,6 +485,26 @@ TEST(Payload, AStartMarkerSaysTheApplicationLogsTheFrameRecord)
   EXPECT_FALSE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticBefore));
 }
 
+TEST(Payload, AFrameSaysAPacerOrALimiterHeldIt)
+{
+  // Bit 3 of the flags byte. Only the application sets it: a payload made without it does not carry it
+  static_assert(static_cast<uint8_t>(FM::MarkerFlags::Paced) == 0x08u);
+  const FM::Payload plain(FM::MarkerKind::Frame, 7u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0});
+  EXPECT_FALSE(FM::HasFlag(plain.Flags(), FM::MarkerFlags::Paced));
+
+  // It is one of the byte's independent flags, and read back as it was written
+  const FM::Payload paced(FM::MarkerKind::Frame, 7u, 1u, FM::MarkerFlags::Paced | FM::MarkerFlags::StaticAfter, FP::NanosecondTimeSpan{0});
+  std::array<uint8_t, FM::Payload::MaxEncodedByteCount> buffer{};
+  const std::size_t byteCount = FM::EncodePayload(paced, {}, buffer);
+  ASSERT_GT(byteCount, 0u);
+  EXPECT_EQ(buffer[16], 0x09u);
+  FM::Payload decoded{};
+  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+  EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::Paced));
+  EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticAfter));
+  EXPECT_FALSE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::FrameRecordLogged));
+}
+
 TEST(Payload, StartMarkerNeedsItsMetadataBlock)
 {
   auto header = PayloadBytes({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});

@@ -149,6 +149,18 @@ namespace MB.FramePacing.Charts
         measured >= minFrames
       );
 
+    /// <summary>
+    /// What the run's captures held, the GUI's counts line and a note on the card: "336 presented frames from 480 captures: 480 decoded, 0
+    /// undecodable, ...".
+    /// </summary>
+    public static string Counts(RunAnalysis run)
+    {
+      var c = run.Counts;
+      return $"{c.PresentedFrames} presented frames from {c.Captures} captures: {c.Decoded} decoded, {c.Undecodable} undecodable, {c.Torn} torn, "
+        + $"{c.NotRecorded} not recorded; {c.SourceDroppedFrames} dropped by the source, {c.MissedCaptures} missed. "
+        + $"{c.SkippedFrameIndices} frame indices never captured, {c.Segments} segment(s).";
+    }
+
     /// <summary>Which cause of animation error dominates, with the counts behind it ("mostly bad pacing: ... (3 error frame(s) ...).").</summary>
     public static string Cause(RunPacing pacing)
     {
@@ -281,6 +293,110 @@ namespace MB.FramePacing.Charts
       if (onDemand)
         wants.Add("on demand");
       return string.Join(", ", wants);
+    }
+
+    /// <summary>
+    /// What the markers of <paramref name="section"/> say about pacing (the report's pacer band and the GUI's Pacer line): whether a pacer
+    /// or a frame limiter held its frames, a checkbox per pacing field, and what the analysis measured them against.
+    /// <list type="bullet">
+    /// <item>Only the markers' paced flag answers, the application's word: in a run where any frame carries it, the section's frames
+    /// without it were not held. A run where no frame carries it does not say, and the report does not guess from the other fields
+    /// (the user, 2026-10-29: "stop guessing now we have a bit").</item>
+    /// <item>The checkboxes are facts: ✓ every frame of the section carries the field, its share when some do, – none.</item>
+    /// </list>
+    /// </summary>
+    public static PacingSummary Pacing(RunSection section)
+    {
+      var chart = section.Run;
+      var pacing = chart.Run.Pacing;
+      var refresh = pacing?.RefreshPeriod ?? chart.CapturePeriod;
+      var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]).ToList();
+      bool runSaysPaced = section.Data.Frames.Any(f => f.Flags.HasFlag(PresentedFrameFlags.Paced));
+      int count = frames.Count;
+      int paced = frames.Count(f => f.Flags.HasFlag(PresentedFrameFlags.Paced));
+      int scheduled = frames.Count(f => f.IntendedDisplayTime != default);
+      int targeted = frames.Count(f => f.MarkerTargetFrameTime != NanosecondTimeDuration.Zero);
+      int preferred = frames.Count(f => f.MarkerPreferredFrameTime != NanosecondTimeDuration.Zero);
+      var onDemand = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
+      int targetOnDemand = frames.Count(f => f.MarkerTargetFrameTime == onDemand);
+      int preferredOnDemand = frames.Count(f => f.MarkerPreferredFrameTime == onDemand);
+      // The target slower than what the application prefers, in whole refreshes as the analysis rounds them (the pacer runs below its rate)
+      int slower = frames.Count(f =>
+        Known(f.MarkerTargetFrameTime)
+        && Known(f.MarkerPreferredFrameTime)
+        && FrameTimeRounding.WholeRefreshes(f.MarkerTargetFrameTime, refresh) > FrameTimeRounding.WholeRefreshes(f.MarkerPreferredFrameTime, refresh)
+      );
+      var targetFps = FpsOf(frames.Select(f => f.MarkerTargetFrameTime));
+      var preferredFps = FpsOf(frames.Select(f => f.MarkerPreferredFrameTime));
+
+      // The mark is the share itself when only some frames carry the field: a half-filled circle reads as a dot at the card's size
+      PacingFieldRow Row(string name, int part, string detail) =>
+        new PacingFieldRow(
+          part == 0 ? "–"
+            : part == count ? "✓"
+            : PercentOf(part, count),
+          name,
+          part == 0 ? string.Empty : detail
+        );
+      // A field's rates, and how much of it is on demand: "on demand" alone when every frame is
+      string Says(double[] fps, int onDemandFrames, string more)
+      {
+        var says = new List<string>();
+        if (fps.Length > 0)
+          says.Add(FpsRange(fps));
+        if (onDemandFrames > 0)
+          says.Add(onDemandFrames == count ? "on demand" : $"on demand in {PercentOf(onDemandFrames, count)}");
+        if (more.Length > 0)
+          says.Add(more);
+        return string.Join(", ", says);
+      }
+      var rows = new[]
+      {
+        Row("paced flag", paced, string.Empty),
+        Row("schedule (intended display times)", scheduled, string.Empty),
+        Row("target frame time", targeted, Says(targetFps, targetOnDemand, string.Empty)),
+        Row(
+          "preferred frame time",
+          preferred,
+          Says(preferredFps, preferredOnDemand, slower > 0 ? $"target slower in {PercentOf(slower, count)}" : string.Empty)
+        ),
+      };
+
+      var (answer, value, basis) =
+        !runSaysPaced ? (PacedAnswer.NotSaid, "not said", "no frame carries the paced flag")
+        : paced == 0 ? (PacedAnswer.MarkersSayNotPaced, "no", "the markers say so")
+        : (PacedAnswer.MarkersSayPaced, paced == count ? "yes" : $"in {PercentOf(paced, count)} of the frames", "the markers say so");
+      return new PacingSummary(answer, value, basis, rows, pacing != null ? TargetSource(pacing.Source) : string.Empty);
+    }
+
+    /// <summary>Where the frames' targets come from, in words ("the pacer's schedule in the markers"): the card, the GUI and analyze say it.</summary>
+    public static string TargetSource(PacingSource source) =>
+      source switch
+      {
+        PacingSource.Schedule => "the pacer's schedule in the markers",
+        PacingSource.TargetFrameTime => "the pacer's target frame time in the markers",
+        PacingSource.PreferredFrameTime => "the preferred frame time in the markers",
+        PacingSource.GivenTarget => "the given target frame rate",
+        _ => "no pacing information: the display's native refresh rate",
+      };
+
+    /// <summary>The distinct frame rates of the known frame times (neither unknown nor on demand), to a tenth of a frame, slowest first.</summary>
+    private static double[] FpsOf(IEnumerable<NanosecondTimeDuration> frameTimes) =>
+      frameTimes
+        .Where(Known)
+        .Select(t => Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / (double)t.Nanoseconds, 1))
+        .Distinct()
+        .Order()
+        .ToArray();
+
+    private static string FpsRange(double[] fps) =>
+      fps.Length == 1 ? $"{Invariant(fps[0], "0.#")} fps" : $"{Invariant(fps[0], "0.#")}–{Invariant(fps[^1], "0.#")} fps";
+
+    /// <summary>A share as a whole percent, never 0 % for some or 100 % for not all ("40 %").</summary>
+    private static string PercentOf(int part, int whole)
+    {
+      long percent = Math.Clamp((long)Math.Round(100.0 * part / whole, MidpointRounding.AwayFromZero), part > 0 ? 1 : 0, part < whole ? 99 : 100);
+      return $"{percent} %";
     }
 
     /// <summary>The marker says a frame time: neither unknown (0) nor on demand.</summary>

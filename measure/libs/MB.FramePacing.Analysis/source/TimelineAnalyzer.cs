@@ -227,6 +227,7 @@ namespace MB.FramePacing.Analysis
       public bool StaticAfter;
       public bool StaticBefore;
       public bool StaticAssumed;
+      public bool Paced;
       public long FirstCaptureIndex;
       public NanosecondTickCount FirstSeenTime;
       public NanosecondTickCount LastSeenTime;
@@ -339,6 +340,7 @@ namespace MB.FramePacing.Analysis
           RefreshPeriod = payload.RefreshPeriod,
           StaticAfter = payload.IsStaticAfter,
           StaticBefore = payload.IsStaticBefore,
+          Paced = payload.IsPaced,
           FirstCaptureIndex = row.CaptureIndex,
           FirstSeenTime = row.CaptureTime,
           LastSeenTime = row.CaptureTime,
@@ -807,6 +809,8 @@ namespace MB.FramePacing.Analysis
           flags |= PresentedFrameFlags.StaticBefore;
         if (uncertainStep)
           flags |= PresentedFrameFlags.UncertainStep;
+        if (b.Paced)
+          flags |= PresentedFrameFlags.Paced;
 
         frames.Add(
           new PresentedFrame(

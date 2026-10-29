@@ -193,6 +193,7 @@
         </Border>
       </Grid>
       <TextBlock Text="{Binding SelectedRun.VerdictText, FallbackValue=''}" TextWrapping="Wrap" />
+      <TextBlock Classes="caption" Text="{Binding SelectedRun.PacingText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.TargetText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock Classes="caption" Text="{Binding SelectedRun.CountsText, FallbackValue=''}" TextWrapping="Wrap" />
       <TextBlock

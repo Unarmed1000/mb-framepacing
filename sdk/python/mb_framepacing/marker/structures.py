@@ -40,7 +40,7 @@ class MarkerKind(IntEnum):
 
 
 class MarkerFlags(IntFlag):
-    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 3 to 7 are reserved: write 0; a decoded payload keeps whatever it
+    """The payload's flags byte (doc/marker-format.md "Flags"). Bits 4 to 7 are reserved: write 0; a decoded payload keeps whatever it
     carried."""
 
     NO_FLAGS = 0
@@ -54,6 +54,10 @@ class MarkerFlags(IntFlag):
     """On a start marker: the application logs the frame record of this run to its own trace (doc/trace-frame-record.md),
     so there is a trace the capture of the run can be merged with. Only the application knows: it sets the flag itself, so it is off
     unless set. It says nothing on a frame, end or sync marker."""
+    PACED = 8
+    """A pacer or a frame limiter held this frame's start to a plan (it waited, or set when the frame began); a present that blocks until
+    the display takes it (vsync alone) is not that. The application sets it on every such frame, from its own pacer or limiter; it is off
+    unless set. A start or end marker carries the value of the frame that shows it."""
 
 
 @dataclass(frozen=True, slots=True)

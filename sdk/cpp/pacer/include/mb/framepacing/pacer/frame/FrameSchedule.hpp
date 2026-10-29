@@ -49,6 +49,9 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeDuration RefreshPeriod;
     //! What the swap interval rule decided from the previous frame; this frame is the first at the new interval.
     SwapIntervalChange Change{SwapIntervalChange::Unchanged};
+    //! The marker's paced flag (Marker::MarkerFlags::Paced): true when the pacer placed this frame, false while the application is not
+    //! pacing (TierPacer::SetPacing).
+    bool Paced{false};
   };
 }
 

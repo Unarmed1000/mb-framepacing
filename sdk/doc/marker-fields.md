@@ -87,7 +87,7 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   - bit 1, **static before**, on the next frame: the application only knows once it renders that frame (it woke up on input after
     waiting).
 - **Value:** set whichever bit the application knows, or both; they are independent flags. Inside a static stretch that is rendered
-  every refresh, a frame carries both. Bit 2 is the start marker's frame record flag (the next section). Bits 3 to 7 are reserved:
+  every refresh, a frame carries both. Bit 2 is the start marker's frame record flag and bit 3 the paced flag (the next sections). Bits 4 to 7 are reserved:
   write `0`.
 - **What the analysis does:** either bit makes the step from the static frame to the next a **static step**.
   - Its animation error is not judged (and it has no prediction error), so an animation clock that pauses while idle does not look like
@@ -128,6 +128,25 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   capture when none was. Nothing is measured or judged by the flag, and a trace is merged with or without it.
 - **Goes wrong when:** it is set for a run whose trace was not recorded (the note sends you looking for a trace that is not
   there), or left out for a run that has one (nothing says a trace exists).
+
+### Flags: paced
+
+- **Means:** a pacer or a frame limiter held this frame's start to a plan: it waited before the frame began (until a time, or for a
+  present or a vertical blank it chose to wait for), or set when the frame began. A loop that only blocks in its present until the
+  display takes the frame (vsync alone) is not paced.
+- **Value:** bit 3 of the flags byte (`MarkerFlags::Paced`), on every frame the pacer or limiter held. A start or end marker carries
+  the value of the frame that shows it.
+  - Your own pacer or limiter: set it whenever it is on, also while it holds the rate it was asked for.
+  - The SDK's pacer (experimental): `FrameSchedule::Paced` is the value, true while `TierPacer` paces and false after
+    `SetPacing(false)`.
+- **Changes:** whenever pacing is switched on or off.
+- **Unknown (`0`):** the default. A `0` reads as "not paced" only in a run where some frame sets the bit; a run where none does says
+  nothing either way.
+- **What the analysis does:** the report's pacer band says whether a pacer or limiter held the frames, and in what share of them. In
+  a run without the bit it says "not said": it does not work it out from the other pacing fields, since a loop that only waits for
+  vsync can write a schedule and a frame limiter a target frame time. Nothing is measured or judged by the flag.
+- **Goes wrong when:** it is set for frames that only vsync held (the report says paced where nothing planned), or left out while a
+  pacer runs (the report says "not said").
 
 ### Animation time
 

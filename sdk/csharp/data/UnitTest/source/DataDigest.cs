@@ -137,6 +137,7 @@ namespace MB.FramePacing.Data.UnitTest
                   ["framesFile"] = r.FramesFile,
                   ["hasStartMarker"] = r.HasStartMarker,
                   ["hasEndMarker"] = r.HasEndMarker,
+                  ["frameRecordLogged"] = r.FrameRecordLogged,
                   ["presentedFrames"] = r.Counts.PresentedFrames,
                   ["droppedFrames"] = r.Counts.DroppedFrames,
                   ["sourceDroppedFrames"] = r.Counts.SourceDroppedFrames,

@@ -565,15 +565,21 @@ namespace MB.FramePacing.Charts.UnitTest
     [Test]
     public void Notes_AreAtTheEndOfTheCard()
     {
-      var drawing = ReportCard.Build(RunSection.Whole(Synthetic(600)));
+      var chart = Synthetic(600);
+      var drawing = ReportCard.Build(RunSection.Whole(chart));
       var lines = drawing.FlatShapes.OfType<TextShape>().Where(t => t.Class == "sub").OrderBy(t => t.Y).ToList();
       Assert.That(lines[0].Content, Does.StartWith("The whole run: "));
       Assert.That(lines[1].Content, Is.EqualTo(ReportCard.NotesHint));
       var label = drawing.FlatShapes.OfType<TextShape>().Single(t => t.Content == "NOTES");
       var notes = lines.Skip(2).ToList();
+      // The GUI's analysis of the run too: the cause and what the captures held, broken into lines that fit
       Assert.That(
         notes.Select(t => t.Content),
-        Is.EqualTo(new[] { "Resolution 4.2 ms (one capture period); error threshold 1 ms.", "Every frame is drawn." })
+        Is.EqualTo(
+          new[] { "Resolution 4.2 ms (one capture period); error threshold 1 ms.", "Every frame is drawn." }.Concat(
+            new[] { "Cause: " + RunHeadline.Cause(chart.Run.Pacing!), RunHeadline.Counts(chart.Run) }.SelectMany(ReportCard.WrapNote)
+          )
+        )
       );
       Assert.That(notes.All(t => t.Y > label.Y), "the notes under their label");
       Assert.That(label.Y, Is.GreaterThan(drawing.Plots.Max(p => p.Bottom)), "after the last panel");
@@ -582,6 +588,42 @@ namespace MB.FramePacing.Charts.UnitTest
       string bare = ReportCard.Render(RunSection.Whole(Synthetic(600)), ReportOptions.Default.Hide(new[] { ReportItem.Description }));
       Assert.That(bare, Does.Not.Contain(">NOTES<"));
       Assert.That(bare, Does.Not.Contain(ReportCard.NotesHint));
+    }
+
+    /// <summary>
+    /// The notes carry what the GUI says under the run: its warnings (each broken into lines that fit, nothing lost) and the start marker's
+    /// frame record note, which summary.json keeps so that a card from the files has it too. A section's card says the cause and the
+    /// counts are the whole run's.
+    /// </summary>
+    [Test]
+    public void Notes_HaveTheRunsWarningsAndFrameRecordNote_AsTheGuiListsThem()
+    {
+      const string Short = "Run 1 has no end marker (the capture ended first)";
+      string longWarning = string.Concat(Enumerable.Repeat("A capture card must capture at the display's refresh rate. ", 6)).TrimEnd();
+      var chart = Synthetic(600);
+      chart = chart with { Run = chart.Run with { Warnings = new[] { Short, longWarning }, FrameRecordLogged = true } };
+      var notes = ReportCard
+        .Build(RunSection.Whole(chart))
+        .FlatShapes.OfType<TextShape>()
+        .Where(t => t.Class == "sub")
+        .OrderBy(t => t.Y)
+        .Skip(2)
+        .Select(t => t.Content)
+        .ToList();
+      Assert.That(notes, Has.Member("Warning: " + Short));
+      Assert.That(notes, Is.SupersetOf(ReportCard.WrapNote(FrameRecordNote.Available)));
+      Assert.That(notes, Has.All.Length.LessThanOrEqualTo(ReportCard.NoteLineLength));
+      var wrapped = ReportCard.WrapNote("Warning: " + longWarning).ToList();
+      Assert.That(wrapped, Has.Count.GreaterThan(1));
+      Assert.That(string.Join(" ", wrapped), Is.EqualTo("Warning: " + longWarning), "nothing lost");
+      Assert.That(notes, Is.SupersetOf(wrapped));
+
+      var section = ReportCard.Build(RunSection.Create(chart, 1, 2)).FlatShapes.OfType<TextShape>().Select(t => t.Content).ToList();
+      Assert.That(section, Has.Some.StartsWith("Cause over the whole run: "));
+      Assert.That(section, Has.Some.StartsWith("Over the whole run, 600 presented frames"));
+
+      // summary.json keeps the start marker's flag: the run read back has it
+      Assert.That(chart.Run.ToSummary("run-1-frames.csv").ToRun(chart.Run.Frames).FrameRecordLogged, Is.True);
     }
 
     /// <summary>ShowOnly keeps just the items named: one panel is a card of that panel; one tile is a tiles row of it.</summary>

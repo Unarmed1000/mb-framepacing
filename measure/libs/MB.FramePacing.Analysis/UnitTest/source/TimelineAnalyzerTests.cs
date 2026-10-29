@@ -273,6 +273,28 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
+    /// The paced flag is the frame's own marker's word, kept on the frame it came with: paced frames, then a stretch the application did not
+    /// pace. It judges nothing (the same steps either way), and a frames CSV row writes it by name and reads it back.
+    /// </summary>
+    [Test]
+    public void PacedFlag_IsTheFramesOwnMarkers_AndRoundTripsThroughTheFramesCsv()
+    {
+      var paced = MB.FramePacing.Marker.MarkerFlags.Paced;
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4, flags: paced).Show(2, 16, 4, flags: paced).Show(3, 32, 4, flags: paced);
+      rows.Show(4, 48, 4).Show(5, 64, 4);
+      rows.End(1);
+
+      var frames = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single().Frames;
+      Assert.That(frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.Paced)), Is.EqualTo(new[] { true, true, true, false, false }));
+      Assert.That(frames.Select(f => f.AnimationError?.Nanoseconds), Is.All.EqualTo(0L).Or.Null);
+
+      var row = frames[1].ToRow();
+      Assert.That(row.Flags, Is.EqualTo(new[] { "Paced" }));
+      Assert.That(row.ToFrame(NanosecondTimeDuration.FromNanoseconds(Period)).Flags, Is.EqualTo(PresentedFrameFlags.Paced));
+    }
+
+    /// <summary>
     /// A second of idle screen after frame 4, said by frame 4 itself (StaticAfter: no pending work after it), by frame 5 (StaticBefore: the
     /// application only knew it then) or by both: the same static step either way. The step into frame 4 is judged (it still moved to its
     /// rest), the step out of it is not, whether the animation clock paused while nothing animated (64 ms) or kept running (1064 ms), and the

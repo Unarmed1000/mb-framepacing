@@ -617,6 +617,8 @@ namespace MB::FramePacing::Pacer
     schedule.TargetFrameTime = NanosecondTimeDuration(period.TimeFor(swapInterval));
     schedule.PreferredFrameTime = NanosecondTimeDuration(period.TimeFor(m_rule.PreferredSwapInterval()));
     schedule.Change = change;
+    // This loop places the frame: the marker says it was paced
+    schedule.Paced = true;
     m_lastAnimationTime = animationTime;
     m_nextFrameStartTime = schedule.NextFrameStartTime;
     m_slip.AddFrame(m_frameId, schedule.IntendedDisplayTime);

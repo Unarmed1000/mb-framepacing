@@ -44,7 +44,7 @@ COUNTS = """"counts": { "captures": 10, "decoded": 9, "undecodable": 1, "torn": 
 
 VALUES = '{ "count": 3, "min": -1.5, "mean": 0.25, "stdDev": 1.25, "p50": 0, "p95": 2, "p99": 2.5, "max": 3 }'
 
-RUN_START = '"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "run-7-frames.csv"'
+RUN_START = '"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "run-7-frames.csv"'
 
 FRAME_COLUMNS = "segment,frameIndex,animationNs,firstCaptureIndex,firstSeenNs,onScreenNs,captures,skippedBefore,driftNs,flags"
 
@@ -215,8 +215,13 @@ class SummaryTests(unittest.TestCase):
         self.refused(one_run(RUN_START, COUNTS, statistics(values="7")), "statistics that are a number")
         self.refused(one_run(RUN_START, COUNTS, statistics(values=replaced(VALUES, '"p50": 0, ', ""))), "statistics without their median")
         self.refused(one_run(COUNTS, statistics()), "no run id")
-        self.refused(one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false', COUNTS, statistics()), "no frames file")
-        self.refused(one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": null', COUNTS, statistics()), "null is absent")
+        self.refused(one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f"', COUNTS, statistics()), "no frame record flag")
+        self.refused(
+            one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": 1, "framesFile": "f"', COUNTS, statistics()),
+            "a frame record flag that is a number",
+        )
+        self.refused(one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false', COUNTS, statistics()), "no frames file")
+        self.refused(one_run('"runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": null', COUNTS, statistics()), "null is absent")
 
     def test_histograms_and_the_camera_are_read_whole(self) -> None:
         def histograms(error: str, display: str) -> str:
@@ -255,7 +260,7 @@ class SummaryTests(unittest.TestCase):
 
     def test_numbers_must_fit_their_fields(self) -> None:
         def start(run_id: str, flag: str = "true", file: str = '"f"') -> str:
-            return f'"runId": {run_id}, "hasStartMarker": {flag}, "hasEndMarker": false, "framesFile": {file}'
+            return f'"runId": {run_id}, "hasStartMarker": {flag}, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": {file}'
 
         self.refused(one_run(start("-1"), COUNTS, statistics()))
         self.refused(one_run(start("4294967296"), COUNTS, statistics()))

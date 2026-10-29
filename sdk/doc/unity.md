@@ -83,6 +83,7 @@ steady clock, and may give its own CPU busy:
 ```csharp
 overlay.StaticAfterProvider = () => nothingPending; // optional: nothing animates while this frame is on screen
 overlay.StaticBeforeProvider = () => wokeFromIdle; // optional: nothing animated while the previous frame was
+overlay.PacedProvider = () => pacer.IsOn; // optional: a pacer or frame limiter held this frame's start (not vsync alone)
 overlay.PreferredFrameTimeProvider = () => pacer.PreferredFrameTime; // a NanosecondTimeDuration: the rate the game wants; default: as the target
 overlay.TargetFrameTimeProvider = () => pacer.TargetFrameTime; // a NanosecondTimeDuration: the interval it aims for now; default: Unity's settings (below)
 overlay.RefreshPeriodProvider = () => pacer.RefreshPeriod; // a NanosecondTimeDuration: the display's refresh period; default: Unity's screen (below)

@@ -89,6 +89,23 @@ namespace MB.FramePacing.Marker.UnitTest
     }
 
     [Test]
+    public void Payload_AFrameSaysAPacerOrALimiterHeldIt()
+    {
+      // Bit 3 of the flags byte. Only the application sets it: a payload made without it does not carry it
+      Assert.That((byte)MarkerFlags.Paced, Is.EqualTo(0x08));
+      var plain = new Payload(MarkerKind.Frame, 7, 1, MarkerFlags.NoFlags, NanosecondTimeSpan.Zero);
+      Assert.That(plain.Flags & MarkerFlags.Paced, Is.EqualTo(MarkerFlags.NoFlags));
+
+      // It is one of the byte's independent flags, and read back as it was written
+      var paced = new Payload(MarkerKind.Frame, 7, 1, MarkerFlags.Paced | MarkerFlags.StaticAfter, NanosecondTimeSpan.Zero);
+      var bytes = new byte[Payload.MaxEncodedByteCount];
+      int count = FrameMarker.EncodePayload(paced, default, bytes);
+      Assert.That(bytes[16], Is.EqualTo(0x09));
+      Assert.That(FrameMarker.TryDecodePayload(bytes.AsSpan(0, count), out var decoded, out _), Is.True);
+      Assert.That(decoded.Flags, Is.EqualTo(MarkerFlags.Paced | MarkerFlags.StaticAfter));
+    }
+
+    [Test]
     public void Payload_TheFlagsAreKeptAsGiven()
     {
       var reserved = (MarkerFlags)0xFF;

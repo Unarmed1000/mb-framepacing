@@ -20,6 +20,7 @@ namespace MB.FramePacing.Charts
     public const string Description = "description";
     public const string Display = "display";
     public const string Warning = "warning";
+    public const string Pacing = "pacing";
     public const string Tiles = "tiles";
     public const string AverageFps = "average-fps";
     public const string OnePercentLow = "one-percent-low";
@@ -64,6 +65,10 @@ namespace MB.FramePacing.Charts
       (LateShare, "panel: share of late frames in the last 2 s"),
       (RefreshStrip, "panel: refresh strip"),
       (Events, "panel: events: frames dropped, out of order or torn, and what the capture missed"),
+      (
+        Pacing,
+        "the pacer band under the panels: whether a pacer or a frame limiter held the frames (the markers' paced flag), a checkbox per pacing field, and what the frames are measured against"
+      ),
       (FrameTimeLines, "lines: the target and preferred frame time on the display time step and frametime panels"),
       (AnimationTimeStep, "overlay (opt-in): the animation time step on the display time step panel"),
     };

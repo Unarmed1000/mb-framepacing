@@ -68,6 +68,12 @@ namespace MB.FramePacing.MarkerDecoding
     public bool IsStaticBefore => (Flags & FM.MarkerFlags.StaticBefore) != 0;
 
     /// <summary>
+    /// A pacer or a frame limiter held this frame's start to a plan (not vsync alone): the application's word. In a run where some frame
+    /// says it, a frame without it was not paced; in a run where none does, nothing is said either way.
+    /// </summary>
+    public bool IsPaced => (Flags & FM.MarkerFlags.Paced) != 0;
+
+    /// <summary>
     /// A start marker says the application logs the frame record of the run to its own trace: a trace of the run exists.
     /// The application's word, read from the start marker only; the bit means nothing on another kind of marker.
     /// </summary>

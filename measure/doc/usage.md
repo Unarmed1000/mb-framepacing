@@ -100,6 +100,10 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
 - A run where at least 90 % of the frames had frames before them that were never shown gets a warning, in the analysis and in the
   same band: the application rendered faster than the display showed its frames, so vsync was probably off (or a present mode showed
   the newest frame at each refresh). The frames are measured as they were presented; check the application's vsync setting.
+- The report card's **PACER** band under its panels (the GUI's **Pacer or limiter:** line) says whether a pacer or a frame limiter
+  held the frames, as the markers' paced flag says ("yes", the share of the frames, "no"); a run whose markers never set it reads
+  "not said", as the other pacing fields can not tell it (a loop that only waits for vsync can write a schedule). Then a checkbox
+  per pacing field (✓ every frame, the share when some frames carry it, – none) and what the frames are measured against.
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
 
@@ -286,7 +290,7 @@ Times are seconds since the run's first frame, the Timeline's axis. Every item o
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description` (the line under
 the title that says what the card shows, and the notes at the end of the card: the resolution, how the frames are drawn, static
 frames, capture gaps, a joined trace, the sequence id), `display`, `warning` (the band under the header when the display and the
-capture disagree or vsync was probably off), `tiles`
+capture disagree or vsync was probably off), `pacing` (the pacing band), `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
 `error-p99`, `error-p999`, `worst-error`, `late-frames`), the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,
 `events`, and `frame-time-lines`: the target and preferred frame time as dashed lines on the display time step and frametime panels

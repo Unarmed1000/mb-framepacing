@@ -70,7 +70,7 @@ namespace
     return text + R"("framesWithAnimationError": 2, "errorPerFrameMs": 0.5, "percentError": 25, "excludedStaticFrames": 0, "uncertainSteps": 0 })";
   }
 
-  constexpr std::string_view RunStart = R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "run-7-frames.csv")";
+  constexpr std::string_view RunStart = R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "run-7-frames.csv")";
 
   //! A summary whose one run has the given members.
   std::string SummaryWithRun(const std::string& members)
@@ -433,18 +433,18 @@ TEST(AnalysisOutput, ListsMustBeLists)
 
 TEST(AnalysisOutput, NumbersMustFitTheirFields)
 {
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": -1, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")),
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": -1, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "f")")),
                FD::DataFormatError);
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 4294967296, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")),
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 4294967296, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "f")")),
                FD::DataFormatError);
-  EXPECT_EQ(FD::ParseSummary(OneRun(R"("runId": 4294967295, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")).Runs[0].RunId,
+  EXPECT_EQ(FD::ParseSummary(OneRun(R"("runId": 4294967295, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "f")")).Runs[0].RunId,
             4294967295u);
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1.5, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")),
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1.5, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "f")")),
                FD::DataFormatError)
     << "a fraction for a whole number";
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1, "hasStartMarker": 1, "hasEndMarker": false, "framesFile": "f")")), FD::DataFormatError)
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1, "hasStartMarker": 1, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "f")")), FD::DataFormatError)
     << "a number for a flag";
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1, "hasStartMarker": true, "hasEndMarker": false, "framesFile": 5)")), FD::DataFormatError)
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 1, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": 5)")), FD::DataFormatError)
     << "a number for a text";
   constexpr std::string_view Frames = R"("framesWithAnimationError": 2)";
   EXPECT_THROW((void)FD::ParseSummary(OneRun(RunStart, Counts, Replaced(Statistics(), Frames, R"("framesWithAnimationError": 1e300)"))),
@@ -468,10 +468,18 @@ TEST(AnalysisOutput, RequiredFieldsAreRequired)
   EXPECT_THROW((void)FD::ParseSummary(R"({ "errorThresholdNs": 1000000 })"), FD::DataFormatError) << "no capture period";
   EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodNs": 16666667 })"), FD::DataFormatError) << "no error threshold";
   EXPECT_THROW((void)FD::ParseSummary(R"({ "capturePeriodNs": null, "errorThresholdNs": 1000000 })"), FD::DataFormatError) << "null is absent";
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")), FD::DataFormatError)
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false, "framesFile": "f")")), FD::DataFormatError)
     << "no run id";
-  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false)")), FD::DataFormatError)
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": false)")), FD::DataFormatError)
     << "no frames file";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false, "framesFile": "f")")), FD::DataFormatError)
+    << "no frame record flag";
+  EXPECT_THROW((void)FD::ParseSummary(OneRun(R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": 1, "framesFile": "f")")),
+               FD::DataFormatError)
+    << "a frame record flag that is a number";
+  EXPECT_TRUE(FD::ParseSummary(OneRun(R"("runId": 7, "hasStartMarker": true, "hasEndMarker": false, "frameRecordLogged": true, "framesFile": "f")"))
+                .Runs[0]
+                .FrameRecordLogged);
   EXPECT_THROW((void)FD::ParseSummary("[]"), FD::DataFormatError) << "not an object";
   EXPECT_THROW((void)FD::ParseSummary("{ \"capturePeriodNs\": "), FD::DataFormatError) << "not JSON";
   EXPECT_THROW((void)FD::ParseSummary(""), FD::DataFormatError) << "empty";

@@ -63,5 +63,11 @@ namespace MB.FramePacing.Analysis
     /// intended period or more is not jitter.
     /// </summary>
     DeltaTimeJitter = 256,
+
+    /// <summary>
+    /// The frame's own marker says a pacer or a frame limiter held its start to a plan (the marker's paced flag). The application's word: in
+    /// a run where some frame carries it, a frame without it was not paced.
+    /// </summary>
+    Paced = 512,
   }
 }

@@ -1,7 +1,7 @@
 //****************************************************************************************************************************************************
 //* File Description
 //* ----------------
-//* The payload's flags byte. See doc/marker-format.md "Flags". Bits 3 to 7 are reserved: write 0; a decoded payload keeps whatever it
+//* The payload's flags byte. See doc/marker-format.md "Flags". Bits 4 to 7 are reserved: write 0; a decoded payload keeps whatever it
 //* carried, so values without a name here survive a round trip.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
@@ -36,5 +36,12 @@ namespace MB.FramePacing.Marker
     /// flag itself and nothing in the SDK does, so it is off unless set. It says nothing on a frame, end or sync marker.
     /// </summary>
     FrameRecordLogged = 1 << 2,
+
+    /// <summary>
+    /// A pacer or a frame limiter held this frame's start to a plan (it waited, or set when the frame began); a present that blocks until
+    /// the display takes it (vsync alone) is not that. The application sets it on every such frame, from its own pacer or limiter; it is off
+    /// unless set. A start or end marker carries the value of the frame that shows it.
+    /// </summary>
+    Paced = 1 << 3,
   }
 }

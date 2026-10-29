@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1343" viewBox="0 0 1180 1343" role="img" aria-label="Run 1  '60-naive-5ms'">
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1447" viewBox="0 0 1180 1447" role="img" aria-label="Run 1  '60-naive-5ms'">
 <title>Run 1  '60-naive-5ms'</title>
 <style>
   text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -103,6 +103,7 @@
   .clip-text { font-size: 11px; fill: #e6edf3; }
   .warn { fill: #d29922; }
   .warn-band { fill: #d29922; fill-opacity: 0.1; stroke: #d29922; stroke-opacity: 0.9; stroke-width: 1.5; }
+  .pacing-band { fill-opacity: 0.03; }
   .warn-label { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; fill: #d29922; }
   .warn-title { font-size: 14px; font-weight: 600; }
   .warn-text { fill: #e6edf3; }
@@ -118,7 +119,7 @@
   .ref-preferred { stroke: #d29922; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
   .key-light { fill: #adbac7; }
 </style>
-<rect class="card" x="0.5" y="0.5" width="1179" height="1342" rx="14"/>
+<rect class="card" x="0.5" y="0.5" width="1179" height="1446" rx="14"/>
 <text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  '60-naive-5ms'</text>
 <text x="20.0" y="54.0" text-anchor="start" class="sub">The whole run: 8.0 s, 480 presented frames on a 60 Hz display, measured against a 16.7 ms target.</text>
 <text x="20.0" y="73.0" text-anchor="start" class="sub">More about this run in the notes at the end of the card.</text>
@@ -127,6 +128,10 @@
 <text x="874.0" y="56.0" text-anchor="start"><tspan class="tile-value">60 Hz</tspan><tspan class="vsync-n">  fixed refresh (vsync)</tspan></text>
 <text x="874.0" y="74.0" text-anchor="start" class="vsync-n">16.7 ms per refresh, target 1 refresh (60 fps)</text>
 <text x="874.0" y="90.0" text-anchor="start" class="vsync-n">preferred 60 fps</text>
+<rect class="tile pacing-band" x="20" y="1252" width="1140" height="52" rx="10"/>
+<text x="34.0" y="1273.0" text-anchor="start"><tspan class="label">PACER</tspan><tspan class="vsync-target">   pacer or limiter: not said</tspan><tspan class="vsync-n">   no frame carries the paced flag</tspan></text>
+<text x="1146.0" y="1273.0" text-anchor="end" class="vsync-n">measured against the pacer's schedule in the markers</text>
+<text x="34.0" y="1293.0" text-anchor="start"><tspan class="vsync-n">–</tspan><tspan class="vsync-n"> paced flag</tspan><tspan class="vsync-target">      99 %</tspan><tspan class="vsync-n"> schedule (intended display times)</tspan><tspan class="vsync-target">      ✓</tspan><tspan class="vsync-n"> target frame time: 60 fps</tspan><tspan class="vsync-target">      ✓</tspan><tspan class="vsync-n"> preferred frame time: 60 fps</tspan></text>
 <rect class="tile" x="20.0" y="118" width="276.0" height="64" rx="10"/>
 <text x="34.0" y="138.0" text-anchor="start" class="label">AVERAGE FPS</text>
 <text x="34.0" y="162.0" text-anchor="start"><tspan class="tile-value">60.0</tspan><tspan class="vsync-n">  16.67 ms · 480 frames</tspan></text>
@@ -1216,7 +1221,9 @@
 <text x="882.5" y="1222.0" text-anchor="middle" class="vsync-n">6 s</text>
 <text x="1011.2" y="1222.0" text-anchor="middle" class="vsync-n">7 s</text>
 <text x="1140.0" y="1222.0" text-anchor="middle" class="vsync-n">8 s</text>
-<text x="20.0" y="1274.0" text-anchor="start" class="label">NOTES</text>
-<text x="20.0" y="1298.0" text-anchor="start" class="sub">Resolution 16.7 ms (one capture period); error threshold 1 ms.</text>
-<text x="20.0" y="1317.0" text-anchor="start" class="sub">Every frame is drawn.</text>
+<text x="20.0" y="1340.0" text-anchor="start" class="label">NOTES</text>
+<text x="20.0" y="1364.0" text-anchor="start" class="sub">Resolution 16.7 ms (one capture period); error threshold 1 ms.</text>
+<text x="20.0" y="1383.0" text-anchor="start" class="sub">Every frame is drawn.</text>
+<text x="20.0" y="1402.0" text-anchor="start" class="sub">Cause: mostly delta time jitter: an even display with uneven animation steps (0 error frame(s) at uneven display, 461 on an even display).</text>
+<text x="20.0" y="1421.0" text-anchor="start" class="sub">480 presented frames from 480 captures: 480 decoded, 0 undecodable, 0 torn, 0 not recorded; 0 dropped by the source, 0 missed. 0 frame indices never captured, 1 segment(s).</text>
 </svg>

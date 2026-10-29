@@ -545,6 +545,7 @@ take them; its default is what emptied the queue on the one system measured.
 | Marker field          | From                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------ |
 | Frame index           | Your own frame counter                                                                                 |
+| Flags: paced          | `schedule.Paced`: `MarkerFlags::Paced` when the pacer placed the frame, none while not pacing          |
 | Animation time        | `schedule.AnimationTime`                                                                               |
 | Preferred frame time  | `schedule.PreferredFrameTime`                                                                          |
 | Target frame time     | `schedule.TargetFrameTime`                                                                             |

@@ -410,6 +410,9 @@ namespace MB.FramePacing.DocImages
       double scale = card.Bounds.Width / drawing.Width;
       Avalonia.Point At(double x, double y) =>
         card.TranslatePoint(new Avalonia.Point(x * scale, y * scale), window) ?? throw new InvalidOperationException("The card is not in the window");
+      // The plot where the pointer goes, scrolled into the card's view as a user would: the page above it takes its height
+      card.BringIntoView(new Avalonia.Rect(plot.Left * scale, plot.Top * scale, (plot.Right - plot.Left) * scale, (plot.Bottom - plot.Top) * scale));
+      Dispatcher.UIThread.RunJobs();
       var middle = At((plot.Left + plot.Right) / 2, (plot.Top + plot.Bottom) / 2);
       double atPointer = plot.ValueX((plot.Left + plot.Right) / 2);
       string whole = analysis.SectionText;

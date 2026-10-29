@@ -258,6 +258,7 @@ class SummaryRun:
     start_time_utc: datetime | None
     has_start_marker: bool
     has_end_marker: bool
+    frame_record_logged: bool
     frames_file: str
     counts: SummaryCounts
     statistics: SummaryStatistics
@@ -354,6 +355,7 @@ def _run(value: _Object) -> SummaryRun:
         start_time_utc=value.optional_time("startTimeUtc"),
         has_start_marker=value.boolean("hasStartMarker"),
         has_end_marker=value.boolean("hasEndMarker"),
+        frame_record_logged=value.boolean("frameRecordLogged"),
         frames_file=value.text("framesFile"),
         counts=_counts(value.child("counts")),
         statistics=_statistics(value.child("statistics")),

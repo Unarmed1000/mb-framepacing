@@ -234,6 +234,7 @@ namespace MB::FramePacing::Data
       run.StartTimeUtc = Optional<std::string>(value, "startTimeUtc");
       run.HasStartMarker = Required<bool>(value, "hasStartMarker");
       run.HasEndMarker = Required<bool>(value, "hasEndMarker");
+      run.FrameRecordLogged = Required<bool>(value, "frameRecordLogged");
       run.FramesFile = Required<std::string>(value, "framesFile");
 
       const Json& counts = RequiredObject(value, "counts");

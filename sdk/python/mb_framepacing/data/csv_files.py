@@ -24,7 +24,7 @@ ON_DEMAND_FRAME_NS = 0xFFFF_FFFF
 class FrameRow:
     """One presented frame. first_seen_ns is its display time (the capture's clock), display_delta_ns the display time step,
     animation_error_ns the animation time step minus the display time step (None for a step from a static frame). flags holds
-    SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep, StaticAssumed or DeltaTimeJitter. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
+    SkippedBefore, UncertainStart, Torn, Late, StaticAfter, StaticBefore, UncertainStep, StaticAssumed, DeltaTimeJitter or Paced. The pacing and CPU fields come from the markers (CPU start time, CPU busy,
     frametime and CPU wait as PresentMon names them, and marker_refresh_period_ns, the refresh period of the display the application
     works with); marker_target_ns and marker_preferred_ns are ON_DEMAND_FRAME_NS on demand,
     target_ns and preferred_ns (what the analysis measured against, in whole refreshes) None then. The last two are EXPERIMENTAL

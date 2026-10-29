@@ -147,6 +147,12 @@ namespace MB.FramePacing.Marker.Unity
     public Func<bool> StaticBeforeProvider { get; set; }
 
     /// <summary>
+    /// True when a pacer or a frame limiter held this frame's start to a plan (not vsync alone): the marker's Paced flag, so the report can
+    /// say the frames were paced. Null = never.
+    /// </summary>
+    public Func<bool> PacedProvider { get; set; }
+
+    /// <summary>
     /// CPU start time: when the CPU started working on the frame, on the same steady clock as
     /// <see cref="IntendedDisplayTimeProvider"/>. Null = Unity's unscaled time at the beginning of the frame while no
     /// IntendedDisplayTimeProvider is set (its clock is the game's own), otherwise 0 (unknown).
@@ -286,7 +292,8 @@ namespace MB.FramePacing.Marker.Unity
         Phase == MarkerPhase.Idle ? 0u : RunId,
         (ulong)Time.frameCount,
         (StaticAfterProvider != null && StaticAfterProvider() ? MarkerFlags.StaticAfter : MarkerFlags.NoFlags)
-          | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.NoFlags),
+          | (StaticBeforeProvider != null && StaticBeforeProvider() ? MarkerFlags.StaticBefore : MarkerFlags.NoFlags)
+          | (PacedProvider != null && PacedProvider() ? MarkerFlags.Paced : MarkerFlags.NoFlags),
         // Cut to the nanosecond by the SDK's own code, so no runtime rounds it another way
         NanosecondTimeSpan.FromSeconds(AnimationTime()),
         preferredFrameTime: PreferredFrameTimeProvider != null ? PreferredFrameTimeProvider() : DefaultTargetFrameTime(),

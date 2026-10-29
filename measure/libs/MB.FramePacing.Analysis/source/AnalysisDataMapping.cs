@@ -151,6 +151,7 @@ namespace MB.FramePacing.Analysis
         run.StartTimeUtc,
         run.HasStartMarker,
         run.HasEndMarker,
+        run.FrameRecordLogged,
         framesFile,
         run.Counts.ToSummary(),
         run.Statistics.ToSummary(),
@@ -173,7 +174,8 @@ namespace MB.FramePacing.Analysis
         frames,
         run.Warnings ?? Array.Empty<string>(),
         Pacing: run.Pacing?.ToPacing(),
-        Name: run.Name
+        Name: run.Name,
+        FrameRecordLogged: run.FrameRecordLogged
       );
 
     public static ValueStatistics ToSummary(this Statistics s) =>
