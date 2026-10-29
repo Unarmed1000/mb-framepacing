@@ -3,8 +3,8 @@
 //* ----------------
 //* Saves an SVG as a PNG at twice its size through a headless Edge or Chrome, as mb-framepacing-explained's diagrams do (find_browser and
 //* save_png in generate_diagrams.py): the browser draws the style sheet and the fonts exactly as it shows the SVG. It also screenshots an HTML
-//* page (the playback page) in a window of a given size, after virtual time for what it loads. The browser comes from MB_BROWSER, the usual
-//* install locations, then PATH.
+//* page (the playback page) in a window of a given size, after virtual time for what it loads, and gives such a page's document as its script
+//* left it (for tests of the page's text). The browser comes from MB_BROWSER, the usual install locations, then PATH.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -107,6 +107,43 @@ namespace MB.FramePacing.Charts
       ThrowUnlessSaved(result, found, pngPath);
     }
 
+    /// <summary>
+    /// The document of the HTML page at <paramref name="pagePath"/> (with the address fragment <paramref name="fragment"/>, without the '#')
+    /// as its script has left it after <paramref name="settleMilliseconds"/> of virtual time, serialised by the browser: what a test reads
+    /// the page's own text from. Throws when there is no browser or it fails.
+    /// </summary>
+    public static string PageDocument(string pagePath, string fragment, int settleMilliseconds = 5000, string? browser = null)
+    {
+      string found =
+        browser ?? Find() ?? throw new InvalidOperationException($"Reading a page needs Edge or Chrome: set {EnvironmentVariable} to its executable");
+      string url = new Uri(Path.GetFullPath(pagePath)).AbsoluteUri + (fragment.Length > 0 ? "#" + fragment : string.Empty);
+      var extra = new[] { "--dump-dom", $"--virtual-time-budget={settleMilliseconds}" };
+      string document = string.Empty;
+      var result = SaveWithRetries(
+        noSandbox =>
+          Attempt(
+            found,
+            url,
+            1600,
+            1000,
+            noSandbox,
+            extra,
+            arguments =>
+            {
+              var (attempt, output) = RunForOutput(found, arguments);
+              document = output;
+              return attempt;
+            }
+          ),
+        OperatingSystem.IsLinux()
+      );
+      if (result.Saved)
+        return document;
+      if (result.TimedOut)
+        throw new TimeoutException($"{found} did not give {pagePath} within {g_timeout.TotalSeconds:0} s{Tail(result.Errors)}");
+      throw new InvalidOperationException($"{found} failed to give {pagePath} (exit code {result.ExitCode}){Tail(result.Errors)}");
+    }
+
     private static void ThrowUnlessSaved(BrowserAttempt result, string browser, string pngPath)
     {
       if (result.Saved)
@@ -150,7 +187,7 @@ namespace MB.FramePacing.Charts
       }
     }
 
-    /// <summary>One run of the browser, in a profile of its own that is deleted afterwards.</summary>
+    /// <summary>One run of the browser that saves a screenshot at <paramref name="pngPath"/>.</summary>
     private static BrowserAttempt Attempt(
       string browser,
       string url,
@@ -163,6 +200,22 @@ namespace MB.FramePacing.Charts
     {
       // An image that is already there would count as this run's: the browser is ended as soon as the file is whole
       File.Delete(pngPath);
+      var arguments = new List<string> { $"--screenshot={Path.GetFullPath(pngPath)}" };
+      arguments.AddRange(extraArguments);
+      return Attempt(browser, url, width, height, noSandbox, arguments, all => Run(browser, all, pngPath));
+    }
+
+    /// <summary>One run of the browser (<paramref name="run"/>, with every argument), in a profile of its own that is deleted afterwards.</summary>
+    private static BrowserAttempt Attempt(
+      string browser,
+      string url,
+      int width,
+      int height,
+      bool noSandbox,
+      IReadOnlyList<string> extraArguments,
+      Func<IReadOnlyList<string>, BrowserAttempt> run
+    )
+    {
       string profile = Path.Combine(Path.GetTempPath(), "mb-framepacing-browser-" + Guid.NewGuid().ToString("N"));
       try
       {
@@ -181,7 +234,6 @@ namespace MB.FramePacing.Charts
             "--disable-extensions",
             $"--user-data-dir={profile}",
             $"--window-size={width},{height}",
-            $"--screenshot={Path.GetFullPath(pngPath)}",
           }
         );
         // macOS: a new profile would ask the keychain for its encryption key, which blocks a headless browser
@@ -192,7 +244,7 @@ namespace MB.FramePacing.Charts
           arguments.Add("--disable-dev-shm-usage");
         arguments.AddRange(extraArguments);
         arguments.Add(url);
-        return Run(browser, arguments, pngPath);
+        return run(arguments);
       }
       finally
       {
@@ -244,6 +296,35 @@ namespace MB.FramePacing.Charts
       }
       int exitCode = process.ExitCode;
       return new BrowserAttempt(exitCode == 0 && IsCompletePng(pngPath), exitCode, Text(reading, errors));
+    }
+
+    /// <summary>
+    /// Run the browser once for what it writes to its output (--dump-dom: the document, then it exits). It counts as done when it exits
+    /// cleanly with a whole document.
+    /// </summary>
+    private static (BrowserAttempt Attempt, string Output) RunForOutput(string browser, IReadOnlyList<string> arguments)
+    {
+      var start = new ProcessStartInfo(browser)
+      {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+      foreach (var argument in arguments)
+        start.ArgumentList.Add(argument);
+      using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {browser}");
+      var output = new StringBuilder();
+      var outputReading = ReadInto(process.StandardOutput, output);
+      var errors = new StringBuilder();
+      var reading = ReadInto(process.StandardError, errors);
+      if (!process.WaitForExit(g_timeout))
+      {
+        process.Kill();
+        return (new BrowserAttempt(false, null, Text(reading, errors)), string.Empty);
+      }
+      string document = Text(outputReading, output);
+      int exitCode = process.ExitCode;
+      return (new BrowserAttempt(exitCode == 0 && document.Contains("</html>", StringComparison.Ordinal), exitCode, Text(reading, errors)), document);
     }
 
     /// <summary>

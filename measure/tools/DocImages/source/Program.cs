@@ -497,7 +497,8 @@ namespace MB.FramePacing.DocImages
     /// <summary>
     /// Save playback page on the imported test clip, as a user does: the clip is lossless 4:4:4 H.264, which browsers cannot play, so the GUI
     /// asks before it makes a playable copy (answered yes in the dialog; automation never remembers an answer). Then the page in a headless
-    /// browser at the clip's busy stretch: playback-page.png (skipped without a browser). Throws when a step does not happen.
+    /// browser at the clip's busy stretch: playback-page.png (skipped without a browser), on a 60 Hz display as the page is told (a headless
+    /// browser's refresh is its machine's). Throws when a step does not happen.
     /// </summary>
     private static async Task CheckPlaybackAsync(Window window, AnalysisViewModel analysis, string output)
     {
@@ -522,7 +523,7 @@ namespace MB.FramePacing.DocImages
       Console.WriteLine($"  Save playback page: asked, made a playable copy, wrote {Path.GetFileName(folder)}/{Path.GetFileName(page)}");
       try
       {
-        HeadlessBrowser.SavePagePng(page, "t=2.05&theme=dark", Path.Combine(output, "playback-page.png"), 1600, 1000);
+        HeadlessBrowser.SavePagePng(page, "t=2.05&theme=dark&display-hz=60", Path.Combine(output, "playback-page.png"), 1600, 1000);
         Console.WriteLine("  playback-page.png");
       }
       catch (InvalidOperationException ex) when (HeadlessBrowser.Find() == null)

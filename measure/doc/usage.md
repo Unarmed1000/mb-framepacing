@@ -214,6 +214,14 @@ zoomed), and **Open playback page** opens it. A report is written only when you 
   through the recording. A zoomed card holds the whole report at its zoom, so a page offers the steps that fit about 64 MB: two
   minutes or ten get every step down to 2 s, half an hour 10 s, an hour 60 s (each zoom is read only when it is first shown). For
   frame detail in a long run, write a report of a section of it (`--from`/`--to`, or the GUI's zoomed Timeline).
+- **View it on a display at the recording's rate or a whole multiple of it** (a 60 Hz recording on 60, 120 or 240 Hz). A display
+  shows each video frame for whole refreshes: at any other rate (a 50 Hz recording on 60 Hz) some stay a refresh longer or are never
+  shown, and the video judders where the capture did not. Under the video the page measures the display's refresh, compares it with
+  the recording's at the speed it plays, and warns when they do not fit, when the refresh is irregular (variable refresh such as
+  G-SYNC or FreeSync, a busy machine), and when the browser skips video frames while playing. The refresh is what the browser draws
+  at, so on a variable refresh display it is usually the display's highest; a fitting rate does not promise the browser's own timing,
+  and only the count of skipped frames shows that. **Check again** measures again; `#display-hz=<Hz>` in the address gives a rate
+  instead of measuring.
 - **Recordings imported as a video file only.** The page finds a capture in the video by its time, the video's own timestamps,
   so it needs a capture made by `import` of a video file. A capture card recorded live, a folder of images or a camera capture
   have no page. Imports made before capture.json named the recording need it named: `--video <file>` (the GUI asks for it).
