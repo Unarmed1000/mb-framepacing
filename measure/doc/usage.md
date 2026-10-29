@@ -104,6 +104,11 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
   held the frames, as the markers' paced flag says ("yes", the share of the frames, or "no" when no frame carries it; the other pacing
   fields can not tell it, as a loop that only waits for vsync can write a schedule). Then a checkbox
   per pacing field (✓ every frame, the share when some frames carry it, – none) and what the frames are measured against.
+- With the markers' CPU start time and CPU busy the card's notes (and the GUI under the cause) place each frame's **present** and say
+  the planned time from present to screen (with a schedule: the pacer's plan), how much later than the run's quickest frame each
+  frame reached the screen after its present (a whole refresh more that stays is a queue that filled; the absolute time is not
+  known, as the clocks are tied only by the frames), **why late frames were late** (submitted late: their CPU work or their start;
+  or submitted on time and held after the present), and how often the CPU work took its intended period or longer.
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
 
@@ -292,7 +297,7 @@ Times are seconds since the run's first frame, the Timeline's axis. Every item o
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description` (the line under
 the title that says what the card shows, and the notes at the end of the card: the resolution, how the frames are drawn, static
 frames, capture gaps, a joined trace, the sequence id), the notes of what the GUI says under the run, each of its own (`cause`,
-`counts`, `run-warnings`, `frame-record-note`), `display`, `warning` (the band under the header when the display and the
+`counts`, `run-warnings`, `frame-record-note`, `present-latency`, `late-reasons`), `display`, `warning` (the band under the header when the display and the
 capture disagree or vsync was probably off), `pacing` (the pacer band), `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
 `error-p99`, `error-p999`, `worst-error`, `late-frames`), the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,

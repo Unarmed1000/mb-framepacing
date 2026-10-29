@@ -36,6 +36,7 @@ namespace MB.FramePacing.Charts
     private readonly Dictionary<HoldKind, Lazy<FrameSequence>> m_holdsByKind;
     private readonly Lazy<long[]> m_droppedBefore;
     private readonly Lazy<long[]> m_presentFailedBefore;
+    private readonly Lazy<PresentTiming[]> m_presentTimings;
     private readonly Lazy<RankBits> m_uncertainSteps;
     private readonly Lazy<RankBits> m_staticSteps;
     private readonly Lazy<FrameSequence> m_animationHolds;
@@ -141,6 +142,7 @@ namespace MB.FramePacing.Charts
       m_spans = Once(() => new RankBits(count, i => Frames[i].FrameTime?.Nanoseconds is > 0 || Frames[i].CpuBusy.Nanoseconds > 0));
       m_droppedBefore = Once(() => DroppedFrames.ByTargetBefore(Frames));
       m_presentFailedBefore = Once(() => DroppedFrames.PresentFailedBefore(Frames));
+      m_presentTimings = Once(() => Charts.PresentTimings.Of(Frames, run.Run.Pacing?.RefreshPeriod ?? run.CapturePeriod));
       m_holdKinds = Once(() =>
       {
         // A hold's kind, the first that applies: not known (a capture gap made the next step uncertain), an older frame came back while
@@ -338,6 +340,9 @@ namespace MB.FramePacing.Charts
     /// (DroppedFrames.PresentFailedBefore): one of the frames never on screen, not counted in <see cref="DroppedBeforeFrame"/>.
     /// </summary>
     public IReadOnlyList<long> PresentFailedBeforeFrame => m_presentFailedBefore.Value;
+
+    /// <summary>Per frame, its present against its plan and the screen, and why it was late (PresentTimings).</summary>
+    public IReadOnlyList<PresentTiming> PresentTimings => m_presentTimings.Value;
 
     /// <summary>The frames whose display time step a capture gap made uncertain (not judged); a static frame's is counted as static.</summary>
     public RankBits UncertainSteps => m_uncertainSteps.Value;

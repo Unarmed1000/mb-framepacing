@@ -165,6 +165,80 @@ namespace MB.FramePacing.Charts
         + $"{c.Segments} segment(s).";
     }
 
+    /// <summary>
+    /// What the markers' CPU fields say of the section's presents, as note lines with their item ids (<see cref="PresentTimings"/>): the
+    /// time the pacer planned from present to screen, how much later than the run's quickest frame each frame reached the screen after
+    /// its present, why late frames were late, and how often the CPU work took its intended period or longer. Each line only when the
+    /// markers carry what it needs. The absolute time from present to screen is never said: the clocks are tied only by the frames.
+    /// </summary>
+    public static IReadOnlyList<(string Id, string Line)> PresentLines(RunSection section)
+    {
+      var chart = section.Run;
+      var refresh = chart.Run.Pacing?.RefreshPeriod ?? chart.CapturePeriod;
+      var timings = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.PresentTimings[i]).ToList();
+      var lines = new List<(string, string)>();
+      // Milliseconds with a true minus sign, and how many refreshes that is
+      string Ms(double milliseconds) => (milliseconds < 0 ? "−" : string.Empty) + ReportCard.Ms1(Math.Abs(milliseconds)) + " ms";
+      string InRefreshes(double milliseconds) =>
+        refresh > NanosecondTimeDuration.Zero ? $" ({Invariant(milliseconds / refresh.Value.TotalMilliseconds, "0.0")} refreshes)" : string.Empty;
+      var planned = timings.Select(t => t.PlannedLatency).OfType<NanosecondTimeSpan>().ToList();
+      if (planned.Count > 0)
+      {
+        var s = Statistics.From(planned);
+        lines.Add(
+          (
+            ReportItem.PresentLatency,
+            $"Planned time from present to screen: median {Ms(s.P50)}{InRefreshes(s.P50)}, {Ms(s.Min)} to {Ms(s.Max)} "
+              + "(the pacer's intended display time: its plan, not a measurement)."
+          )
+        );
+      }
+      var extra = timings.Select(t => t.ExtraDelay).OfType<NanosecondTimeSpan>().ToList();
+      if (extra.Count > 0)
+      {
+        var s = Statistics.From(extra);
+        lines.Add(
+          (
+            ReportItem.PresentLatency,
+            $"Present to screen, beyond the run's quickest frame: median {Ms(s.P50)}, p95 {Ms(s.P95)}, max {Ms(s.Max)}{InRefreshes(s.Max)}. "
+              + "A whole refresh more that stays is a queue that filled; the quickest frame's own time is not known (the clocks are tied only "
+              + "by the frames)."
+          )
+        );
+      }
+      int late = Enumerable.Range(section.Start, section.FrameCount).Count(i => (section.Data.Frames[i].Flags & PresentedFrameFlags.Late) != 0);
+      int work = timings.Count(t => t.LateReason == LateReason.SubmittedLateWork);
+      int start = timings.Count(t => t.LateReason == LateReason.SubmittedLateStart);
+      int after = timings.Count(t => t.LateReason == LateReason.ShownLateAfterPresent);
+      if (late > 0 && work + start + after > 0)
+      {
+        string Frames(int n) => n == 1 ? "1 frame" : $"{Number(n)} frames";
+        int unknown = late - work - start - after;
+        lines.Add(
+          (
+            ReportItem.LateReasons,
+            $"Late frames: {Number(late)}; {Number(work + start)} submitted late ({Number(work)} whose CPU work took longer than their target, "
+              + $"{Number(start)} that started late), {Number(after)} submitted on time and shown late (held after the present: GPU, queue, "
+              + "compositor or display; the capture can not tell which)"
+              + (unknown > 0 ? $"; {Frames(unknown)} without the CPU fields to tell." : ".")
+          )
+        );
+      }
+      int known = timings.Count(t => t.WorkOverTarget.HasValue);
+      if (known > 0)
+      {
+        int over = timings.Count(t => t.WorkOverTarget == true);
+        lines.Add(
+          (
+            ReportItem.LateReasons,
+            $"CPU work took its intended period or longer on {Number(over)} of {Number(known)} frames"
+              + (over > 0 ? $" ({PercentOf(over, known)})." : ".")
+          )
+        );
+      }
+      return lines;
+    }
+
     /// <summary>Which cause of animation error dominates, with the counts behind it ("mostly bad pacing: ... (3 error frame(s) ...).").</summary>
     public static string Cause(RunPacing pacing)
     {

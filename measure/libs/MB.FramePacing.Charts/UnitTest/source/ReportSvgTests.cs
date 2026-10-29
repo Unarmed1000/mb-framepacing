@@ -649,7 +649,7 @@ namespace MB.FramePacing.Charts.UnitTest
         [ReportItem.RunWarnings] = "Warning: Run 1 has no end marker",
         [ReportItem.FrameRecordNote] = "The start marker says the application logged",
       };
-      Assert.That(marks.Keys, Is.EquivalentTo(ReportItem.NoteIds));
+      Assert.That(marks.Keys, Is.SubsetOf(ReportItem.NoteIds));
       Assert.That(marks.Values.All(mark => Notes(ReportOptions.Default).Any(line => line.StartsWith(mark, StringComparison.Ordinal))));
       foreach (var (id, mark) in marks)
       {

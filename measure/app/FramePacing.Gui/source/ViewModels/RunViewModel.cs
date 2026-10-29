@@ -124,6 +124,11 @@ namespace MB.FramePacing.Gui.ViewModels
     /// field's checkbox (what the frames are measured against is the target line's).
     /// </summary>
     public string PacingText => $"Pacer or limiter: {Pacing.Value} ({Pacing.Basis}).   " + string.Join("   ", Pacing.Rows.Select(r => r.Text));
+
+    /// <summary>The report's present timing notes (RunHeadline.PresentLines), one per line; empty without the markers' CPU fields.</summary>
+    public string PresentText => string.Join(Environment.NewLine, RunHeadline.PresentLines(RunSection.Whole(Chart)).Select(l => l.Line));
+
+    public bool HasPresentText => PresentText.Length > 0;
     public string VerdictText { get; } = string.Empty;
     public string Title { get; }
 

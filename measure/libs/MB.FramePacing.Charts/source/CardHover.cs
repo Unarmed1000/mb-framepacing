@@ -54,7 +54,7 @@ namespace MB.FramePacing.Charts
         default:
         {
           int index = IndexAt(x);
-          return index >= 0 ? Describe(m_section.Data.Frames[index], m_section.Data.TraceFrames?[index]) : null;
+          return index >= 0 ? Describe(m_section.Data.Frames[index], m_section.Data.TraceFrames?[index], m_section.Data.PresentTimings[index]) : null;
         }
       }
     }
@@ -127,7 +127,7 @@ namespace MB.FramePacing.Charts
         );
     }
 
-    private string Describe(PresentedFrame frame, TraceFrame? trace)
+    private string Describe(PresentedFrame frame, TraceFrame? trace, PresentTiming present)
     {
       var lines = new List<string> { Heading(frame) };
       if (frame.DisplayDelta is { } display)
@@ -140,6 +140,20 @@ namespace MB.FramePacing.Charts
         lines.Add($"frametime {Ms(frameTime)} ms");
       if (frame.CpuBusy != NanosecondTimeDuration.Zero)
         lines.Add($"CPU busy {Ms(frame.CpuBusy)} ms");
+      // Its present (CPU start + CPU busy) against the plan, the screen and the frame before
+      if (present.PlannedLatency is { } planned)
+        lines.Add($"planned: shown {Ms(planned)} ms after its present");
+      if (present.ExtraDelay is { } extra)
+        lines.Add($"on screen {Ms(extra)} ms later after its present than the run's quickest frame");
+      if (present.LateReason is { } reason)
+        lines.Add(
+          reason switch
+          {
+            LateReason.SubmittedLateWork => "late: submitted late, its CPU work took longer than its target",
+            LateReason.SubmittedLateStart => "late: submitted late, it started late",
+            _ => "late: submitted on time, held after its present",
+          }
+        );
       // What the step to this frame was aimed at, as the reference lines draw it (the preferred frame time below, as the marker says it)
       if (FrameReference.Target(frame) is { } target)
         lines.Add($"target {Ms(target)} ms ({Invariant(NanosecondTimeSpan.NanosecondsPerSecond / (double)target.Nanoseconds, "0.#")} fps)");

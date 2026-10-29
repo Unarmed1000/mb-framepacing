@@ -876,6 +876,13 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       the failed ones, and the vsync-off check counts by the target only. The report: `HoldKind.PresentFailed`,
       `RunEventKind.PresentFailed`, the strip's last refreshes before the next frame, all tan (`#c69c6d`, `*-failed`,
       `key-tan`), the frames dropped tile's "· N present failed", the counts line, the hover and the playback page's pill.
+  - **Present timing** (the user, 2026-10-29: how long from submission to screen, "if we could detect if a frame was late due to
+    being submitted too late"): `PresentTimings` in Charts (`PresentTiming`, `LateReason`, `RunChartData.PresentTimings`) from the
+    frames, no output format: the present is CPU start + CPU busy. Planned latency (intended display − present, one clock, the
+    pacer's plan), the extra delay after the present over the run's quickest frame (the offset cancels out), a late frame's
+    present step against its intended period (`IntendedPeriods.Of`, half a refresh) for its reason (submitted late through its work
+    or its start, or held after an on-time present), and work over its intended period. Notes under `present-latency` and
+    `late-reasons` (`RunHeadline.PresentLines`), the GUI's caption, the hover. **Never an absolute present-to-screen time.**
   - **Assumed static** (`TimelineOptions.AssumeStatic`, on by default; `analyze --no-static-guess`, the GUI's "Guess static",
     `GuiSettings.AssumeStatic`): `TimelineAnalyzer.AssumeStatic` flags a frame `StaticAfter | StaticAssumed` when a frame the target
     dropped took the rest's flag: the next presented frame carries `StaticBefore` for a frame never shown, or (the flag lost) the run

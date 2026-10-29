@@ -211,6 +211,14 @@
       </ItemsControl>
       <Expander Header="Detailed statistics (ms)" HorizontalAlignment="Stretch">
         <StackPanel>
+          <!-- When the frames were presented (the report's present timing notes): only with the markers' CPU fields -->
+          <TextBlock
+            Classes="caption"
+            Margin="0,0,0,8"
+            IsVisible="{Binding SelectedRun.HasPresentText, FallbackValue=False}"
+            Text="{Binding SelectedRun.PresentText, FallbackValue=''}"
+            TextWrapping="Wrap"
+          />
           <Grid ColumnDefinitions="170,80,80,80,80,80,80,80">
             <TextBlock Grid.Column="1" Classes="caption" Text="min" TextAlignment="Right" />
             <TextBlock Grid.Column="2" Classes="caption" Text="mean" TextAlignment="Right" />

@@ -123,6 +123,12 @@ namespace MB.FramePacing.Charts
         description.Add((section.IsWholeRun ? "Cause: " : "Cause over the whole run: ") + RunHeadline.Cause(pacing));
       if (options.IsShown(ReportItem.Counts))
         description.Add((section.IsWholeRun ? string.Empty : "Over the whole run, ") + RunHeadline.Counts(run));
+      // When the frames were presented, from the markers' CPU fields: the plan after the present, the screen after it, why frames were late
+      foreach (var (id, line) in RunHeadline.PresentLines(section))
+      {
+        if (options.IsShown(id))
+          description.Add(line);
+      }
       // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
       int excluded = section.Data.StaticSteps.CountIn(section.Start, section.End);
       if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)

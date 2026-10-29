@@ -25,6 +25,8 @@ namespace MB.FramePacing.Charts
     public const string Counts = "counts";
     public const string RunWarnings = "run-warnings";
     public const string FrameRecordNote = "frame-record-note";
+    public const string PresentLatency = "present-latency";
+    public const string LateReasons = "late-reasons";
     public const string Tiles = "tiles";
     public const string AverageFps = "average-fps";
     public const string OnePercentLow = "one-percent-low";
@@ -77,6 +79,14 @@ namespace MB.FramePacing.Charts
       (Counts, "note: what the run's captures held: presented frames, decoded, undecodable, torn, not recorded, dropped, missed (with description)"),
       (RunWarnings, "notes: the run's warnings, as the GUI lists them (with description)"),
       (FrameRecordNote, "note: the start marker says the application logged the run's frame record to a trace (with description)"),
+      (
+        PresentLatency,
+        "notes: the planned time from present to screen, and how much later than the run's quickest frame each reached the screen after its present (with description)"
+      ),
+      (
+        LateReasons,
+        "notes: why late frames were late (submitted late, or held after an on-time present) and CPU work over its target (with description)"
+      ),
       (FrameTimeLines, "lines: the target and preferred frame time on the display time step and frametime panels"),
       (AnimationTimeStep, "overlay (opt-in): the animation time step on the display time step panel"),
     };
@@ -107,7 +117,7 @@ namespace MB.FramePacing.Charts
     /// The notes that say what the GUI says under the run, each of its own id so a card can leave it out: lines of the description, shown
     /// only with it (the description's other notes have no id of their own).
     /// </summary>
-    public static readonly IReadOnlyList<string> NoteIds = new[] { Cause, Counts, RunWarnings, FrameRecordNote };
+    public static readonly IReadOnlyList<string> NoteIds = new[] { Cause, Counts, RunWarnings, FrameRecordNote, PresentLatency, LateReasons };
 
     /// <summary>The opt-in overlays, each with the panel it is drawn on: off unless shown (ReportOptions.Show), and only with that panel.</summary>
     public static readonly IReadOnlyDictionary<string, string> Overlays = new Dictionary<string, string> { [AnimationTimeStep] = DisplayTimeStep };

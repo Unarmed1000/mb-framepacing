@@ -305,6 +305,15 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   hold one longer than 4.294967295 s as that (`Payload.MaxCpuBusy`, `0xFFFFFFFF`).
 - **What the analysis does:** the frametime panel draws it under the frametime, the frame timeline card as the length of the CPU
   box, and the **CPU wait** is the frametime minus CPU busy (PresentMon's `MsCPUWait`).
+- **With the CPU start time it places the present** (CPU start + CPU busy, on your clock), and the report's notes say:
+  - with an intended display time, the **planned time from present to screen** (the pacer's plan, not a measurement);
+  - how much later than the run's quickest frame each frame reached the screen after its present: a whole refresh more that stays
+    is a queue that filled. How long the quickest frame took is not known, as the capture's clock and yours are tied only by the
+    frames;
+  - **why each late frame was late:** submitted late (its present came half a refresh or more after its intended period from the
+    frame before's, its CPU work taking that long or its start coming late), or submitted on time and held after the present (GPU,
+    queue, compositor or display: the capture can not tell which);
+  - how often the CPU work alone took its intended period or longer.
 
 ### Start time and sequence id (start marker only)
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1447" viewBox="0 0 1180 1447" role="img" aria-label="Run 1  'perfect-storm'">
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1561" viewBox="0 0 1180 1561" role="img" aria-label="Run 1  'perfect-storm'">
 <title>Run 1  'perfect-storm'</title>
 <style>
   text { font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -125,7 +125,7 @@
   .ref-preferred { stroke: #d29922; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
   .key-light { fill: #adbac7; }
 </style>
-<rect class="card" x="0.5" y="0.5" width="1179" height="1446" rx="14"/>
+<rect class="card" x="0.5" y="0.5" width="1179" height="1560" rx="14"/>
 <text x="20.0" y="30.0" text-anchor="start" class="title">Run 1  'perfect-storm'</text>
 <text x="20.0" y="54.0" text-anchor="start" class="sub">The whole run: 8.0 s, 464 presented frames on a 60 Hz display, measured against a 16.7 ms target.</text>
 <text x="20.0" y="73.0" text-anchor="start" class="sub">More about this run in the notes at the end of the card.</text>
@@ -1226,4 +1226,10 @@
 <text x="20.0" y="1383.0" text-anchor="start" class="sub">Every frame is drawn.</text>
 <text x="20.0" y="1402.0" text-anchor="start" class="sub">Cause: mostly delta time jitter: an even display with uneven animation steps (32 error frame(s) at uneven display, 419 on an even display).</text>
 <text x="20.0" y="1421.0" text-anchor="start" class="sub">464 presented frames from 480 captures: 480 decoded, 0 undecodable, 0 torn, 0 not recorded; 0 dropped by the source, 0 missed. 0 frame indices never captured, 1 segment(s).</text>
+<text x="20.0" y="1440.0" text-anchor="start" class="sub">Planned time from present to screen: median 4.2 ms (0.2 refreshes), −4.2 ms to 4.2 ms (the pacer's intended display time: its plan, not a measurement).</text>
+<text x="20.0" y="1459.0" text-anchor="start" class="sub">Present to screen, beyond the run's quickest frame: median 0.0 ms, p95 8.3 ms, max 8.3 ms (0.5 refreshes). A whole refresh more that stays is a queue that filled; the quickest</text>
+<text x="20.0" y="1478.0" text-anchor="start" class="sub">frame's own time is not known (the clocks are tied only by the frames).</text>
+<text x="20.0" y="1497.0" text-anchor="start" class="sub">Late frames: 14; 6 submitted late (6 whose CPU work took longer than their target, 0 that started late), 8 submitted on time and shown late (held after the present: GPU, queue,</text>
+<text x="20.0" y="1516.0" text-anchor="start" class="sub">compositor or display; the capture can not tell which).</text>
+<text x="20.0" y="1535.0" text-anchor="start" class="sub">CPU work took its intended period or longer on 16 of 48 frames (33 %).</text>
 </svg>
