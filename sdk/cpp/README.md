@@ -45,15 +45,15 @@ The release archive, pinned by its hash (the release page lists it in `SHA256SUM
 ```cmake
 include(FetchContent)
 FetchContent_Declare(mb_framepacing
-  URL https://github.com/Unarmed1000/mb-framepacing/releases/download/sdk-v0.1.0-alpha.6/mb-framepacing-cpp-0.1.0-alpha.6.tar.gz
+  URL https://github.com/Unarmed1000/mb-framepacing/releases/download/sdk-v0.1.0-alpha.7/mb-framepacing-cpp-0.1.0-alpha.7.tar.gz
   URL_HASH SHA256=<from SHA256SUMS>
   FIND_PACKAGE_ARGS 0.1 CONFIG COMPONENTS marker)      # an installed copy of a compatible version wins
 FetchContent_MakeAvailable(mb_framepacing)
 target_link_libraries(my_game PRIVATE mb_framepacing::marker)
 ```
 
-Or git (`GIT_TAG sdk-v0.1.0-alpha.6`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of this folder, an installed copy with
-`find_package(mb_framepacing 0.1 CONFIG REQUIRED COMPONENTS marker data)`, or Conan 2 (`mb-framepacing/0.1.0-alpha.6` from the recipe in
+Or git (`GIT_TAG sdk-v0.1.0-alpha.7`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirectory` of this folder, an installed copy with
+`find_package(mb_framepacing 0.1 CONFIG REQUIRED COMPONENTS marker data)`, or Conan 2 (`mb-framepacing/0.1.0-alpha.7` from the recipe in
 [`conan/`](conan), see the guide). Every way gives the same targets: link the modules you use.
 
 | Option                              | Default                                                                                                                   |
