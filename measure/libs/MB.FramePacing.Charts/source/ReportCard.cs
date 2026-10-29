@@ -119,9 +119,10 @@ namespace MB.FramePacing.Charts
         perFrame ? "Every frame is drawn." : "Each pixel column shows its frames' range; with 20 or more, the middle 90 % solid and the rest faint.",
       };
       // The analysis of the run as the GUI's Analyze page says it: which cause of animation error dominates and what the captures held
-      if (pacing != null)
+      if (pacing != null && options.IsShown(ReportItem.Cause))
         description.Add((section.IsWholeRun ? "Cause: " : "Cause over the whole run: ") + RunHeadline.Cause(pacing));
-      description.Add((section.IsWholeRun ? string.Empty : "Over the whole run, ") + RunHeadline.Counts(run));
+      if (options.IsShown(ReportItem.Counts))
+        description.Add((section.IsWholeRun ? string.Empty : "Over the whole run, ") + RunHeadline.Counts(run));
       // The frame rates describe the frames that animate: counted from the prepared data, without the section's own numbers
       int excluded = section.Data.StaticSteps.CountIn(section.Start, section.End);
       if (RunHeadline.ExcludedStatic(excluded) is { } staticFrames)
@@ -146,9 +147,9 @@ namespace MB.FramePacing.Charts
             )
         );
       // The run's warnings and the note of its start marker's frame record flag, as the GUI lists them under the run
-      foreach (string runWarning in run.Warnings)
-        description.Add("Warning: " + runWarning);
-      if (FrameRecordNote.Of(run, chart.Trace != null) is { } recordNote)
+      if (options.IsShown(ReportItem.RunWarnings))
+        description.AddRange(run.Warnings.Select(runWarning => "Warning: " + runWarning));
+      if (options.IsShown(ReportItem.FrameRecordNote) && FrameRecordNote.Of(run, chart.Trace != null) is { } recordNote)
         description.Add(recordNote);
       // A Perfetto trace of the run was joined. What it has for these frames, and what its times rest on
       string? augmentedLine = null;

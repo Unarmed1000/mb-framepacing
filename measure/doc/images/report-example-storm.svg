@@ -129,7 +129,7 @@
 <text x="874.0" y="74.0" text-anchor="start" class="vsync-n">16.7 ms per refresh, target 1 refresh (60 fps)</text>
 <text x="874.0" y="90.0" text-anchor="start" class="vsync-n">preferred 60 fps</text>
 <rect class="tile pacing-band" x="20" y="1252" width="1140" height="52" rx="10"/>
-<text x="34.0" y="1273.0" text-anchor="start"><tspan class="label">PACER</tspan><tspan class="vsync-target">   pacer or limiter: not said</tspan><tspan class="vsync-n">   no frame carries the paced flag</tspan></text>
+<text x="34.0" y="1273.0" text-anchor="start"><tspan class="label">PACER</tspan><tspan class="vsync-target">   pacer or limiter: no</tspan><tspan class="vsync-n">   no frame carries the paced flag</tspan></text>
 <text x="1146.0" y="1273.0" text-anchor="end" class="vsync-n">measured against the pacer's schedule in the markers</text>
 <text x="34.0" y="1293.0" text-anchor="start"><tspan class="vsync-n">–</tspan><tspan class="vsync-n"> paced flag</tspan><tspan class="vsync-target">      99 %</tspan><tspan class="vsync-n"> schedule (intended display times)</tspan><tspan class="vsync-target">      ✓</tspan><tspan class="vsync-n"> target frame time: 60 fps</tspan><tspan class="vsync-target">      ✓</tspan><tspan class="vsync-n"> preferred frame time: 60 fps</tspan></text>
 <rect class="tile" x="20.0" y="118" width="276.0" height="64" rx="10"/>

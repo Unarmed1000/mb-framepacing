@@ -430,6 +430,7 @@ namespace MB.FramePacing.Charts.UnitTest
       (ReportItem.FrameTime, ">FRAMETIME AND CPU BUSY: THE APPLICATION SIDE, FROM THE MARKERS<"),
       (ReportItem.LateShare, ">SHARE OF LATE FRAMES IN THE LAST 2 S (WHOLE RUN "),
       (ReportItem.RefreshStrip, ">REFRESH STRIP: ONE CELL PER REFRESH, A NEW SHADE PER FRAME<"),
+      (ReportItem.Pacing, ">PACER<"),
     };
 
     /// <summary>Hiding an item removes exactly what it draws; the title, description, the tiles and every panel also make the card shorter.</summary>
@@ -624,6 +625,47 @@ namespace MB.FramePacing.Charts.UnitTest
 
       // summary.json keeps the start marker's flag: the run read back has it
       Assert.That(chart.Run.ToSummary("run-1-frames.csv").ToRun(chart.Run.Frames).FrameRecordLogged, Is.True);
+    }
+
+    /// <summary>
+    /// Each note that says what the GUI says under the run has an id of its own: hiding it leaves out exactly its lines, and the
+    /// description's other notes stay (a card can be what it was before those notes came). Naming one alone keeps the description.
+    /// </summary>
+    [Test]
+    public void Options_NoteIds_HideExactlyTheirLines()
+    {
+      var chart = Synthetic(600);
+      chart = chart with
+      {
+        Run = chart.Run with { Warnings = new[] { "Run 1 has no end marker (the capture ended first)" }, FrameRecordLogged = true },
+      };
+      var section = RunSection.Whole(chart);
+      List<string> Notes(ReportOptions options) =>
+        ReportCard.Build(section, options).FlatShapes.OfType<TextShape>().Where(t => t.Class == "sub").Select(t => t.Content).ToList();
+      var marks = new Dictionary<string, string>
+      {
+        [ReportItem.Cause] = "Cause: ",
+        [ReportItem.Counts] = "600 presented frames from ",
+        [ReportItem.RunWarnings] = "Warning: Run 1 has no end marker",
+        [ReportItem.FrameRecordNote] = "The start marker says the application logged",
+      };
+      Assert.That(marks.Keys, Is.EquivalentTo(ReportItem.NoteIds));
+      Assert.That(marks.Values.All(mark => Notes(ReportOptions.Default).Any(line => line.StartsWith(mark, StringComparison.Ordinal))));
+      foreach (var (id, mark) in marks)
+      {
+        var notes = Notes(ReportOptions.Default.Hide(new[] { id }));
+        Assert.That(notes, Has.None.StartsWith(mark), id + ": gone");
+        foreach (var (other, otherMark) in marks.Where(m => m.Key != id))
+          Assert.That(notes, Has.Some.StartsWith(otherMark), $"{id}: {other} stays");
+        Assert.That(notes, Has.Member("Every frame is drawn."), id + ": the description's other notes stay");
+      }
+      // All four hidden: the notes the card had before them
+      var before = Notes(ReportOptions.Default.Hide(ReportItem.NoteIds));
+      Assert.That(before.Skip(2), Is.EqualTo(new[] { "Resolution 4.2 ms (one capture period); error threshold 1 ms.", "Every frame is drawn." }));
+      // One named alone: the description stays for it
+      var only = Notes(ReportOptions.ShowOnly(new[] { ReportItem.Cause }));
+      Assert.That(only, Has.Some.StartsWith("Cause: "));
+      Assert.That(only, Has.None.StartsWith("600 presented frames from "));
     }
 
     /// <summary>ShowOnly keeps just the items named: one panel is a card of that panel; one tile is a tiles row of it.</summary>

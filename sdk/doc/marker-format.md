@@ -176,8 +176,7 @@ say the same fact, for applications that know it at different moments:
   began. A present that blocks until the display takes the frame (vsync alone) is not that. Set it on every such frame, from the
   application's own pacer or limiter or from the SDK's pacer (`FrameSchedule::Paced`); it is `0` unless set, and pacing may switch
   on and off during a run. A start or end marker carries the value of the frame that shows it. The mb-framepacing tools read it as
-  the application's word: in a run where any frame sets it, a frame without it was not paced; a run where none does says nothing
-  either way, and the report does not work it out from the other pacing fields.
+  the application's word: a frame without it was not paced, and the report does not work it out from the other pacing fields.
 - **Bits 4 to 7** are reserved for future flags. Write `0`. Decoders accept any value and ignore the bits they do not know.
 
 ### CPU start time and CPU busy

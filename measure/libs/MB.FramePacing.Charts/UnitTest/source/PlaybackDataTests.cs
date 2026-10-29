@@ -42,6 +42,22 @@ namespace MB.FramePacing.Charts.UnitTest
     private static JsonDocument Data(RunSection section) =>
       JsonDocument.Parse(PlaybackData.Json(section, PlaybackPage.Cards(section, ReportOptions.Default), ReportOptions.Default, g_video, "test"));
 
+    /// <summary>
+    /// The page's cards leave out what the options hide (import --playback-hide pacing), as well as the title and the tiles, which the page's
+    /// header has: every card, the whole report's and each zoom step's.
+    /// </summary>
+    [Test]
+    public void Cards_LeaveOutWhatTheOptionsHide()
+    {
+      var section = RunSection.Whole(GoldenRun());
+      static bool HasBand(PlaybackCard card) => card.Drawing.FlatShapes.OfType<TextRunsShape>().Any(t => t.Runs[0].Text == "PACER");
+      var shown = PlaybackPage.Cards(section, ReportOptions.Default);
+      Assert.That(shown, Has.Count.GreaterThan(1));
+      Assert.That(shown.All(HasBand));
+      Assert.That(shown.SelectMany(c => c.Drawing.FlatShapes.OfType<TextShape>()).Where(t => t.Class == "title"), Is.Empty, "no title");
+      Assert.That(PlaybackPage.Cards(section, ReportOptions.Default.Hide(new[] { ReportItem.Pacing })).Any(HasBand), Is.False);
+    }
+
     [Test]
     public void FrameColumns_ReadBack_AreTheRunsFrames()
     {

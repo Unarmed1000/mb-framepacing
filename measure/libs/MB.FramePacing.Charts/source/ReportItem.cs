@@ -21,6 +21,10 @@ namespace MB.FramePacing.Charts
     public const string Display = "display";
     public const string Warning = "warning";
     public const string Pacing = "pacing";
+    public const string Cause = "cause";
+    public const string Counts = "counts";
+    public const string RunWarnings = "run-warnings";
+    public const string FrameRecordNote = "frame-record-note";
     public const string Tiles = "tiles";
     public const string AverageFps = "average-fps";
     public const string OnePercentLow = "one-percent-low";
@@ -69,6 +73,10 @@ namespace MB.FramePacing.Charts
         Pacing,
         "the pacer band under the panels: whether a pacer or a frame limiter held the frames (the markers' paced flag), a checkbox per pacing field, and what the frames are measured against"
       ),
+      (Cause, "note: which cause of animation error dominates, as the GUI says it (with description)"),
+      (Counts, "note: what the run's captures held: presented frames, decoded, undecodable, torn, not recorded, dropped, missed (with description)"),
+      (RunWarnings, "notes: the run's warnings, as the GUI lists them (with description)"),
+      (FrameRecordNote, "note: the start marker says the application logged the run's frame record to a trace (with description)"),
       (FrameTimeLines, "lines: the target and preferred frame time on the display time step and frametime panels"),
       (AnimationTimeStep, "overlay (opt-in): the animation time step on the display time step panel"),
     };
@@ -94,6 +102,12 @@ namespace MB.FramePacing.Charts
     /// (ReportOptions.Show) keeps it whatever it counts; hiding it leaves it out.
     /// </summary>
     public static readonly IReadOnlyList<string> AutoTiles = new[] { FramesDropped, OutOfOrder };
+
+    /// <summary>
+    /// The notes that say what the GUI says under the run, each of its own id so a card can leave it out: lines of the description, shown
+    /// only with it (the description's other notes have no id of their own).
+    /// </summary>
+    public static readonly IReadOnlyList<string> NoteIds = new[] { Cause, Counts, RunWarnings, FrameRecordNote };
 
     /// <summary>The opt-in overlays, each with the panel it is drawn on: off unless shown (ReportOptions.Show), and only with that panel.</summary>
     public static readonly IReadOnlyDictionary<string, string> Overlays = new Dictionary<string, string> { [AnimationTimeStep] = DisplayTimeStep };

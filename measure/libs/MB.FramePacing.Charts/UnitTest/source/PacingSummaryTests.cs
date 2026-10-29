@@ -36,11 +36,11 @@ namespace MB.FramePacing.Charts.UnitTest
     private static string[] Marks(PacingSummary pacing) => pacing.Rows.Select(r => r.Mark).ToArray();
 
     [Test]
-    public void NoPacingFields_IsNotSaid_AndEveryBoxIsEmpty()
+    public void NoPacingFields_IsNotPaced_AndEveryBoxIsEmpty()
     {
       var pacing = Whole((f, _) => f);
-      Assert.That(pacing.Answer, Is.EqualTo(PacedAnswer.NotSaid));
-      Assert.That(pacing.Line, Is.EqualTo("pacer or limiter: not said (no frame carries the paced flag)"));
+      Assert.That(pacing.Answer, Is.EqualTo(PacedAnswer.NotPaced));
+      Assert.That(pacing.Line, Is.EqualTo("pacer or limiter: no (no frame carries the paced flag)"));
       Assert.That(Marks(pacing), Is.EqualTo(new[] { "–", "–", "–", "–" }));
       Assert.That(
         pacing.Rows.Select(r => r.Name),
@@ -50,8 +50,9 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// Without the paced flag nothing is guessed: a schedule, a target frame time that changes or is slower than the preferred one, a constant
-    /// target (a frame limiter writes one, and a loop on vsync that knows its refresh writes a schedule) are listed, never an answer.
+    /// Without the paced flag the frames were not paced, whatever else the markers carry: a schedule, a target frame time that changes or
+    /// is slower than the preferred one, a constant target (a frame limiter writes one, a loop on vsync that knows its refresh writes a
+    /// schedule) are listed, never an answer.
     /// </summary>
     [Test]
     public void WithoutThePacedFlag_TheOtherFieldsAreListed_AndNothingIsGuessed()
@@ -65,7 +66,7 @@ namespace MB.FramePacing.Charts.UnitTest
             MarkerPreferredFrameTime = g_60,
           }
       );
-      Assert.That(pacing.Answer, Is.EqualTo(PacedAnswer.NotSaid));
+      Assert.That(pacing.Answer, Is.EqualTo(PacedAnswer.NotPaced));
       Assert.That(
         pacing.Rows.Select(r => r.Text),
         Is.EqualTo(
@@ -102,15 +103,14 @@ namespace MB.FramePacing.Charts.UnitTest
     }
 
     /// <summary>
-    /// The paced flag is the application's word: paced frames are said so with their share, and in a run that carries the flag a section
-    /// without it was not paced.
+    /// The paced flag is the application's word: paced frames are said so with their share, and a section without it was not paced.
     /// </summary>
     [Test]
-    public void ThePacedFlag_IsTheAnswer_InEverySectionOfARunThatCarriesIt()
+    public void ThePacedFlag_IsTheAnswer_InEverySection()
     {
       var chart = Run((f, i) => i < Frames / 2 ? f with { Flags = f.Flags | PresentedFrameFlags.Paced } : f);
       var whole = RunHeadline.Pacing(RunSection.Whole(chart));
-      Assert.That(whole.Answer, Is.EqualTo(PacedAnswer.MarkersSayPaced));
+      Assert.That(whole.Answer, Is.EqualTo(PacedAnswer.Paced));
       Assert.That(whole.Line, Is.EqualTo("pacer or limiter: in 50 % of the frames (the markers say so)"));
       Assert.That(Marks(whole), Is.EqualTo(new[] { "50 %", "–", "–", "–" }));
 
@@ -120,8 +120,8 @@ namespace MB.FramePacing.Charts.UnitTest
 
       // The second half of the 2.5 s run: frames 300 on
       var unpaced = RunHeadline.Pacing(RunSection.Create(chart, 1.5, 2.4));
-      Assert.That(unpaced.Answer, Is.EqualTo(PacedAnswer.MarkersSayNotPaced));
-      Assert.That(unpaced.Line, Is.EqualTo("pacer or limiter: no (the markers say so)"));
+      Assert.That(unpaced.Answer, Is.EqualTo(PacedAnswer.NotPaced));
+      Assert.That(unpaced.Line, Is.EqualTo("pacer or limiter: no (no frame carries the paced flag)"));
       Assert.That(unpaced.Rows[0].Mark, Is.EqualTo("–"));
     }
 

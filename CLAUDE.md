@@ -857,8 +857,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       two loops that place frames, false in `FreeRunLoop`). The tools keep it as `PresentedFrameFlags.Paced` (the frames CSV's flag
       `Paced`) and judge nothing by it. **The report's pacer band** (`RunHeadline.Pacing` → `PacingSummary`, `ReportItem.Pacing`,
       a full-width band under the panels, labelled PACER so it is not read as "pacing was fine"; the GUI's "Pacer or limiter:"
-      caption line) answers from the flag only: in a run where any frame carries it, a frame without it was not held ("the markers
-      say so"); a run where none does is "not said". **Never guess it from the other fields** (the user, 2026-10-29: "stop
+      caption line) answers from the flag only: a frame without it was not held, so a section where none carries it reads "no"
+      (the user, 2026-10-29: "I dont understand why a run without a pacer bit isnt just NO"; no start-marker bit to declare the
+      flag is used). `--playback-hide <ids>` (import, analyze, render) leaves items out of the playback page's card; the notes
+      b8096cdb added have ids of their own (`cause`, `counts`, `run-warnings`, `frame-record-note`, `ReportItem.NoteIds`), so
+      explained's cards can be as before. **Never guess it from the other fields** (the user, 2026-10-29: "stop
       guessing now we have a bit"; a vsync loop that knows its refresh writes a schedule, a frame limiter a target). Then a
       checkbox per pacing field (✓ every frame, the share as the mark when some frames carry it, – none: a half-filled circle
       reads as a dot at the card's size) and what the frames are measured against (`RunHeadline.TargetSource`, also `analyze`'s

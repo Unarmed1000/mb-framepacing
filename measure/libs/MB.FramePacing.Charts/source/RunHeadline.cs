@@ -299,9 +299,9 @@ namespace MB.FramePacing.Charts
     /// What the markers of <paramref name="section"/> say about pacing (the report's pacer band and the GUI's Pacer line): whether a pacer
     /// or a frame limiter held its frames, a checkbox per pacing field, and what the analysis measured them against.
     /// <list type="bullet">
-    /// <item>Only the markers' paced flag answers, the application's word: in a run where any frame carries it, the section's frames
-    /// without it were not held. A run where no frame carries it does not say, and the report does not guess from the other fields
-    /// (the user, 2026-10-29: "stop guessing now we have a bit").</item>
+    /// <item>Only the markers' paced flag answers, the application's word: a frame without it was not held by a pacer or a limiter (the
+    /// user, 2026-10-29: a run without the bit is not paced). Nothing is worked out from the other fields ("stop guessing now we have a
+    /// bit").</item>
     /// <item>The checkboxes are facts: ✓ every frame of the section carries the field, its share when some do, – none.</item>
     /// </list>
     /// </summary>
@@ -311,7 +311,6 @@ namespace MB.FramePacing.Charts
       var pacing = chart.Run.Pacing;
       var refresh = pacing?.RefreshPeriod ?? chart.CapturePeriod;
       var frames = Enumerable.Range(section.Start, section.FrameCount).Select(i => section.Data.Frames[i]).ToList();
-      bool runSaysPaced = section.Data.Frames.Any(f => f.Flags.HasFlag(PresentedFrameFlags.Paced));
       int count = frames.Count;
       int paced = frames.Count(f => f.Flags.HasFlag(PresentedFrameFlags.Paced));
       int scheduled = frames.Count(f => f.IntendedDisplayTime != default);
@@ -363,9 +362,9 @@ namespace MB.FramePacing.Charts
       };
 
       var (answer, value, basis) =
-        !runSaysPaced ? (PacedAnswer.NotSaid, "not said", "no frame carries the paced flag")
-        : paced == 0 ? (PacedAnswer.MarkersSayNotPaced, "no", "the markers say so")
-        : (PacedAnswer.MarkersSayPaced, paced == count ? "yes" : $"in {PercentOf(paced, count)} of the frames", "the markers say so");
+        paced == 0
+          ? (PacedAnswer.NotPaced, "no", "no frame carries the paced flag")
+          : (PacedAnswer.Paced, paced == count ? "yes" : $"in {PercentOf(paced, count)} of the frames", "the markers say so");
       return new PacingSummary(answer, value, basis, rows, pacing != null ? TargetSource(pacing.Source) : string.Empty);
     }
 

@@ -61,21 +61,42 @@ namespace MB.FramePacing.App.Commands
         HelpName = "ask|yes|no",
       };
 
+    public Option<string?> Hide { get; } =
+      new Option<string?>("--playback-hide")
+      {
+        Description =
+          "With --playback: leave these items out of the report card the page shows, comma separated (the ids of render --hide, e.g. "
+          + "pacing). The page shows the title and the tiles in its own header, never on the card.",
+        HelpName = "ids",
+      };
+
     /// <summary>Add the options to <paramref name="command"/>: the others only with --playback.</summary>
     public void AddTo(Command command)
     {
-      foreach (var option in new Option[] { Playback, Video, VideoUrl, TranscodeChoice })
+      foreach (var option in new Option[] { Playback, Video, VideoUrl, TranscodeChoice, Hide })
         command.Options.Add(option);
       command.Validators.Add(result =>
       {
         if (!result.GetValue(Playback))
         {
-          foreach (var option in new Option[] { Video, VideoUrl, TranscodeChoice })
+          foreach (var option in new Option[] { Video, VideoUrl, TranscodeChoice, Hide })
           {
             if (result.GetResult(option) is { Implicit: false })
               result.AddError($"{option.Name} goes with --playback.");
           }
           return;
+        }
+        // Unknown item ids are refused before anything is imported or analysed
+        if (result.GetValue(Hide) is { } hide)
+        {
+          try
+          {
+            ReportOptions.ParseIds(hide);
+          }
+          catch (ArgumentException ex)
+          {
+            result.AddError($"{Hide.Name}: {ex.Message}");
+          }
         }
         // A named video replaces the copy: the recording and the question about it do not apply
         if (result.GetResult(VideoUrl) is { Implicit: false })
@@ -130,7 +151,9 @@ namespace MB.FramePacing.App.Commands
         TranscodeChoice = PlaybackExportOptions.Choice(parseResult.GetValue(output.TranscodeChoice), config),
         FromSeconds = fromSeconds,
         ToSeconds = toSeconds,
-        Report = report ?? ReportOptions.Default,
+        Report = parseResult.GetValue(output.Hide) is { } hide
+          ? (report ?? ReportOptions.Default).Hide(ReportOptions.ParseIds(hide))
+          : report ?? ReportOptions.Default,
         ToolVersion = Program.VersionString,
       };
       var progress = new ConsoleProgress();

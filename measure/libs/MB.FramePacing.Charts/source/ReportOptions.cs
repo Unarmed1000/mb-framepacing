@@ -118,6 +118,9 @@ namespace MB.FramePacing.Charts
         shown.UnionWith(ReportItem.TileIds);
       if (ReportItem.TileIds.Any(shown.Contains))
         shown.Add(ReportItem.Tiles);
+      // A note is one of the description's lines: naming it keeps the description
+      if (ReportItem.NoteIds.Any(shown.Contains))
+        shown.Add(ReportItem.Description);
       foreach (var (overlay, panel) in ReportItem.Overlays)
       {
         if (shown.Contains(overlay))

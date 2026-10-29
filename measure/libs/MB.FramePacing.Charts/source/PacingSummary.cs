@@ -13,7 +13,7 @@ using System.Collections.Generic;
 namespace MB.FramePacing.Charts
 {
   /// <param name="Answer">Whether a pacer or a frame limiter held the frames, as the paced flag says.</param>
-  /// <param name="Value">The answer in a few words ("yes", "in 50 % of the frames", "no", "not said").</param>
+  /// <param name="Value">The answer in a few words ("yes", "in 50 % of the frames", "no").</param>
   /// <param name="Basis">Where it comes from ("the markers say so", "no frame carries the paced flag").</param>
   /// <param name="Rows">A checkbox per pacing field, in the marker's order.</param>
   /// <param name="MeasuredAgainst">What the analysis measured the frames against ("the pacer's schedule in the markers"), empty without pacing.</param>

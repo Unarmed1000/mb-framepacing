@@ -101,8 +101,8 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
   same band: the application rendered faster than the display showed its frames, so vsync was probably off (or a present mode showed
   the newest frame at each refresh). The frames are measured as they were presented; check the application's vsync setting.
 - The report card's **PACER** band under its panels (the GUI's **Pacer or limiter:** line) says whether a pacer or a frame limiter
-  held the frames, as the markers' paced flag says ("yes", the share of the frames, "no"); a run whose markers never set it reads
-  "not said", as the other pacing fields can not tell it (a loop that only waits for vsync can write a schedule). Then a checkbox
+  held the frames, as the markers' paced flag says ("yes", the share of the frames, or "no" when no frame carries it; the other pacing
+  fields can not tell it, as a loop that only waits for vsync can write a schedule). Then a checkbox
   per pacing field (✓ every frame, the share when some frames carry it, – none) and what the frames are measured against.
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
@@ -236,6 +236,8 @@ zoomed), and **Open playback page** opens it. A report is written only when you 
   ffmpeg copies the video into an MP4 file when only the container is the problem (quick), and otherwise encodes it as H.264 (this
   takes a while). Every frame keeps its timestamp. The tools **ask** first; without the copy the report has no video, and the page
   shows the command that makes it and an **Open video...** button for a file of the recording.
+- **Items of the card can be left out of the page** with `--playback-hide <ids>` (the ids of `render --hide`, e.g. `pacing`); the
+  title and the tiles are in the page's own header, never on its card.
 - **The answer can be given in advance**: per run with `--playback-transcode yes|no|ask`, or for good in the configuration
   (`playbackTranscode`; `config --set-playback-transcode yes`, the GUI's Settings page, or **Remember my choice** in its question).
   When the command line cannot ask (its input is redirected), it makes no copy and says which option answers the question.
@@ -289,8 +291,9 @@ mb-framepacing render capture-20260924-153000 --timeline --from 1.5 --to 1.86 --
 Times are seconds since the run's first frame, the Timeline's axis. Every item of the card can be left out or kept alone, by id:
 `--hide late-share,refresh-strip`, `--only animation-error,display-time-step`. The ids: `title`, `description` (the line under
 the title that says what the card shows, and the notes at the end of the card: the resolution, how the frames are drawn, static
-frames, capture gaps, a joined trace, the sequence id), `display`, `warning` (the band under the header when the display and the
-capture disagree or vsync was probably off), `pacing` (the pacing band), `tiles`
+frames, capture gaps, a joined trace, the sequence id), the notes of what the GUI says under the run, each of its own (`cause`,
+`counts`, `run-warnings`, `frame-record-note`), `display`, `warning` (the band under the header when the display and the
+capture disagree or vsync was probably off), `pacing` (the pacer band), `tiles`
 (all tiles) or one tile (`average-fps`, `one-percent-low`, `point-one-percent-low`, `frames-dropped`, `out-of-order`, `frames-off`,
 `error-p99`, `error-p999`, `worst-error`, `late-frames`), the panels `animation-error`, `display-time-step`, `frametime`, `late-share`, `refresh-strip`,
 `events`, and `frame-time-lines`: the target and preferred frame time as dashed lines on the display time step and frametime panels

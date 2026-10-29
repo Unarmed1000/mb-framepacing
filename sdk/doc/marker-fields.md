@@ -140,13 +140,13 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   - The SDK's pacer (experimental): `FrameSchedule::Paced` is the value, true while `TierPacer` paces and false after
     `SetPacing(false)`.
 - **Changes:** whenever pacing is switched on or off.
-- **Unknown (`0`):** the default. A `0` reads as "not paced" only in a run where some frame sets the bit; a run where none does says
-  nothing either way.
-- **What the analysis does:** the report's pacer band says whether a pacer or limiter held the frames, and in what share of them. In
-  a run without the bit it says "not said": it does not work it out from the other pacing fields, since a loop that only waits for
-  vsync can write a schedule and a frame limiter a target frame time. Nothing is measured or judged by the flag.
+- **Not paced (`0`):** the default, and what it means: no pacer or limiter held the frame. An application that paces sets the bit;
+  one that does not leaves it off, and its frames read "not paced".
+- **What the analysis does:** the report's pacer band says whether a pacer or limiter held the frames, and in what share of them;
+  without the bit, "no". It does not work it out from the other pacing fields, since a loop that only waits for vsync can write a
+  schedule and a frame limiter a target frame time. Nothing is measured or judged by the flag.
 - **Goes wrong when:** it is set for frames that only vsync held (the report says paced where nothing planned), or left out while a
-  pacer runs (the report says "not said").
+  pacer runs (the report says not paced).
 
 ### Animation time
 
