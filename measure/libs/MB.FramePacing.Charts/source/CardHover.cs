@@ -142,7 +142,11 @@ namespace MB.FramePacing.Charts
         lines.Add($"CPU busy {Ms(frame.CpuBusy)} ms");
       // Its present (CPU start + CPU busy) against the plan, the screen and the frame before
       if (present.PlannedLatency is { } planned)
-        lines.Add($"planned: shown {Ms(planned)} ms after its present");
+        lines.Add(
+          planned.Nanoseconds >= 0
+            ? $"planned: shown {Ms(planned)} ms after its present"
+            : $"presented {Ms(new NanosecondTimeSpan(-planned.Nanoseconds))} ms after its intended display time"
+        );
       if (present.ExtraDelay is { } extra)
         lines.Add($"on screen {Ms(extra)} ms later after its present than the run's quickest frame");
       if (present.LateReason is { } reason)

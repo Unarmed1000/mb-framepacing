@@ -181,7 +181,15 @@ namespace MB.FramePacing.Charts
       string Ms(double milliseconds) => (milliseconds < 0 ? "−" : string.Empty) + ReportCard.Ms1(Math.Abs(milliseconds)) + " ms";
       string InRefreshes(double milliseconds) =>
         refresh > NanosecondTimeDuration.Zero ? $" ({Invariant(milliseconds / refresh.Value.TotalMilliseconds, "0.0")} refreshes)" : string.Empty;
-      var planned = timings.Select(t => t.PlannedLatency).OfType<NanosecondTimeSpan>().ToList();
+      // The plan of the frames presented before their intended display time: one presented after it (its CPU work or its start ran past
+      // the refresh it was meant for) has no time to the screen left in its plan, and would read as a negative latency
+      var scheduled = timings.Select(t => t.PlannedLatency).OfType<NanosecondTimeSpan>().ToList();
+      var planned = scheduled.Where(p => p.Nanoseconds >= 0).ToList();
+      int afterIntended = scheduled.Count - planned.Count;
+      string leftOut =
+        afterIntended == 0 ? string.Empty
+        : afterIntended == 1 ? "; 1 frame presented after its intended display time is left out"
+        : $"; {Number(afterIntended)} frames presented after their intended display time are left out";
       if (planned.Count > 0)
       {
         var s = Statistics.From(planned);
@@ -189,10 +197,12 @@ namespace MB.FramePacing.Charts
           (
             ReportItem.PresentLatency,
             $"Planned time from present to screen: median {Ms(s.P50)}{InRefreshes(s.P50)}, {Ms(s.Min)} to {Ms(s.Max)} "
-              + "(the pacer's intended display time: its plan, not a measurement)."
+              + $"(the pacer's intended display time: its plan, not a measurement){leftOut}."
           )
         );
       }
+      else if (afterIntended > 0)
+        lines.Add((ReportItem.PresentLatency, "Every frame with an intended display time was presented after it: no planned time to the screen."));
       var extra = timings.Select(t => t.ExtraDelay).OfType<NanosecondTimeSpan>().ToList();
       if (extra.Count > 0)
       {

@@ -71,6 +71,27 @@ namespace MB.FramePacing.Charts.UnitTest
       );
     }
 
+    /// <summary>
+    /// A frame whose CPU work ran past its intended display time has no time to the screen left in its plan: it is left out of the planned
+    /// time and counted, so the line never reads as a negative latency; its own hover says how late its present came.
+    /// </summary>
+    [Test]
+    public void FramesPresentedAfterTheirIntendedDisplayTime_AreLeftOutOfThePlan()
+    {
+      var run = Run(change: (f, i) => i % 100 == 50 ? f with { CpuBusy = NanosecondTimeDuration.FromNanoseconds(3 * Refresh) } : f);
+      var timings = RunChartData.Of(run).PresentTimings;
+      Assert.That(timings[50].PlannedLatency?.Nanoseconds, Is.EqualTo(Busy - Refresh), "presented a refresh less 1 ms after its intended display");
+      Assert.That(
+        Lines(run, ReportItem.PresentLatency)[0],
+        Is.EqualTo(
+          "Planned time from present to screen: median 8.3 ms (2.0 refreshes), 8.3 ms to 8.3 ms "
+            + "(the pacer's intended display time: its plan, not a measurement); 6 frames presented after their intended display time are left out."
+        )
+      );
+      var all = Run(change: (f, _) => f with { CpuBusy = NanosecondTimeDuration.FromNanoseconds(3 * Refresh) });
+      Assert.That(Lines(all, ReportItem.PresentLatency)[0], Does.StartWith("Every frame with an intended display time was presented after it"));
+    }
+
     /// <summary>The run's quickest frame is the reference: a queue that fills shows as a whole refresh more that stays, whatever the clocks' offset.</summary>
     [Test]
     public void TheExtraDelay_IsAfterThePresent_OverTheRunsQuickestFrame()
