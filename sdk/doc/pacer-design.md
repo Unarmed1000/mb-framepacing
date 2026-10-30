@@ -1046,10 +1046,14 @@ simulated, by holding back every call for 3 or 4 s.
 - **The model's sum holds:** a refresh and the display's lead, less the call's delay. This compositor has no lead to speak of, so
   about 16 ms where the model's 5 ms gives 21.
 - **Calls that are held back stop the loop inside the present.** On FIFO one wait ran out (66.7 ms is that timeout at 60 Hz; 67.8 ms
-  on Vulkan, 78.3 ms on OpenGL ES, about 12 ms over, not explained) and the next present did not return: 2,932.0 ms on Vulkan and
-  2,924.5 ms on OpenGL ES of a hold of 3 s, and 3,000.7 ms for a present with the pacer off, with the thread in Mesa's WSI in
+  on Vulkan, and on OpenGL ES 67.5 to 67.7 ms in three runs and 78.3 ms in one, about 12 ms over, not explained) and the next
+  present did not return: 2,932.0 ms on Vulkan and 2,924.5 to 2,933.7 ms in those four on OpenGL ES, of a hold of 3 s, and 3,000.7 ms for a present with the pacer off, with the thread in Mesa's WSI in
   `wl_display_dispatch_queue`. So the two waits that stop the waits are not made, `WorkingTier()` does not fall to 3.4, and no
-  rule runs. The loop went on by itself when the calls were back. MAILBOX went on presenting through the hold.
+  rule runs. The loop went on by itself when the calls were back.
+- **On a present that goes on the waits stop as built** (Vulkan's MAILBOX, smoothness, a hold of 3 s from the 300th commit): the tier
+  went 3.3c, 3.4, 3.3c by itself, by the sample's log of the working tier; 12 waits ran out, the two longest 67.7 and 67.4 ms. Its 174
+  commits in the hold had at most 8 calls asked for, so requests were skipped, and the tier coming back says that a later call
+  answered for them: seen from that, not checked present by present.
 
 **What the simulation adds to that.** A present that waits as long as the calls stay away gives the same: 2,933.7 ms of a hold of 3 s,
 and the waits never stop. A present of more than 2 s (the frame window's length) starts the frames again, and nothing is lost.
@@ -1058,8 +1062,7 @@ A shorter one is one frame that is late by it: the animation time is that far be
 that was not shown and a narrow band, so nothing was changed for it.
 
 **What it does not answer.** Whether a real compositor holds calls back like this, and what a present does then: that needs a real
-one. Whether the waits stop as built on a present that goes on (MAILBOX should show it; those runs did not say). The tier's rank
-against 3.4 is a proposal, as every order here is. And a loop that stands in its present stands with its application's thread, which
+one. The tier's rank against 3.4 is a proposal, as every order here is. And a loop that stands in its present stands with its application's thread, which
 no pacer can help: a present mode that does not wait for the call, or the FIFO protocol, can.
 
 ## Every time is in nanoseconds
@@ -2261,7 +2264,7 @@ measured only where a section above says so.
 
 9. **The frame callback measured** (decision 22, 2026-10-30: first runs on a test compositor, "The frame callback"): on a real
    compositor and GPU, with both aims, against 3.4, with a capture; whether a real compositor holds calls back and what a present
-   does then; the waits stopping on a present that goes on. Not built: with low latency, a start held after the call.
+   does then. Not built: with low latency, a start held after the call.
 
 Not planned, and written down above: a pacer that relies on a display's side that skips (the "s"); an aim the pacer picks;
 pacing by display times beyond the display's slip in major tier 2 (decision 20); variable refresh.
