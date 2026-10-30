@@ -45,6 +45,30 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     return capabilities.Has(PacerCapability::WaitForPresent) || capabilities.Has(PacerCapability::DisplayTimes);
   }
 
+  //! Whether a frame callback would hold the loop in this set, were it there. Not with a wait for a present, which says more.
+  //! Not with vertical blank times: there a wait's return is read as the refresh a frame was shown at, and a window system's call
+  //! says that the display's side took a frame, which may be before it is shown. And not where display times reach the second
+  //! major tier: the display's side places the frames there, and the loop follows its slip.
+  [[nodiscard]] constexpr bool FrameCallbackCanHold(const PacerCapabilities& capabilities) noexcept
+  {
+    const bool placedAfterFrameBefore =
+      HasPresentAfterDuration(capabilities) && !HasPresentAtTime(capabilities) && capabilities.Has(PacerCapability::DisplayTimes);
+    return !capabilities.Has(PacerCapability::WaitForPresent) && !capabilities.Has(PacerCapability::VBlankTimes) && !placedAfterFrameBefore;
+  }
+
+  //! Whether a frame callback holds the loop: the set has one, and it can (FrameCallbackCanHold). The plan's wait for a present
+  //! is then that present's callback.
+  [[nodiscard]] constexpr bool HoldsByFrameCallback(const PacerCapabilities& capabilities) noexcept
+  {
+    return capabilities.Has(PacerCapability::FrameCallback) && FrameCallbackCanHold(capabilities);
+  }
+
+  //! Whether the display's side holds the loop before a frame: a wait for a present, or a frame callback where one holds it.
+  [[nodiscard]] constexpr bool HasDisplayHold(const PacerCapabilities& capabilities) noexcept
+  {
+    return capabilities.Has(PacerCapability::WaitForPresent) || HoldsByFrameCallback(capabilities);
+  }
+
   //! The major tier of a tier: who places a frame on its refresh. A value that is no tier is taken as the tier next to it.
   [[nodiscard]] constexpr PacerMajorTier MajorOf(const PacerTier tier) noexcept
   {
@@ -83,13 +107,15 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
   }
 
   //! Whether the set reaches the tier: it has what the tier's major tier needs (a time on the present; a duration on the present),
-  //! and the wait for a present, the vertical blank times and the display times that the tier is named for. TimerPeriodOnly needs
+  //! and the wait for a present, the vertical blank times and the display times that the tier is named for. On a grid on the clock
+  //! a frame callback is that wait, but for the second major tier, which has to see where frames were shown. TimerPeriodOnly needs
   //! nothing, so every set reaches it.
   [[nodiscard]] constexpr bool Reaches(const PacerCapabilities& capabilities, const PacerTier tier) noexcept
   {
     const bool atTime = HasPresentAtTime(capabilities);
     const bool afterDuration = HasPresentAfterDuration(capabilities);
     const bool wait = capabilities.Has(PacerCapability::WaitForPresent);
+    const bool hold = HasDisplayHold(capabilities);
     const bool vblank = capabilities.Has(PacerCapability::VBlankTimes);
     const bool displayTimes = capabilities.Has(PacerCapability::DisplayTimes);
     switch (tier)
@@ -97,7 +123,7 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     case PacerTier::AtTimeVBlankWaitForPresent:
       return atTime && vblank && wait;
     case PacerTier::AtTimeTimerWaitForPresent:
-      return atTime && wait;
+      return atTime && hold;
     case PacerTier::AtTimeVBlankPeriodOnly:
       return atTime && vblank;
     case PacerTier::AtTimeTimerPeriodOnly:
@@ -115,7 +141,7 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     case PacerTier::VBlankPeriodOnly:
       return vblank;
     case PacerTier::TimerWaitForPresent:
-      return wait;
+      return hold;
     case PacerTier::TimerPeriodOnly:
       break;
     }
@@ -130,13 +156,15 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
   }
 
   //! The rating of a set: the best tier it reaches, the capabilities that would raise it, and the facts beside it: whether display
-  //! times are reported, whether the display's side holds and whether it skips a frame that is overdue.
+  //! times are reported, whether the display's side holds, whether it skips a frame that is overdue and whether a frame callback
+  //! holds the loop.
   [[nodiscard]] constexpr PacerRating Rate(const PacerCapabilities& capabilities) noexcept
   {
     PacerRating rating;
     rating.ReportsDisplayTimes = capabilities.Has(PacerCapability::DisplayTimes);
     rating.DisplaySideHolds = DisplaySideHolds(capabilities);
     rating.SkipsOverdue = capabilities.Has(PacerCapability::PresentSkipsOverdue);
+    rating.HoldsByFrameCallback = HoldsByFrameCallback(capabilities);
     // The best tier: the first one of the list that the set reaches (every set reaches the last)
     auto number = static_cast<uint8_t>(PacerTier::AtTimeVBlankWaitForPresent);
     while (!Reaches(capabilities, static_cast<PacerTier>(number)))
@@ -146,7 +174,8 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     rating.Tier = static_cast<PacerTier>(number);
     // What the set does not have and would be raised by: a time on the present; without one, a duration on the present (or a
     // swap interval of two or more) where the set sees where frames were shown, and display times where it has a duration and no
-    // wait for a present; a wait for a present; vertical blank times
+    // wait for a present; a wait for a present, which a frame callback that holds the loop is at its tier unless a duration needs
+    // the real one; a frame callback where one would hold the loop and the set has none; vertical blank times
     const bool atTime = HasPresentAtTime(capabilities);
     const bool afterDuration = HasPresentAfterDuration(capabilities);
     const bool wait = capabilities.Has(PacerCapability::WaitForPresent);
@@ -168,9 +197,13 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
         rating.RaisesTier = rating.RaisesTier | PacerCapability::DisplayTimes;
       }
     }
-    if (!wait)
+    if (!wait && (!rating.HoldsByFrameCallback || (afterDuration && !atTime)))
     {
       rating.RaisesTier = rating.RaisesTier | PacerCapability::WaitForPresent;
+    }
+    if (!capabilities.Has(PacerCapability::FrameCallback) && FrameCallbackCanHold(capabilities))
+    {
+      rating.RaisesTier = rating.RaisesTier | PacerCapability::FrameCallback;
     }
     if (!capabilities.Has(PacerCapability::VBlankTimes))
     {

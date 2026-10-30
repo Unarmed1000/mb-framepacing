@@ -9,14 +9,19 @@
 
 namespace MB::FramePacing::Pacer
 {
-  FrameStartPlan PresentWaitRule::Plan(const PacerSettings& settings, const RefreshPeriod period, const uint32_t swapInterval) const noexcept
+  FrameStartPlan PresentWaitRule::Plan(const PacerSettings& settings, const RefreshPeriod period, const uint32_t swapInterval,
+                                       const bool endsWhenTaken) const noexcept
   {
     FrameStartPlan plan;
     // The present to wait for: the one PresentWaitDepth back from the frame that is about to be made (the presents that may
-    // wait, and never one of a frame that is still in flight). While the waits run out nothing is waited for: the plan asks
-    // after a present that many frames older, which has had the time a wait would give
+    // wait, and never one of a frame that is still in flight). A wait that ends when the display's side took a present ends
+    // about a refresh before it is shown: one present nearer is the same place in the loop, and at the least the last present
+    // is waited for. While the waits run out nothing is waited for: the plan asks after a present that many frames older,
+    // which has had the time a wait would give
     const bool stopped = Stopped();
-    const uint64_t back = (uint64_t{settings.PresentWaitDepth()} - 1u) + (stopped ? settings.PresentWaitSwapIntervals() : 0u);
+    const uint32_t depth = settings.PresentWaitDepth();
+    const uint32_t depthNow = endsWhenTaken ? std::max(depth - 1u, 1u) : depth;
+    const uint64_t back = (uint64_t{depthNow} - 1u) + (stopped ? settings.PresentWaitSwapIntervals() : 0u);
     // Asking is not free everywhere: while stopped it is done once in a number of frames
     const bool asks = !stopped || m_framesSinceAsk >= FramesBetweenAsks;
     if (asks && !m_waitReported && m_lastAcceptedId > back && (m_lastAcceptedId - back) >= m_oldestWaitableId &&
@@ -41,14 +46,14 @@ namespace MB::FramePacing::Pacer
     m_waitReported = true;
     const bool heldTheLoop = HeldTheLoop(report, period);
     // A wait that ran out, and every answer while the waits are stopped: the window is not shown, or was not a moment ago
-    m_disturbed = m_disturbed || !report.Shown || Stopped();
+    m_disturbed = m_disturbed || !report.Taken || Stopped();
     if (Stopped())
     {
       // The answer to what the plan asked. Answers in a row that say shown end the stop: one by itself can be a frame of a
       // window that is still covered, shown in passing. An ask that held the loop is the pacer's doing as a wait is
       m_framesSinceAsk = 0;
-      m_timeouts += report.Shown ? 0u : 1u;
-      m_shownAsks = report.Shown ? m_shownAsks + 1u : 0u;
+      m_timeouts += report.Taken ? 0u : 1u;
+      m_shownAsks = report.Taken ? m_shownAsks + 1u : 0u;
       m_waitRanOut = m_waitRanOut || heldTheLoop;
       if (m_shownAsks >= AsksShownToWait)
       {
@@ -56,7 +61,7 @@ namespace MB::FramePacing::Pacer
       }
       return false;
     }
-    if (!report.Shown)
+    if (!report.Taken)
     {
       ++m_timeouts;
       m_runOutFromId = m_waitsRunOut == 0 ? report.FrameId : m_runOutFromId;

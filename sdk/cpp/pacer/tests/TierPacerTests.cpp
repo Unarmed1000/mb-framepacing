@@ -191,6 +191,73 @@ TEST(TierPacer, TheCapabilitySetsGiveTheRatingsAndTheTierThatPaces)
   EXPECT_EQ(timed.WorkingTier(), PacerTier::TimerPeriodOnly);
 }
 
+TEST(TierPacer, AFrameCallbackHoldsTheLoopAsAWaitForAPresentDoes)
+{
+  const PacerCapability callback = PacerCapability::FrameCallback;
+  Loop loop(Settings(), PacerCapabilities(callback | Wait | VBlank));
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(callback));
+  EXPECT_EQ(loop.Pacer.WorkingTier(), PacerTier::TimerWaitForPresent);
+  EXPECT_TRUE(loop.Pacer.ActiveRating().HoldsByFrameCallback);
+  EXPECT_FALSE(loop.Pacer.Rating().HoldsByFrameCallback);
+
+  // The plan asks for it as a wait for a present: the last present, as the call comes about a refresh before a frame is shown
+  static_cast<void>(loop.Frame());
+  EXPECT_EQ(loop.Pacer.PlanFrame(At(loop.Now)).WaitForPresentFrameId, 1u);
+  static_cast<void>(loop.Frame());
+  EXPECT_EQ(loop.Plan.WaitForPresentFrameId, 1u);
+  EXPECT_EQ(loop.Pacer.PlanFrame(At(loop.Now)).WaitForPresentFrameId, 2u);
+  // A wait for a present is as far back as ever, and the mark goes
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(callback | Wait));
+  EXPECT_FALSE(loop.Pacer.ActiveRating().HoldsByFrameCallback);
+  Loop waits(Settings(), PacerCapabilities(callback | Wait));
+  static_cast<void>(waits.Frame());
+  static_cast<void>(waits.Frame());
+  EXPECT_EQ(waits.Pacer.PlanFrame(At(waits.Now)).WaitForPresentFrameId, 1u);
+  // With vertical blank times it is left out, and no wait is asked for
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(callback | VBlank));
+  EXPECT_FALSE(loop.Pacer.PlanFrame(At(loop.Now)).WaitsForPresent());
+  EXPECT_EQ(loop.Pacer.ActiveRating().Tier, PacerTier::VBlankPeriodOnly);
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(callback));
+  EXPECT_EQ(loop.Pacer.PlanFrame(At(loop.Now)).WaitForPresentFrameId, 2u);
+
+  // Its wait is taken where a plan asks for it, and the wait for the GPU's work is not the one that holds the loop
+  PC::TierPacer pacer(Settings(), PacerCapabilities(callback | PacerCapability::WaitForGpuWork));
+  PC::GpuWaitReport notDone;
+  notDone.FrameId = 1;
+  notDone.Done = false;
+  pacer.AddGpuWait(notDone);
+  EXPECT_EQ(pacer.GpuWaitTimeouts(), 0u);
+
+  // Calls that do not come stop the waits as waits for a present that run out do, and the tier that paces says so
+  int64_t now = Start;
+  for (uint64_t frame = 1; frame <= 4; ++frame)
+  {
+    const PC::FrameStartPlan plan = pacer.PlanFrame(At(now));
+    if (plan.WaitsForPresent())
+    {
+      PC::PresentWaitReport wait;
+      wait.FrameId = plan.WaitForPresentFrameId;
+      wait.BeginTime = At(now);
+      now += plan.WaitForPresentTimeout.Nanoseconds();
+      wait.EndTime = At(now);
+      wait.Taken = false;
+      pacer.AddPresentWait(wait);
+    }
+    static_cast<void>(pacer.BeginFrame(At(now)));
+    static_cast<void>(pacer.EndFrame(At(now + Work)));
+    PC::PresentReport report;
+    report.FrameId = frame;
+    report.CallTime = At(now + Work);
+    report.ReturnTime = At(now + Work);
+    pacer.AddPresent(report);
+    now += Work;
+  }
+  EXPECT_TRUE(pacer.PresentWaitsStopped());
+  EXPECT_EQ(pacer.PresentWaitTimeouts(), 2u);
+  EXPECT_EQ(pacer.WorkingTier(), PacerTier::TimerPeriodOnly);
+  EXPECT_EQ(pacer.ActiveRating().Tier, PacerTier::TimerWaitForPresent);
+}
+
 TEST(TierPacer, AChangeOfTheActiveSetTakesEffectWhenTheOpenFrameHasEnded)
 {
   PC::TierPacer pacer(Settings(), PacerCapabilities(Wait));
@@ -1179,7 +1246,7 @@ TEST(TierPacer, AWaitThatIsNotActiveIsNotTakenAndWaitsThatStoppedLowerTheTierTha
   notShown.FrameId = 1;
   notShown.BeginTime = At(Start + Period);
   notShown.EndTime = At(Start + (5 * Period));
-  notShown.Shown = false;
+  notShown.Taken = false;
   plain.AddPresentWait(notShown);
   EXPECT_EQ(plain.PresentWaitTimeouts(), 0u);
   PC::GpuWaitReport notDone;
@@ -1211,7 +1278,7 @@ TEST(TierPacer, AWaitThatIsNotActiveIsNotTakenAndWaitsThatStoppedLowerTheTierTha
         wait.BeginTime = At(now);
         now += plan.WaitForPresentTimeout.Nanoseconds();
         wait.EndTime = At(now);
-        wait.Shown = false;
+        wait.Taken = false;
         pacer.AddPresentWait(wait);
       }
       static_cast<void>(pacer.BeginFrame(At(now)));

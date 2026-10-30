@@ -951,6 +951,80 @@ error over 1 ms. Two things in the numbers:
 holds while the return comes within a refresh period of the display taking the frame, which it did at 240 Hz; at a much
 higher refresh rate a return that late would read as a blank more. The refresh period is the settings', as above.
 
+## The frame callback
+
+Decision 22, built on 2026-10-30 at the first integration's report that the floor had no signal the pacer used: the lowest
+configuration has a call for a new frame and nothing else from the display, and that reached no tier. **Checked on the simulation
+only: no compositor has run it.**
+
+**What the signal is**, in the words of Wayland's protocol
+([`wl_surface.frame`](https://wayland.app/protocols/wayland#wl_surface:request:frame)): a notification "when it is a good time to
+start drawing a new frame", which "will take effect on the next wl_surface.commit" and "will only be posted for one frame unless
+requested again", "in the order the frame requests were committed". A server "should give some time for the client to draw and
+commit after sending the frame callback events to let it hit the next output refresh", and "should avoid signaling the frame
+callbacks if the surface is not visible in any way". Its time is "in milliseconds, with an undefined base". So it names a
+present, it comes once for it, it can stop, and it says nothing of when a frame is on screen: Weston and KWin send it after their
+repaint, ahead of the flip ([Weston](https://www.collabora.com/about-us/blog/2015/02/12/weston-repaint-scheduling), and a
+[merge request of KWin's](https://invent.kde.org/plasma/kwin/-/merge_requests/6205)), and how far ahead differs by compositor.
+
+**A wait, and no reading of where the refreshes are.** It has the shape of the wait for a present: a named present, a timeout,
+and a signal that can stop for a window that is not shown, which is what `PresentWaitRule` was made for. The plan's wait for a
+present is that present's callback, and no call or type is added. Mesa's own wait for a present does the same where
+presentation-time is missing, with a timeout, by its merge requests ("roughly" present complete plus a latch delay; read in
+summaries of them, not in its source). It is not a vertical blank time: the phase is the compositor's and differs between them,
+and a wait's return is read at tiers 3.1 and 2.1 as the blank a frame was shown at, which a call that may come before the flip
+would get wrong. So vertical blank times and a wait for a present each leave it unused, and it does not count as seeing where a
+frame was shown (`SeesWhereFramesWereShown`), so it reaches no tier of major tier 2.
+
+**One present nearer.** A wait for a present is for the one `PresentWaitDepth` back, as a present that was shown is one that has
+left the queue. The call comes about a refresh sooner than that, so the same place in the loop is one present nearer
+(`PresentWaitRule::Plan`, `endsWhenTaken`), at the least the last present. It also has to be: a swap chain's FIFO present can wait
+for this same call,
+[as SDL's commit says of Wayland without the FIFO protocol](https://github.com/libsdl-org/SDL/commit/d7b63cc71d94588a80994db2b88e228735c61f5c),
+and then the call for the present before the last has come before the wait starts. Given at the depth of a wait for a present the
+wait holds nothing: in the table below that run is within 0.13 ms of the timer in every row, with the loop held in the present and
+its frame already drawn. Whether a given present waits is not read from Mesa's source; the one Linux run on record (a virtual
+machine, "A loop the system holds") had a present that waited a third of a refresh, which fits and proves nothing.
+
+**The time is the end of the wait.** Nothing is given per callback. The event's own time is not taken: no rule has a use for it,
+and it is a millisecond with an undefined base.
+
+**What the simulation shows.** A display at 60 Hz that takes a frame 5 ms before its vertical blank, a call 0.1 to 0.9 ms after
+that, 2 ms of CPU work and 3 ms of GPU work, a timer up to 0.3 ms late, a present that waits for the call after the present before
+it, 1,200 frames with the first 240 left out. A frame's start to its display, the median, and how long the present held the loop
+where it did:
+
+| The run starts, after a blank | Low latency, a timer | Low latency, the callback | Smoothness, a timer | Smoothness, the callback |
+| ----------------------------- | -------------------- | ------------------------- | ------------------- | ------------------------ |
+| 0 ms                          | 16.46 ms             | 21.01 ms                  | 33.13 ms (9.95 ms)  | 21.14 ms                 |
+| 3 ms                          | 13.46 ms             | 21.01 ms                  | 30.13 ms (6.95 ms)  | 21.14 ms                 |
+| 6 ms                          | 10.46 ms             | 21.01 ms                  | 27.13 ms (3.95 ms)  | 21.01 ms                 |
+| 9 ms                          | 24.13 ms (0.96 ms)   | 21.01 ms                  | 37.75 ms (14.61 ms) | 21.14 ms                 |
+| 11 ms                         | 22.13 ms             | 21.01 ms                  | 37.75 ms (14.61 ms) | 21.14 ms                 |
+| 13 ms                         | 20.13 ms             | 21.01 ms                  | 36.79 ms (13.62 ms) | 21.14 ms                 |
+| 15 ms                         | 18.13 ms             | 21.01 ms                  | 34.79 ms (11.62 ms) | 21.14 ms                 |
+
+- **The callback's number does not depend on where the loop started**, and the present holds nothing: the frame is held before it
+  starts. It is a refresh and the display's lead, less the call's delay.
+- **With low latency a timer that happens to land well is sooner**, by up to 10.5 ms in this table: the callback starts a frame at
+  the call, a whole cycle before the next repaint, and nothing holds the start after it. So the two aims start a frame at the same
+  place here. Holding it as tier 3.2 does is **not built**: it would need to know how long before a blank the display takes a frame.
+- **A display 0.2 % off its period** (the same, 6,000 frames): the timer had 11 frames off their swap interval on a display that is
+  faster, and on one that is slower the present held it 14 ms and the animation fell 11 refreshes behind. The callback had none of
+  either, at 20.9 to 21.2 ms.
+- **GPU work of 80 % of a refresh, reported**, the run at 0 ms: 21.1 ms with the callback, and 33.3 ms with 10.1 ms in the present
+  on the timer. Of 100 %: both at two refreshes per frame, 37.8 and 33.3 ms.
+- **Calls that stop for 15 s** of a run of 40 s (a present that does not wait for them): the waits stop after two that ran out, the
+  frame rate holds on the timer, the swap interval stays 1, and a second after the calls are back the waits are made and every
+  frame is on its refresh. **Calls up to two refreshes late**, some of them together: no two frames start less than half a
+  refresh apart.
+
+**What it does not answer.** A present that does not return while a window is not shown is out of the pacer's reach: no rule runs
+until it returns. SDL's commit says that a FIFO present blocks while a window is obscured without the FIFO protocol, and Vulkan only
+asks for "finite time"; the simulation has a present that gives up, by its own setting. What a compositor's call does on a real
+system, with a real present, is the first thing to measure ("What is still missing"), and the tier's rank against 3.4 is a proposal
+as every order here is.
+
 ## Every time is in nanoseconds
 
 Decided on 2026-10-07 and built: the whole pacer module counts in nanoseconds, the unit in which no platform loses
@@ -985,7 +1059,7 @@ One type, a set of capabilities, in generic terms:
 | `WaitForPresent`       | wait until a present it names was shown, with a timeout                                                                                                | `VK_KHR_present_wait2`, DXGI's waitable swap chain                                                                                   |
 | `WaitForGpuWork`       | wait until the GPU finished a frame it names, with a timeout                                                                                           | a fence                                                                                                                              |
 | `WaitForImage`         | wait until an image of its swap chain is free to draw into, with a timeout, and say how many images there are                                          | the fence of a Vulkan acquire                                                                                                        |
-| `FrameCallback`        | say when the window system called for a new frame                                                                                                      | Wayland's frame callback                                                                                                             |
+| `FrameCallback`        | wait until the window system called for a new frame after a present it names, with a timeout                                                           | Wayland's frame callback                                                                                                             |
 | `VBlankTimes`          | say when a vertical blank was, and the period between them                                                                                             | DXGI's output, Wayland's presentation feedback, Choreographer                                                                        |
 | `GpuWorkTimes`         | say when the GPU began and ended its work on a frame, on the application's clock, frames later: with the CPU's own times, how the two overlap          | calibrated timestamp queries                                                                                                         |
 | `GpuWorkDurations`     | say how long the GPU worked on a frame, frames later: how long, not when                                                                               | timer queries                                                                                                                        |
@@ -999,7 +1073,7 @@ a frame takes anything, and before its present).
 The lowest configuration the design is made for is a little above that baseline: a graphics API without any timing extension,
 on a window system that gives its core signals only (a refresh rate and a call for a new frame). Such a call can stop or come
 late (for a window that is hidden), so the pacer uses it only while it comes about once per shown frame, and a wait on it has
-a timeout.
+a timeout ("The frame callback", above; decision 22).
 
 The application gives the pacer two sets:
 
@@ -1180,6 +1254,9 @@ Inside a major tier a sub tier is a rank, from two capabilities:
 
 **Beside the tier, in a rating:**
 
+- **`c`: a frame callback holds the loop** (`FrameCallback`, `PacerRating::HoldsByFrameCallback`, shown last: "3.3c"; decision
+  22). The tier is the wait's, as what holds the loop is the display's side taking a frame; the mark says that the signal is
+  no wait for a present, and that the measurements of .3 are not of it.
 - **`+`: display times are reported** (`DisplayTimes`, `PacerRating::ReportsDisplayTimes`, shown after the tier's number:
   "3.1+"). The animation error can then be worked out where the application runs: the animation time step is the pacer's,
   and the display time step is between two reported times. It is statistics, as display times are in today's pacer, and
@@ -1244,10 +1321,9 @@ Inside a major tier a sub tier is a rank, from two capabilities:
   the other, and it is two refreshes per frame. Nothing finer than the frame before and the one before that is decided
   until it is measured under a real GPU load, with and without the wait, with both aims.
 
-**What reaches no tier and is no fact of a rating.** `WaitForImage` fills the queue where it works, and `FrameCallback`
-is not built anywhere and can stop or come late. `GpuWorkTimes` and what a present does to the loop (`PresentWaits` and the
-others, above) are information every tier takes. A wait for a present is not taken as a way to know where the refreshes
-are: it returned 0.06 to 2.4 ms after the display took the frame (1 % to 99 % of 11,460 waits), which is over half a
+**What reaches no tier and is no fact of a rating.** `WaitForImage` fills the queue where it works. `GpuWorkTimes` and what a
+present does to the loop (`PresentWaits` and the others, above) are information every tier takes. A wait for a present is not
+taken as a way to know where the refreshes are: it returned 0.06 to 2.4 ms after the display took the frame (1 % to 99 % of 11,460 waits), which is over half a
 refresh at 240 Hz. With the vertical blanks known it is used for less: a wait's return says which of them a frame was
 shown at.
 
@@ -2146,6 +2222,11 @@ measured only where a section above says so.
    the low-latency aim followed looks like in a capture (is the start a refresh later the right answer, and is a display
    that has no frame waiting moved once and no more, as the rule is built to).
 
+9. **The frame callback measured** (decision 22, 2026-10-30: built against the simulation): on a compositor with the core protocol
+   alone, whether the present waits for the same call, whether it returns while the window is not shown, whether one present nearer
+   is right, and what a frame's start to its display is against 3.4 with both aims. Not built: with low latency, a start held after
+   the call.
+
 Not planned, and written down above: a pacer that relies on a display's side that skips (the "s"); an aim the pacer picks;
 pacing by display times beyond the display's slip in major tier 2 (decision 20); variable refresh.
 
@@ -2383,6 +2464,18 @@ pacing by display times beyond the display's slip in major tier 2 (decision 20);
     with them; the names are the same). No set is paced differently or rated another way of placing its frames: a set reaches
     only one of .2 and .3, as it has the vertical blank times or the wait, and with both it reaches .1. Revisit when major
     tiers 1 or 2 are measured; the numbers in decision 20 are this decision's.
+
+22. **A frame callback holds the loop**: decided on 2026-10-30 (the user's choices of the rating and the API, from the first
+    integration's report that the lowest configuration reached 3.4, a timer, with a signal it did not use; "The frame callback").
+    A set held by one rates as a wait, .3, with the mark "c" ("3.3c"), over a sub tier of its own (which would renumber the baseline
+    in every major tier for a rank nothing has measured), over no tier (a capability that changes how good the pacing is does not
+    hide inside a place), and over .3 without a mark (a run on it would read as a run on a wait for a present). It is the wait for a present
+    in the API, and `PresentWaitReport::Shown` became `Taken`, the one word that was not true of it: a callback says that the
+    display's side took a frame. So there is no call per callback and no second copy of the wait, and what happens when calls stop is
+    `PresentWaitRule`'s. On a grid on the clock only, one present nearer than a wait for a present, and never with display times that
+    reach major tier 2 (`PacerTierUtil::FrameCallbackCanHold`). The sub tier stays the same rank in every major tier
+    (decision 21) as far as the major tier allows: 1.3 with the callback, and none of major tier 2, which has to see where frames were
+    shown. Revisit when a compositor has been measured.
 
 ## What changes for whom
 

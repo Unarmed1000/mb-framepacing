@@ -110,7 +110,7 @@ namespace
       report.BeginTime = At(now);
       now = wait.EndNanoseconds != 0 ? wait.EndNanoseconds : now + 50'000;
       report.EndTime = At(now);
-      report.Shown = wait.Shown;
+      report.Taken = wait.Shown;
       rPacer.AddPresentWait(report);
       plan = rPacer.PlanFrame(At(now));
       EXPECT_FALSE(plan.WaitsForPresent());

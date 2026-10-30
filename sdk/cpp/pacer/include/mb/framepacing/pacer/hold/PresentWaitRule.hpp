@@ -66,7 +66,10 @@ namespace MB::FramePacing::Pacer
     //! many back, and the longest the wait may take (a few of the frame's own swap intervals, as a present that is never
     //! shown is to hold the loop no longer). While the waits are stopped the plan asks once in a number of frames, with no
     //! time to wait, after a present that has had the time a wait would have given it. The plan has no start time.
-    [[nodiscard]] FrameStartPlan Plan(const PacerSettings& settings, RefreshPeriod period, uint32_t swapInterval) const noexcept;
+    //! endsWhenTaken: the wait ends when the display's side took a present and not when it was shown (a frame callback), about a
+    //! refresh sooner, so it is for the present one nearer (at the least the last one): the same place in the frame loop.
+    [[nodiscard]] FrameStartPlan Plan(const PacerSettings& settings, RefreshPeriod period, uint32_t swapInterval,
+                                      bool endsWhenTaken = false) const noexcept;
 
     //! True when the wait took a share of a refresh period (one in HeldDivisor) or more: it held the loop.
     [[nodiscard]] static bool HeldTheLoop(const PresentWaitReport& report, RefreshPeriod period) noexcept;

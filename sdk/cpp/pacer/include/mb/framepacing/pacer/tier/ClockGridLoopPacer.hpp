@@ -61,8 +61,10 @@ namespace MB::FramePacing::Pacer
   class ClockGridLoopPacer
   {
     SwapIntervalRule m_rule;
-    // What holds the loop: a wait for a present, or nothing but the times the pacer gives
+    // What holds the loop: a wait for a present, or nothing but the times the pacer gives. The wait may be a frame callback, which
+    // ends when the display's side took a present and not when it was shown
     bool m_waitsForPresent;
+    bool m_waitEndsWhenTaken{false};
     // The time a present is given. With PresentTiming::AtTime the display's side puts a frame on its refresh, else the loop
     // does by when it presents
     PresentTiming m_presentTiming{PresentTiming::Untimed};
@@ -220,6 +222,13 @@ namespace MB::FramePacing::Pacer
     //! The wait held the loop, not the grid's times: when it is given up the grid starts again at the next frame, which
     //! begins a swap interval after the last one and is not judged, as after a handover.
     void SetWaitsForPresent(bool waitsForPresent) noexcept;
+
+    //! Whether the wait for a present ends when the display's side took the present and not when it was shown (a frame callback,
+    //! PacerTierUtil::HoldsByFrameCallback), from the next plan on: the plan asks for one present nearer (PresentWaitRule::Plan).
+    void SetWaitEndsWhenTaken(const bool waitEndsWhenTaken) noexcept
+    {
+      m_waitEndsWhenTaken = waitEndsWhenTaken;
+    }
 
     //! The time the presents are given, from the next frame on: none (the loop presents at the right moment), or the one the
     //! display's side places the frame by.

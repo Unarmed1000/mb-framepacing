@@ -436,7 +436,7 @@ TEST(NotPacing, WaitsNoPlanAskedForAreNotTakenAndTheOtherReportsAre)
     wait.FrameId = before.FrameId;
     wait.BeginTime = At(loop.Now);
     wait.EndTime = At(loop.Now + Period);
-    wait.Shown = false;
+    wait.Taken = false;
     loop.Pacer.AddPresentWait(wait);
     PC::GpuWaitReport gpuWait;
     gpuWait.FrameId = before.FrameId;

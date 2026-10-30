@@ -17,7 +17,8 @@ namespace MB::FramePacing::Pacer
   //! (PacerTierUtil::MajorOf and SubTierOf, PacerTierText::NumberOf). A sub tier is a rank inside its major tier, the same in every
   //! major tier (decision 21 of the design record), from two capabilities:
   //! - a wait for a present (WaitForPresent): the loop is held until the display took an earlier frame, where without one it is
-  //!   held on a timer (or until the GPU finished an earlier frame, where the application can wait for that);
+  //!   held on a timer (or until the GPU finished an earlier frame, where the application can wait for that). On a grid on the
+  //!   clock a frame callback (FrameCallback) is that wait too, with the "c" beside the tier;
   //! - vertical blank times (VBlankTimes): the pacer knows where the display's refreshes are, where without them it counts
   //!   refresh periods on the clock.
   //! .1 both, .2 vertical blank times, .3 a wait for a present, .4 neither: the vertical blank times rank first, as the one

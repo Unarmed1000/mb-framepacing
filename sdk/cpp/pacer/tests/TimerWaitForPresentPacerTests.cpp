@@ -80,7 +80,7 @@ namespace
     report.FrameId = frameId;
     report.BeginTime = At(beginNanoseconds);
     report.EndTime = At(endNanoseconds);
-    report.Shown = shown;
+    report.Taken = shown;
     return report;
   }
 

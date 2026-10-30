@@ -24,6 +24,10 @@ namespace MB::FramePacing::Pacer::Simulation
     int64_t PresentWaitBeginNanoseconds{0};
     int64_t PresentWaitTargetNanoseconds{0};
     int64_t PresentNanoseconds{0};
+    //! When the present returned (the present itself: the same unless it waited), and when the window system called for a new
+    //! frame after it (0: the loop has no such call)
+    int64_t PresentReturnNanoseconds{0};
+    int64_t FrameCallbackNanoseconds{0};
     int64_t ShownNanoseconds{0};
     //! The frames presented and not yet shown when this frame started
     int32_t PendingAtStart{0};
@@ -46,6 +50,8 @@ namespace MB::FramePacing::Pacer::Simulation
     //! animation time was behind the clock by then, in refreshes
     uint32_t ActiveCapabilities{0};
     uint64_t RefreshesBehindClock{0};
+    //! For a tier pacer's loop: the waits for a present were stopped when this frame started (TierPacer::PresentWaitsStopped)
+    bool PresentWaitsStopped{false};
     //! For a tier pacer's loop that reports display times: what the pacer counted from them when this frame started
     //! (DisplayErrorState)
     uint64_t DisplayJudgedFrames{0};

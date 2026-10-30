@@ -38,10 +38,11 @@ namespace MB::FramePacing::Pacer
   //!
   //! Its calls a frame, each values in and values out:
   //!   AddVBlank       a vertical blank's time, whenever the application has one (with PacerCapability::VBlankTimes active)
-  //!   PlanFrame       before the frame takes anything: a present to wait for (with WaitForPresent active), then a time
+  //!   PlanFrame       before the frame takes anything: a present to wait for (with WaitForPresent active, or a frame callback
+  //!                   that holds the loop: that present's callback), then a time
   //!   AddPresentWait  after that wait: what became of it. PlanFrame is then called again
   //!   AddGpuWait      the same for the wait for the GPU's work on an earlier frame, which the plan asks for where
-  //!                   WaitForGpuWork is active and WaitForPresent is not
+  //!                   WaitForGpuWork is active and nothing else holds the loop
   //!   BeginFrame      the frame starts: its swap interval, its animation time and the marker's values
   //!   EndFrame        the CPU's work is done: the time to wait until before the present, or the time to give the present
   //!   AddPresent      after the present, before the next frame is planned
@@ -62,6 +63,10 @@ namespace MB::FramePacing::Pacer
   //! where frames were shown the loop places the frames and the values are given next to what it does. The eight tiers where
   //! the display's side places the frame are built against the simulation's display only: no system has been measured with
   //! them.
+  //!
+  //! On the grid on the clock a frame callback (PacerCapability::FrameCallback) holds the loop as a wait for a present does, where
+  //! the set has no such wait (PacerTierUtil::HoldsByFrameCallback, the "c" beside the tier): the plan's wait is then that
+  //! present's callback, and it stops and starts again as that wait does.
   //!
   //! A set that says the display's side skips a frame that is overdue (PacerCapability::PresentSkipsOverdue) is rated with it
   //! (PacerRating::SkipsOverdue) and paced as without it: every present is taken as shown, which one that was skipped is not.

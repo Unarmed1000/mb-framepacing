@@ -7,6 +7,7 @@
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapabilities.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
+#include <mb/framepacing/pacer/capability/PacerTierUtil.hpp>
 #include <mb/framepacing/pacer/display/DisplayErrorState.hpp>
 #include <mb/framepacing/pacer/display/DisplayReport.hpp>
 #include <mb/framepacing/pacer/frame/FrameSchedule.hpp>
@@ -130,6 +131,34 @@ namespace MB::FramePacing::Pacer::Simulation
       rFrame.DisplayStartToDisplayLongestNanoseconds = state.StartToDisplayLongest.Nanoseconds();
     }
 
+    //! Whether the run has calls for a new frame: the loop's own, one it changes to, or a present's that waits for them
+    bool HasFrameCallbacks(const LoopSettings& settings, const PacerCapability named) noexcept
+    {
+      const auto calls = [](const LoopActiveSetChange& change) { return HasCapability(change.Named, PacerCapability::FrameCallback); };
+      return HasCapability(named, PacerCapability::FrameCallback) || settings.PresentWaitsForFrameCallbackNanoseconds > 0 ||
+             std::any_of(settings.ActiveSetChanges.begin(), settings.ActiveSetChanges.end(), calls);
+    }
+
+    //! When the window system calls for a new frame after a frame that was just presented: in the order of the presents, never
+    //! before the present returned, and at the end of a stretch in which no call comes
+    int64_t FrameCallback(const LoopFrame& frame, const std::vector<LoopFrame>& frames, const LoopSettings& settings, const int64_t firstStart,
+                          SplitMix64& random) noexcept
+    {
+      const NanosecondRange after = settings.FrameCallbackReturn;
+      const int64_t previous = frames.empty() ? 0 : frames.back().FrameCallbackNanoseconds;
+      int64_t call =
+        std::max({frame.ShownNanoseconds + random.Draw(after.MinNanoseconds, after.MaxNanoseconds), frame.PresentReturnNanoseconds, previous});
+      for (const LoopFrameCallbackGap& gap : settings.FrameCallbackGaps)
+      {
+        const int64_t begin = firstStart + gap.AfterNanoseconds;
+        if (call >= begin && call < (begin + gap.ForNanoseconds))
+        {
+          call = begin + gap.ForNanoseconds;
+        }
+      }
+      return call;
+    }
+
     //! The frame log is the first integration's, which counts in ticks of 100 ns
     constexpr int64_t NanosecondsPerTick = NanosecondTimeSpan::NanosecondsPerTick;
 
@@ -179,7 +208,7 @@ namespace MB::FramePacing::Pacer::Simulation
 
     std::vector<LoopFrame> frames;
     frames.reserve(static_cast<std::size_t>(std::max(settings.Frames, 0)));
-    int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds;
+    int64_t now = settings.Display.FirstBlankNanoseconds + settings.LoopNanoseconds + settings.FirstStartDelayNanoseconds;
     int64_t previousGpuEndNanoseconds = 0;
     std::size_t nextGpuReport = 0;
     std::size_t nextDisplayReport = 0;
@@ -190,6 +219,7 @@ namespace MB::FramePacing::Pacer::Simulation
     NanosecondRange gpuWork = settings.GpuWork;
     std::size_t nextWorkChange = 0;
     int64_t firstStartNanoseconds = 0;
+    const bool hasFrameCallbacks = HasFrameCallbacks(settings, named);
     PresentReport report;
     for (int32_t index = 0; index < settings.Frames; ++index)
     {
@@ -210,7 +240,8 @@ namespace MB::FramePacing::Pacer::Simulation
       for (; nextChange < settings.ActiveSetChanges.size() && settings.ActiveSetChanges[nextChange].Frame <= index; ++nextChange)
       {
         // Made with all the application has first: the timed presents and the display reports stay as the settings have them
-        pacer.SetCapabilities(CapabilitiesOf(settings, PacerCapability::VBlankTimes | PacerCapability::WaitForPresent));
+        pacer.SetCapabilities(
+          CapabilitiesOf(settings, PacerCapability::VBlankTimes | PacerCapability::WaitForPresent | PacerCapability::FrameCallback));
         pacer.SetActiveCapabilities(CapabilitiesOf(settings, settings.ActiveSetChanges[nextChange].Named));
       }
       // The application stops pacing or starts again: between two frames too
@@ -219,7 +250,8 @@ namespace MB::FramePacing::Pacer::Simulation
         pacer.SetPacing(settings.PacingChanges[nextPacingChange].IsPacing);
       }
       const bool hasVBlankTimes = pacer.ActiveCapabilities().Has(PacerCapability::VBlankTimes);
-      const bool hasWaitForPresent = pacer.ActiveCapabilities().Has(PacerCapability::WaitForPresent);
+      const bool hasWaitForPresent = PacerTierUtil::HasDisplayHold(pacer.ActiveCapabilities());
+      const bool waitsForFrameCallback = PacerTierUtil::HoldsByFrameCallback(pacer.ActiveCapabilities());
       frame.ActiveCapabilities = static_cast<uint32_t>(pacer.ActiveCapabilities().Capabilities());
       if (hasVBlankTimes)
       {
@@ -235,15 +267,17 @@ namespace MB::FramePacing::Pacer::Simulation
       }
       if (startPlan.WaitsForPresent())
       {
-        // The wait returns a little after the display took the frame, at once when that has passed, or when its time runs out
-        const int64_t shownNanoseconds = frames[static_cast<std::size_t>(startPlan.WaitForPresentFrameId) - 1].ShownNanoseconds;
-        const int64_t returnNanoseconds =
-          shownNanoseconds + random.Draw(settings.PresentWaitReturn.MinNanoseconds, settings.PresentWaitReturn.MaxNanoseconds);
+        // The wait returns a little after the display took the frame, or with the call for a new frame after it, at once when
+        // that has passed, or when its time runs out
+        const LoopFrame& waitedFor = frames[static_cast<std::size_t>(startPlan.WaitForPresentFrameId) - 1];
+        const int64_t returnNanoseconds = waitsForFrameCallback ? waitedFor.FrameCallbackNanoseconds
+                                                                : waitedFor.ShownNanoseconds + random.Draw(settings.PresentWaitReturn.MinNanoseconds,
+                                                                                                           settings.PresentWaitReturn.MaxNanoseconds);
         const int64_t timeoutNanoseconds = now + startPlan.WaitForPresentTimeout.Nanoseconds();
         PresentWaitReport waitReport;
         waitReport.FrameId = startPlan.WaitForPresentFrameId;
         waitReport.BeginTime = NanosecondTickCount(now);
-        waitReport.Shown = returnNanoseconds <= timeoutNanoseconds;
+        waitReport.Taken = returnNanoseconds <= timeoutNanoseconds;
         now = std::max(now, std::min(returnNanoseconds, timeoutNanoseconds));
         waitReport.EndTime = NanosecondTickCount(now);
         pacer.AddPresentWait(waitReport);
@@ -322,6 +356,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.WindowFrames = window.Frames;
       frame.WindowLateFrames = window.LateFrames;
       frame.RefreshesBehindClock = pacer.RefreshesBehindClock();
+      frame.PresentWaitsStopped = pacer.PresentWaitsStopped();
       SetDisplayErrors(frame, pacer);
 
       frame.WorkCpuNanoseconds = CpuWork(settings, cpuWork, index, random);
@@ -342,6 +377,12 @@ namespace MB::FramePacing::Pacer::Simulation
         now = WaitUntil(now, frame.PresentWaitTargetNanoseconds, random, settings.TimerLate);
       }
       frame.PresentNanoseconds = now;
+      // A present that waits for the call that follows the present before it
+      if (settings.PresentWaitsForFrameCallbackNanoseconds > 0 && !frames.empty())
+      {
+        now = std::max(now, std::min(frames.back().FrameCallbackNanoseconds, now + settings.PresentWaitsForFrameCallbackNanoseconds));
+      }
+      frame.PresentReturnNanoseconds = now;
       // The present, with the time the plan gives where the present takes one
       // A swap interval on the present: no sooner than that many of the display's refreshes after the frame before it, which
       // to the display is a time that frame stays of half a refresh less
@@ -353,8 +394,12 @@ namespace MB::FramePacing::Pacer::Simulation
                                                       (displayPeriod.ToNanosecondTimeSpan().Nanoseconds() / 2));
       }
       frame.ShownNanoseconds = display.PresentTimed(now, frame.GpuEndNanoseconds, presentPlan.NotBeforeTime.Nanoseconds(), minimumDuration);
+      if (hasFrameCallbacks)
+      {
+        frame.FrameCallbackNanoseconds = FrameCallback(frame, frames, settings, firstStartNanoseconds, random);
+      }
       report.FrameId = presentPlan.FrameId;
-      report.CallTime = NanosecondTickCount(now);
+      report.CallTime = NanosecondTickCount(frame.PresentNanoseconds);
       report.ReturnTime = NanosecondTickCount(now);
       frames.push_back(frame);
       now += settings.LoopNanoseconds;

@@ -31,10 +31,11 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
       PacerCapability Named{PacerCapability::NoCapabilities};
     };
 
-    constexpr std::array<Way, 4> Ways = {{{"timer", PacerCapability::NoCapabilities},
+    constexpr std::array<Way, 5> Ways = {{{"timer", PacerCapability::NoCapabilities},
                                           {"timer-wait", PacerCapability::WaitForPresent},
                                           {"vblank", PacerCapability::VBlankTimes},
-                                          {"vblank-wait", PacerCapability::VBlankTimes | PacerCapability::WaitForPresent}}};
+                                          {"vblank-wait", PacerCapability::VBlankTimes | PacerCapability::WaitForPresent},
+                                          {"timer-callback", PacerCapability::FrameCallback}}};
 
     //! A case: its name and what it changes of a loop with light work
     struct Case

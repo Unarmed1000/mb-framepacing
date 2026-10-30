@@ -46,8 +46,8 @@ namespace MB::FramePacing::Pacer
   TierPacer::TierPacer(const PacerSettings& settings, const PacerCapabilities& capabilities)
     : m_capabilities(capabilities)
     , m_active(capabilities)
-    , m_grid(settings, capabilities.Has(PacerCapability::WaitForPresent))
-    , m_vblank(settings, capabilities.Has(PacerCapability::WaitForPresent))
+    , m_grid(settings, PacerTierUtil::HasDisplayHold(capabilities))
+    , m_vblank(settings, PacerTierUtil::HasDisplayHold(capabilities))
     , m_onVBlanks(capabilities.Has(PacerCapability::VBlankTimes))
   {
     m_grid.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
@@ -58,6 +58,7 @@ namespace MB::FramePacing::Pacer
     m_vblank.SetUsesDisplayTimes(capabilities.Has(PacerCapability::DisplayTimes));
     m_grid.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
     m_vblank.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
+    m_grid.SetWaitEndsWhenTaken(PacerTierUtil::HoldsByFrameCallback(capabilities));
   }
 
   void TierPacer::SetCapabilities(const PacerCapabilities& capabilities) noexcept
@@ -100,7 +101,7 @@ namespace MB::FramePacing::Pacer
   {
     // What is really pacing: the vertical blanks once one was read, and the wait while it is made
     const bool onVBlanks = m_onVBlanks && m_vblank.HasVBlankReading();
-    const bool waits = m_active.Has(PacerCapability::WaitForPresent) && !PresentWaitsStopped();
+    const bool waits = PacerTierUtil::HasDisplayHold(m_active) && !PresentWaitsStopped();
     // The display's side places a frame at a time, or after the one before it where the pacer sees where frames were shown
     PresentTiming placement = DisplayPlacementUtil::TimingFor(m_active);
     if (placement != PresentTiming::AtTime)
@@ -153,9 +154,11 @@ namespace MB::FramePacing::Pacer
       }
       m_onVBlanks = onVBlanks;
     }
-    const bool waits = active.Has(PacerCapability::WaitForPresent);
+    const bool waits = PacerTierUtil::HasDisplayHold(active);
     m_grid.SetWaitsForPresent(waits);
     m_vblank.SetWaitsForPresent(waits);
+    // Vertical blank times keep a frame callback from holding the loop: only the grid can have that wait
+    m_grid.SetWaitEndsWhenTaken(PacerTierUtil::HoldsByFrameCallback(active));
     // The wait for the GPU's work holds the loop where no wait for a present does: the part knows which of the two it has
     m_grid.SetWaitsForGpuWork(active.Has(PacerCapability::WaitForGpuWork));
     m_vblank.SetWaitsForGpuWork(active.Has(PacerCapability::WaitForGpuWork));
@@ -221,7 +224,7 @@ namespace MB::FramePacing::Pacer
   void TierPacer::AddPresentWait(const PresentWaitReport& report) noexcept
   {
     // A wait the plan did not ask for is not taken: the wait is not active, or the application is not pacing
-    if (!m_isPacing || !m_active.Has(PacerCapability::WaitForPresent))
+    if (!m_isPacing || !PacerTierUtil::HasDisplayHold(m_active))
     {
       return;
     }
@@ -238,7 +241,7 @@ namespace MB::FramePacing::Pacer
   void TierPacer::AddGpuWait(const GpuWaitReport& report) noexcept
   {
     // A wait the plan did not ask for is not taken
-    if (!m_isPacing || !m_active.Has(PacerCapability::WaitForGpuWork) || m_active.Has(PacerCapability::WaitForPresent))
+    if (!m_isPacing || !m_active.Has(PacerCapability::WaitForGpuWork) || PacerTierUtil::HasDisplayHold(m_active))
     {
       return;
     }

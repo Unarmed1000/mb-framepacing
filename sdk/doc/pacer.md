@@ -30,7 +30,7 @@ every measurement so far with its conditions, the decisions and what is still mi
 
 | Checked                                                                                                                                                                                                        | Not checked                                                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A simulated frame loop on a display model that queues presents, against golden results (`sdk/test-data/pacer`): the four ways of pacing below, both aims, seventeen cases                                      | Any real swap chain recorded by a capture card and analysed with the tools                                                                                                                                      |
+| A simulated frame loop on a display model that queues presents, against golden results (`sdk/test-data/pacer`): the five ways of pacing below, both aims, seventeen cases                                      | Any real swap chain recorded by a capture card and analysed with the tools                                                                                                                                      |
 | The swap intervals and refreshes of mb-framepacing-explained's simulation, frame by frame                                                                                                                      | Any platform but Windows, any graphics API but Vulkan, any GPU vendor but one                                                                                                                                   |
 | The refresh rates monitors have, 50 to 540 Hz: frames on time, two and three refreshes per frame, a display a thousandth off its rate (simulated)                                                              | A real display's clock against a real CPU clock for longer than minutes                                                                                                                                         |
 | Every line and branch of the module by its tests; no allocation per frame; two compilers, and a build with the address and undefined behaviour sanitizers                                                      | The compilers of Linux and macOS                                                                                                                                                                                |
@@ -41,6 +41,7 @@ every measurement so far with its conditions, the decisions and what is still mi
 | The wait for the GPU's work, on that system: 96 runs with GPU work of 68 % and 129 % of a refresh, against the application's own wait for a frame slot                                                         | A GPU's limit on any other machine or scene                                                                                                                                                                     |
 | An application that stops pacing and starts again: every call while it is off, and the frames on their refreshes again afterwards (simulated)                                                                  | Pacing switched off and on, on any system                                                                                                                                                                       |
 | The display's side placing a frame after the one before (major tier 2): a display that holds a frame a refresh, both aims, on the grid and on the vertical blanks, one and two refreshes per frame (simulated) | The display's slip followed from display times on any system                                                                                                                                                    |
+| A frame callback as what holds the loop: a compositor model that calls after it repainted, both aims, wherever the loop started, calls that stop, late and together (simulated)                                | A frame callback on any compositor                                                                                                                                                                              |
 |                                                                                                                                                                                                                | Vsync off; a variable refresh rate ([below](#a-variable-refresh-rate))                                                                                                                                          |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
@@ -80,19 +81,20 @@ display (`SetCapabilities`).
 
 What a platform can do beyond the baseline, in terms of no graphics API (`PacerCapability`, combined into a `PacerCapabilities`):
 
-| Capability                                                                       | The application can …                                                                                                                      | Examples                                                                             |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `WaitForPresent`                                                                 | wait until a present it names was shown, with a timeout                                                                                    | `VK_KHR_present_wait2`, DXGI's waitable swap chain                                   |
-| `VBlankTimes`                                                                    | say when a vertical blank of its display was                                                                                               | DXGI's output, Wayland's presentation feedback, Choreographer                        |
-| `PresentAtTime`                                                                  | give a present a time before which the frame is not shown                                                                                  | `VK_EXT_present_timing` (absolute), `EGL_ANDROID_presentation_time`                  |
-| `PresentSkipsOverdue`                                                            | say that of two presents that are both due the later is shown and the earlier never                                                        | Vulkan's `FIFO_LATEST_READY`, Android's buffers with a time                          |
-| `PresentAfterDuration`                                                           | give a present a time the frame before it stays on screen at least                                                                         | `VK_EXT_present_timing` (relative), Metal's minimum duration                         |
-| `PresentSwapInterval`                                                            | present with a swap interval of 1 to a maximum it gives                                                                                    | `eglSwapInterval`, DXGI's sync interval                                              |
-| `WaitForGpuWork`                                                                 | wait until the GPU finished a frame it names, with a timeout                                                                               | a fence                                                                              |
-| `GpuWorkTimes`, `GpuWorkDurations`                                               | say when the GPU began and ended its work on a frame, or how long it took, frames later                                                    | calibrated timestamp queries, timer queries                                          |
-| `DisplayTimes`                                                                   | say when a present was shown, or that it never was, frames later                                                                           | `VK_EXT_present_timing`, DXGI's frame statistics, `EGL_ANDROID_get_frame_timestamps` |
-| `PresentWaits` / `PresentReturnsAtOnce`, `AcquireWaits` / `AcquireReturnsAtOnce` | say whether its present, and its call for the next image, wait for the display: one of each pair, or neither                               | DXGI's default present waits; one asked to return at once does not                   |
-| `WaitForImage`, `FrameCallback`                                                  | wait until an image of its swap chain is free; say when the window system called for a new frame. Information only: no pacer paces by them | a Vulkan acquire's fence, Wayland's frame callback                                   |
+| Capability                                                                       | The application can …                                                                                        | Examples                                                                             |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `WaitForPresent`                                                                 | wait until a present it names was shown, with a timeout                                                      | `VK_KHR_present_wait2`, DXGI's waitable swap chain                                   |
+| `VBlankTimes`                                                                    | say when a vertical blank of its display was                                                                 | DXGI's output, Wayland's presentation feedback, Choreographer                        |
+| `PresentAtTime`                                                                  | give a present a time before which the frame is not shown                                                    | `VK_EXT_present_timing` (absolute), `EGL_ANDROID_presentation_time`                  |
+| `PresentSkipsOverdue`                                                            | say that of two presents that are both due the later is shown and the earlier never                          | Vulkan's `FIFO_LATEST_READY`, Android's buffers with a time                          |
+| `PresentAfterDuration`                                                           | give a present a time the frame before it stays on screen at least                                           | `VK_EXT_present_timing` (relative), Metal's minimum duration                         |
+| `PresentSwapInterval`                                                            | present with a swap interval of 1 to a maximum it gives                                                      | `eglSwapInterval`, DXGI's sync interval                                              |
+| `WaitForGpuWork`                                                                 | wait until the GPU finished a frame it names, with a timeout                                                 | a fence                                                                              |
+| `GpuWorkTimes`, `GpuWorkDurations`                                               | say when the GPU began and ended its work on a frame, or how long it took, frames later                      | calibrated timestamp queries, timer queries                                          |
+| `DisplayTimes`                                                                   | say when a present was shown, or that it never was, frames later                                             | `VK_EXT_present_timing`, DXGI's frame statistics, `EGL_ANDROID_get_frame_timestamps` |
+| `PresentWaits` / `PresentReturnsAtOnce`, `AcquireWaits` / `AcquireReturnsAtOnce` | say whether its present, and its call for the next image, wait for the display: one of each pair, or neither | DXGI's default present waits; one asked to return at once does not                   |
+| `FrameCallback`                                                                  | wait until the window system called for a new frame after a present it names, with a timeout                 | Wayland's `wl_surface.frame`                                                         |
+| `WaitForImage`                                                                   | wait until an image of its swap chain is free. Information only: no pacer paces by it                        | a Vulkan acquire's fence                                                             |
 
 The application gives the pacer two sets: what it **has** (when the pacer is made, and again when that changes), and what of
 it is **active** now (`SetActiveCapabilities`). The active set is how an application controls the pacer: a capability that is
@@ -110,12 +112,12 @@ three **major tiers**, by who places a frame and with what, each with four **sub
 | 2          | The display's side, after the frame before: a duration on the present, or a swap interval of 2+ | `PresentAfterDuration` (or `PresentSwapInterval` up to 2 or more), and `WaitForPresent` or `DisplayTimes` | Built against the simulation's display only: no system has been measured with it |
 | 3          | The frame loop: it has to make the present at the right moment                                  | nothing                                                                                                   | Built; first runs and measurements on one system                                 |
 
-| Sub tier | In major tier 1                  | In major tier 2                  | In major tier 3                  |
-| -------- | -------------------------------- | -------------------------------- | -------------------------------- |
-| .1       | `VBlankTimes` + `WaitForPresent` | `VBlankTimes` + `WaitForPresent` | `VBlankTimes` + `WaitForPresent` |
-| .2       | `VBlankTimes`                    | `VBlankTimes` + `DisplayTimes`   | `VBlankTimes`                    |
-| .3       | `WaitForPresent`                 | `WaitForPresent`                 | `WaitForPresent`                 |
-| .4       | nothing more                     | `DisplayTimes`                   | nothing (the baseline)           |
+| Sub tier | In major tier 1                     | In major tier 2                  | In major tier 3                     |
+| -------- | ----------------------------------- | -------------------------------- | ----------------------------------- |
+| .1       | `VBlankTimes` + `WaitForPresent`    | `VBlankTimes` + `WaitForPresent` | `VBlankTimes` + `WaitForPresent`    |
+| .2       | `VBlankTimes`                       | `VBlankTimes` + `DisplayTimes`   | `VBlankTimes`                       |
+| .3       | `WaitForPresent` or `FrameCallback` | `WaitForPresent`                 | `WaitForPresent` or `FrameCallback` |
+| .4       | nothing more                        | `DisplayTimes`                   | nothing (the baseline)              |
 
 A sub tier is the same rank in every major tier: vertical blank times before a wait for a present, the order the one
 measurement there is gives (the frame loop's, on one system). Nothing has shown that another order is better where the
@@ -123,6 +125,9 @@ display's side places the frame.
 
 - **A wait for a present** holds the loop until the display took an earlier frame, so the frames that wait to be shown can not
   grow. Without one the loop is held on a timer, and a frame that comes to wait stays.
+- **A frame callback** holds the loop the same way, on a grid on the clock, where the set has neither a wait for a present nor
+  vertical blank times ([below](#a-frame-callback)). It says that the display's side took a frame, which may be before the frame
+  is shown, so it is no wait for a present: a set held by one has the tier of the wait, and the mark "c".
 - **Vertical blank times** tell the pacer where the display's refreshes are. Without them it counts refresh periods on the
   clock: a grid that is a constant part of a refresh away from the display, and slides against it as slowly as the two clocks
   differ.
@@ -136,11 +141,12 @@ display's side places the frame.
   the frames later by the refreshes the display slipped (`DisplaySlipRefreshes`); neither moves the animation time.
 - **Every order in the list is a proposal until the tiers have been measured against each other**: major tier 2 against 3.1
   first (the data so far, of one system without a duration on the present, shows nothing ahead of 3.1), and .2 against .3.
-- Beside the tier, a rating has two marks and a fact. Display times reported: "+" ("3.1+"). A display's side that skips a frame
+- Beside the tier, a rating has three marks and a fact. Display times reported: "+" ("3.1+"). A display's side that skips a frame
   that is overdue (`PresentSkipsOverdue`): "s" after that ("1.2+s", "3.1s"). It describes the system (a display may skip whether
   asked or not, as Android's does with a time on the present) and is a rating only: no pacer relies on it yet, and every
-  present is taken as shown, so where a frame was skipped the pacer's counts are off by it. And whether the display's side can
-  hold a frame for more than one refresh (a time on the present, a minimum duration, or a swap interval of two or more).
+  present is taken as shown, so where a frame was skipped the pacer's counts are off by it. A frame callback that holds the loop:
+  "c" last ("3.3c", "3.3+c"). And whether the display's side can hold a frame for more than one refresh (a time on the present,
+  a minimum duration, or a swap interval of two or more).
 - A duration and a swap interval are given on every present where they are active. In major tier 2 the loop then holds no
   present; without a way to see where frames were shown they are given next to what the frame loop does.
 - The wait for the GPU's work and its times stay capabilities with no tier and no mark: they hold or inform the loop at any tier.
@@ -153,6 +159,7 @@ const PC::PacerRating rating = PC::PacerTierUtil::Rate(has);        // of any se
 ShowText(PC::PacerTierText::NumberOf(rating.Tier));                 // "3.1"
 ShowText(rating.ReportsDisplayTimes ? PC::PacerTierText::DisplayTimesMark : "");   // "+"
 ShowText(rating.SkipsOverdue ? PC::PacerTierText::SkipsOverdueMark : "");          // "s"
+ShowText(rating.HoldsByFrameCallback ? PC::PacerTierText::FrameCallbackMark : ""); // "c"
 ShowText(PC::PacerTierText::ShortDescriptionOf(rating.Tier));       // one line of 44 characters at most
 // rating.RaisesTier: the capabilities any one of which would raise the tier
 ```
@@ -183,8 +190,8 @@ PC::FrameStartPlan start = pacer.PlanFrame(Now());                   // before t
 if (start.WaitsForPresent())
 {
   const FP::NanosecondTickCount begin = Now();
-  const bool shown = WaitUntilShown(start.WaitForPresentFrameId, start.WaitForPresentTimeout);   // yours
-  pacer.AddPresentWait({start.WaitForPresentFrameId, begin, Now(), shown});
+  const bool taken = WaitUntilTaken(start.WaitForPresentFrameId, start.WaitForPresentTimeout);   // yours
+  pacer.AddPresentWait({start.WaitForPresentFrameId, begin, Now(), taken});
   start = pacer.PlanFrame(Now());                                    // planned again after a wait
 }
 if (start.WaitsForGpuWork())
@@ -218,7 +225,7 @@ pacer.AddPresent({present.FrameId, call, Now(), taken});             // before t
   work is asked for where it is active and the wait for a present is not: it is then the application's one wait for a frame
   slot, and the application makes no such wait of its own next to it.
 - **A wait may take `WaitForPresentTimeout` or `WaitForGpuWorkTimeout` at the most**: a few of the frame's own swap intervals,
-  and 50 ms at the least (`MinWaitTimeout`). A wait that ran out is reported as not shown, or not done. The pacer counts it and
+  and 50 ms at the least (`MinWaitTimeout`). A wait that ran out is reported as not taken, or not done. The pacer counts it and
   does not hold the frame to it, and when waits for a present run out in a row it stops asking for a while: a window that is
   not shown.
 - **`EndFrame` comes when the CPU's work is done**, before the wait for the present time and before the present: a wait is not
@@ -244,6 +251,29 @@ pacer.AddPresent({present.FrameId, call, Now(), taken});             // before t
 as two stretches: one after the other with one frame in flight, the longer of the two with two (`MaxFramesInFlight`, which is
 the application's word for how far its CPU may be ahead of its GPU). Without a GPU work report the pacer knows the CPU's time
 only, and a loop whose GPU work does not fit a refresh is not slowed down by its work.
+
+### A frame callback
+
+Where the window system's call for a new frame is the only signal from the display, it holds the loop: Wayland's
+`wl_surface.frame` on a compositor with the core protocol alone. Say `FrameCallback` and not `WaitForPresent`. **The frame loop
+above does not change, and nothing is called per callback**: the plan's wait for a present is that present's callback, and
+`AddPresentWait` reports how it ended.
+
+- **Before each present**, ask for the call: the request takes effect on the next commit, which the present makes. Keep it on
+  an event queue of its own, so that the wait dispatches nothing else, and keep one number: the highest frame id whose call came.
+  Calls come in the order of the presents, so a later call answers for an earlier frame.
+- **The wait** is for that number to reach `WaitForPresentFrameId`, for `WaitForPresentTimeout` at the most. `Taken` is whether
+  it did, and `EndTime` is read when the wait returns: that is when the call arrived, which is the time the pacer goes by.
+- **While the waits are stopped** the plan names a present with a timeout of zero: look without waiting, and report the answer.
+- **The time in the event is not taken**: it is in milliseconds, with a base the protocol leaves undefined.
+- **It paces nothing else.** With vertical blank times, or a wait for a present, the callback is not used. It does not reach
+  major tier 2, which has to see where a frame was shown.
+- **When calls stop** it is the pacer's, as for a wait for a present: two waits that run out stop the waits, the frames go on on
+  the timer at their swap interval, `WorkingTier()` falls to 3.4, none of those frames is judged, and the waits start again by
+  themselves. The application keeps asking for a call at each present, reports what happened, and has no timer of its own for
+  it. It may bound the calls it has outstanding while a window is not shown. `ForgetPresents()` after a new swap chain, as ever.
+- **A present can wait for the same call.** Nothing in the pacer runs while a present has not returned: whether a present on a
+  window that is not shown returns is the platform's, and is to be tried before it is relied on.
 
 ## The two aims
 
@@ -432,7 +462,7 @@ For an overlay or a log; none of it has to be read to pace.
 | `Rating()`, `ActiveRating()`, `WorkingTier()`, `IsPacing()`             | The tiers, as [above](#capabilities-and-tiers), and whether the frames are paced at all ([not pacing](#not-pacing))                           |
 | `SwapInterval()`, `FrameWindow()`                                       | The swap interval now, and what the rule's frame window holds: its frames, the late ones, and `StartsAhead`                                   |
 | `RefreshesBehindClock()`                                                | The refreshes the animation time is behind the clock: what was lost and not caught up with                                                    |
-| `PresentWaitTimeouts()`, `PresentWaitsStopped()`                        | The waits for a present that ended without the present shown, and whether the waits are stopped now                                           |
+| `PresentWaitTimeouts()`, `PresentWaitsStopped()`                        | The waits for a present that ended without the present taken, and whether the waits are stopped now                                           |
 | `GpuWaitTimeouts()`, `GpuTime()`                                        | The waits for the GPU's work that ran out, and the GPU time a frame is judged with                                                            |
 | `HasVBlankReading()`, `VBlankJumps()`                                   | Whether a vertical blank reading was taken, and the readings that were off where the ones before them put the vertical blanks                 |
 | `ReadyPlaceNow()`, `ReadyPlaceTries()`, `ShownLaterByWaits()`           | Where in a refresh a frame is to be ready now, how often that was tried a step later again, and the vertical blanks frames were shown late by |
@@ -589,7 +619,7 @@ regenerates them with `pacer-sim --golden` (built with the tests when the pacer 
 - `100-stages` and `60-relapse`: seeded staged loads. The fix is never late more often than the full-window rule and never slows down
   later; on `100-stages` and `60-relapse` it is late less often.
 - `tier-loops.csv` and `tier-loop-<run>.csv`: the pacer in a simulated frame loop on a display model that queues what a present
-  gives it. 136 runs: the four ways of pacing of major tier 3, both aims and seventeen cases (light work, GPU work of 90 and
+  gives it. 170 runs: the five ways of pacing of major tier 3, both aims and seventeen cases (light work, GPU work of 90 and
   130 % of a refresh, a frame that runs long, a slow display, two frames in flight, vertical blanks at which no frame is taken,
   a time on the present, a minimum duration, a swap interval on the present, the wait for the GPU's work, display reports,
   changes of the active set, an application that stops pacing and starts again, 60 Hz). A line per run with the length and the CRC-32 of its frames as text, and the eight runs

@@ -54,7 +54,7 @@ namespace
     report.FrameId = frameId;
     report.BeginTime = FP::NanosecondTickCount(Start);
     report.EndTime = FP::NanosecondTickCount(Start + blockedNanoseconds);
-    report.Shown = shown;
+    report.Taken = shown;
     return report;
   }
 
@@ -83,6 +83,30 @@ TEST(PresentWaitRule, WithTwoFramesInFlightThePlanAsksForThePresentOneFurtherBac
   Present(rule, 3);
   EXPECT_EQ(AskedFor(rule, picked), 2u);
   EXPECT_EQ(AskedFor(rule, twoInFlight), 1u);
+}
+
+TEST(PresentWaitRule, AWaitThatEndsWhenThePresentWasTakenIsForThePresentOneNearer)
+{
+  // What the pacer picks, as for an application that sets nothing
+  PC::PacerSettings picked(g_hz100);
+  picked.SetMinWaitTimeout(FP::NanosecondTimeDuration::Zero());
+  PC::PacerSettings twoInFlight = picked;
+  twoInFlight.SetMaxFramesInFlight(2);
+
+  PC::PresentWaitRule rule;
+  EXPECT_FALSE(rule.Plan(picked, g_hz100, 1, true).WaitsForPresent());
+  Present(rule, 1);
+  // The last present, where a wait for one that was shown has none yet
+  EXPECT_EQ(rule.Plan(picked, g_hz100, 1, true).WaitForPresentFrameId, 1u);
+  EXPECT_EQ(rule.Plan(picked, g_hz100, 1, false).WaitForPresentFrameId, 0u);
+  Present(rule, 2);
+  EXPECT_EQ(rule.Plan(picked, g_hz100, 1, true).WaitForPresentFrameId, 2u);
+  EXPECT_EQ(rule.Plan(picked, g_hz100, 1, false).WaitForPresentFrameId, 1u);
+  // A frame in flight stays out of it, one nearer all the same
+  EXPECT_EQ(rule.Plan(twoInFlight, g_hz100, 1, true).WaitForPresentFrameId, 1u);
+  // And it is never nearer than the last present
+  EXPECT_EQ(rule.Plan(Settings(1), g_hz100, 1, true).WaitForPresentFrameId, 2u);
+  EXPECT_EQ(rule.Plan(Settings(1), g_hz100, 1, false).WaitForPresentFrameId, 2u);
 }
 
 TEST(PresentWaitRule, ThePlanAsksForThePresentSoManyBackThatThePresentsThatMayWaitAreInBetween)

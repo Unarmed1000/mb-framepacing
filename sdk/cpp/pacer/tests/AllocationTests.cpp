@@ -153,7 +153,7 @@ TEST(Allocations, ThePacerOfATimerWithAWaitForAPresentPacesFramesWithoutAllocati
         waitReport.BeginTime = FP::NanosecondTickCount(now);
         now += (frame % 3) == 0 ? 50'000 : 3'000'000;
         waitReport.EndTime = FP::NanosecondTickCount(now);
-        waitReport.Shown = (frame % 97) != 0;
+        waitReport.Taken = (frame % 97) != 0;
         pacer.AddPresentWait(waitReport);
       }
       now = plan.WaitsForStartTime() && plan.StartTime.Nanoseconds() > now ? plan.StartTime.Nanoseconds() : now;
@@ -261,7 +261,7 @@ TEST(Allocations, ThePacerOfVerticalBlankTimesWithAWaitPacesFramesWithoutAllocat
           waitReport.BeginTime = FP::NanosecondTickCount(now);
           now += covered ? plan.WaitForPresentTimeout.Nanoseconds() : ((frame % 3) == 0 ? 50'000 : 2'000'000);
           waitReport.EndTime = FP::NanosecondTickCount(now);
-          waitReport.Shown = !covered;
+          waitReport.Taken = !covered;
           pacer.AddPresentWait(waitReport);
           plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
         }
@@ -337,7 +337,7 @@ TEST(Allocations, TheOnePacerPacesFramesAndChangesItsActiveCapabilitiesWithoutAl
           waitReport.BeginTime = FP::NanosecondTickCount(now);
           now += (frame % 3) == 0 ? 50'000 : 2'000'000;
           waitReport.EndTime = FP::NanosecondTickCount(now);
-          waitReport.Shown = (frame % 97) != 0;
+          waitReport.Taken = (frame % 97) != 0;
           pacer.AddPresentWait(waitReport);
           plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
         }

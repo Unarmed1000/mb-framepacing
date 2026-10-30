@@ -452,7 +452,10 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     measurement for the loop's order only): .1 both, .2 vertical blank times, .3 a wait, .4 neither (major 2: `DisplayTimes`
     with .2 and .4, which have no wait); proposals until measured. **Marks:** "+" display times, **"s"** `PresentSkipsOverdue`
     (`PacerRating::SkipsOverdue`, `PacerTierText::SkipsOverdueMark`: describes the system, a rating only until a pacer relies
-    on it). The GPU wait and GPU work times: capabilities, no tier, no mark. `DisplaySideHolds` stays beside the tier. No
+    on it), **"c"** a frame callback holds the loop (`PacerRating::HoldsByFrameCallback`, the user's choices of 2026-10-30,
+    decision 22: "3.3c"; the plan's wait for a present is that present's callback, `PresentWaitReport::Taken` says it came, no call
+    per callback and no event time; on a grid on the clock only, one present nearer than a wait for "shown", unused with
+    `WaitForPresent` or `VBlankTimes`, no tier of major tier 2: `PacerTierUtil::FrameCallbackCanHold`). The GPU wait and GPU work times: capabilities, no tier, no mark. `DisplaySideHolds` stays beside the tier. No
     capability that changes how good the pacing is may hide inside a place. `PacerTierText` has the words and `NumberOf(tier)`; an
     application shows no texts of its own. **Every tier has both aims** (`PacerAim::Smoothness`, the default, and `LowLatency`): an
     aim is never built in as a tier's only behaviour, and the pacer does not pick it (the user: not now).

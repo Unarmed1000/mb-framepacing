@@ -8,6 +8,7 @@
 #include <vector>
 #include "DisplayModelSettings.hpp"
 #include "LoopActiveSetChange.hpp"
+#include "LoopFrameCallbackGap.hpp"
 #include "LoopPacingChange.hpp"
 #include "LoopWorkChange.hpp"
 #include "NanosecondRange.hpp"
@@ -32,14 +33,25 @@ namespace MB::FramePacing::Pacer::Simulation
     NanosecondRange GpuWork{3'750'000, 3'750'000};
     //! How long after its time a timer wakes
     NanosecondRange TimerLate{0, 0};
-    //! From a present to where the loop is ready for the next frame (the present never waits)
+    //! From a present to where the loop is ready for the next frame
     int64_t LoopNanoseconds{60'000};
+    //! Where in a refresh the run starts, after the first vertical blank: a loop on a timer stays where it started
+    int64_t FirstStartDelayNanoseconds{0};
     //! true: one frame in flight, so a frame's start waits for the GPU's work on the frame before it
     bool WaitsForPreviousGpuWork{true};
     //! For a loop that waits for a present: the presents that may be waiting while a frame is made (0: the pacer picks, as
     //! it does for an application, which sets none), and how long after the display took a frame a wait for it returns
     uint32_t WaitingPresents{0};
     NanosecondRange PresentWaitReturn{60'000, 2'400'000};
+    //! For a loop with PacerCapability::FrameCallback: when the window system calls for a new frame after a present, from the time
+    //! the display shows that frame: before it, for a compositor that calls when it has repainted. Never before the present itself,
+    //! and in the order of the presents. The loop's wait for that present then ends with the call
+    NanosecondRange FrameCallbackReturn{-1'000'000, -500'000};
+    //! The stretches of the run in which no such call comes, ascending
+    std::vector<LoopFrameCallbackGap> FrameCallbackGaps;
+    //! The longest a present waits for the call that follows the present before it, as a swap chain's present can where nothing
+    //! else says that the display's side took a frame: the loop then has such calls whatever the pacer uses. 0: it does not wait
+    int64_t PresentWaitsForFrameCallbackNanoseconds{0};
     //! For the tier pacers: what they optimize for (PacerSettings::Aim). Low latency unless a run asks for the other
     PacerAim Aim{PacerAim::LowLatency};
     //! For the tier pacers. true: the loop gives the pacer each frame's GPU work, begin and end, once it is done

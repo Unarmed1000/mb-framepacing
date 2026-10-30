@@ -49,11 +49,13 @@ namespace MB::FramePacing::Pacer
     WaitForGpuWork = 1u << 8u,
     //! A wait until an image of its swap chain is free to draw into, with a timeout
     WaitForImage = 1u << 9u,
+    //! A wait until the window system called for a new frame after a present it names, with a timeout: the display's side took
+    //! that frame, which may be before it is shown. It holds the loop as a wait for a present does where the set has neither that
+    //! nor vertical blank times (PacerTierUtil::HoldsByFrameCallback, the "c" beside the tier)
+    FrameCallback = 1u << 10u,
 
     // What the application can tell the pacer
 
-    //! When the window system called for a new frame
-    FrameCallback = 1u << 10u,
     //! When a vertical blank was, and the period between them
     VBlankTimes = 1u << 11u,
     //! When the GPU began and ended its work on a frame, on the application's clock, frames later

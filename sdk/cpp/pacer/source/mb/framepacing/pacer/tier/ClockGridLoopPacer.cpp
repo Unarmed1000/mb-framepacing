@@ -253,7 +253,8 @@ namespace MB::FramePacing::Pacer
   FrameStartPlan ClockGridLoopPacer::PlanFrame(const NanosecondTickCount now) const noexcept
   {
     // The wait for a present, where the loop has one, and after it the time the frame is due at
-    FrameStartPlan plan = m_waitsForPresent ? m_wait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval()) : FrameStartPlan();
+    FrameStartPlan plan =
+      m_waitsForPresent ? m_wait.Plan(m_rule.Settings(), m_rule.Refresh(), m_rule.SwapInterval(), m_waitEndsWhenTaken) : FrameStartPlan();
     if (!m_waitsForPresent && m_waitsForGpuWork)
     {
       // Without a wait for a present: the wait for the GPU's work on an earlier frame, where the application can make it

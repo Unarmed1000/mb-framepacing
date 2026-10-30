@@ -17,8 +17,8 @@
 //!
 //! A tier is shown as its major tier and its sub tier (NumberOf): "1.1" is the best and "3.4" the baseline that every set
 //! reaches. A rating that reports display times (PacerRating::ReportsDisplayTimes) is shown with DisplayTimesMark after it, and
-//! one whose display skips a frame that is overdue (PacerRating::SkipsOverdue) with SkipsOverdueMark after that: "3.1+",
-//! "1.2+s", "3.1s".
+//! one whose display skips a frame that is overdue (PacerRating::SkipsOverdue) with SkipsOverdueMark after that, and one that a
+//! frame callback holds (PacerRating::HoldsByFrameCallback) with FrameCallbackMark last: "3.1+", "1.2+s", "3.1s", "3.3c".
 namespace MB::FramePacing::Pacer::PacerTierText
 {
   //! The tiers there are: PacerTier's values are 1 to this.
@@ -29,6 +29,8 @@ namespace MB::FramePacing::Pacer::PacerTierText
   inline constexpr std::string_view DisplayTimesMark = "+";
   //! What follows a tier's number (and DisplayTimesMark) when the display's side skips a frame that is overdue.
   inline constexpr std::string_view SkipsOverdueMark = "s";
+  //! What follows a tier's number (and the marks before it) when a frame callback holds the loop, not a wait for a present.
+  inline constexpr std::string_view FrameCallbackMark = "c";
   //! The capabilities there are: capability number index is PacerCapability(1 << index), index from 0 to this less one.
   inline constexpr uint32_t CapabilityCount = 16;
 

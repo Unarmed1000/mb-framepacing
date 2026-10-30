@@ -68,7 +68,8 @@ namespace
   constexpr PacerCapability TimedPresent = PacerCapability::PresentAtTime;
   constexpr PacerCapability Duration = PacerCapability::PresentAfterDuration;
   constexpr PacerCapability Skips = PacerCapability::PresentSkipsOverdue;
-  constexpr PacerCapability EveryRaise = TimedPresent | PacerCapability::WaitForPresent | PacerCapability::VBlankTimes;
+  constexpr PacerCapability EveryRaise =
+    TimedPresent | PacerCapability::WaitForPresent | PacerCapability::FrameCallback | PacerCapability::VBlankTimes;
   // What raises a set that sees where frames were shown and has no present that places a frame
   constexpr PacerCapability PlacingPresents = TimedPresent | Duration | PacerCapability::PresentSwapInterval;
 
@@ -296,9 +297,9 @@ TEST(PacerTier, ATierIsItsCapabilitySet)
 
   // What slows a loop when its queue is full, what only measures, a wait for the GPU's work, display times and a display's side
   // that skips reach no tier above the baseline
-  const PacerCapabilities noTier(PacerCapability::WaitForImage | PacerCapability::FrameCallback | PacerCapability::PresentWaits |
-                                   PacerCapability::AcquireWaits | PacerCapability::WaitForGpuWork | PacerCapability::GpuWorkTimes |
-                                   PacerCapability::GpuWorkDurations | shown | Skips,
+  const PacerCapabilities noTier(PacerCapability::WaitForImage | PacerCapability::PresentWaits | PacerCapability::AcquireWaits |
+                                   PacerCapability::WaitForGpuWork | PacerCapability::GpuWorkTimes | PacerCapability::GpuWorkDurations | shown |
+                                   Skips,
                                  1);
   for (const PacerTier tier : EveryTier)
   {
@@ -306,6 +307,62 @@ TEST(PacerTier, ATierIsItsCapabilitySet)
   }
   // A value that is no tier is reached by nothing better than every set reaches
   EXPECT_TRUE(Reaches(PacerCapabilities(), static_cast<PacerTier>(13)));
+}
+
+TEST(PacerTier, AFrameCallbackHoldsTheLoopOnAGridWhereNothingBetterDoes)
+{
+  using PC::PacerTierUtil::HasDisplayHold;
+  using PC::PacerTierUtil::HoldsByFrameCallback;
+  using PC::PacerTierUtil::Rate;
+  using PC::PacerTierUtil::Reaches;
+  const PacerCapability callback = PacerCapability::FrameCallback;
+  const PacerCapability wait = PacerCapability::WaitForPresent;
+  const PacerCapability vblank = PacerCapability::VBlankTimes;
+  const PacerCapability shown = PacerCapability::DisplayTimes;
+
+  // Alone it is the wait of the tier on the grid, with the mark
+  EXPECT_TRUE(HoldsByFrameCallback(PacerCapabilities(callback)));
+  EXPECT_TRUE(HasDisplayHold(PacerCapabilities(callback)));
+  EXPECT_FALSE(HasDisplayHold(PacerCapabilities()));
+  EXPECT_TRUE(Reaches(PacerCapabilities(callback), PacerTier::TimerWaitForPresent));
+  EXPECT_EQ(Rate(PacerCapabilities(callback)),
+            (PacerRating{PacerTier::TimerWaitForPresent, TimedPresent | PacerCapability::VBlankTimes, false, false, false, true}));
+  // The same with a time on the present: the sub tier is the same rank in every major tier
+  EXPECT_EQ(Rate(PacerCapabilities(callback | TimedPresent)),
+            (PacerRating{PacerTier::AtTimeTimerWaitForPresent, PacerCapability::VBlankTimes, true, false, false, true}));
+  // A wait for a present says more: it holds the loop, and there is no mark
+  EXPECT_FALSE(HoldsByFrameCallback(PacerCapabilities(callback | wait)));
+  EXPECT_TRUE(HasDisplayHold(PacerCapabilities(callback | wait)));
+  EXPECT_EQ(Rate(PacerCapabilities(callback | wait)), Rate(PacerCapabilities(wait)));
+  // Vertical blank times keep it out: a wait's return is read there as the refresh a frame was shown at
+  EXPECT_FALSE(HoldsByFrameCallback(PacerCapabilities(callback | vblank)));
+  EXPECT_FALSE(HasDisplayHold(PacerCapabilities(callback | vblank)));
+  EXPECT_FALSE(Reaches(PacerCapabilities(callback | vblank), PacerTier::VBlankWaitForPresent));
+  EXPECT_EQ(Rate(PacerCapabilities(callback | vblank)), Rate(PacerCapabilities(vblank)));
+
+  // It sees nothing of where a frame was shown: a duration without more stays with the frame loop, held by the callback
+  const PacerCapabilities duration(Duration | callback);
+  EXPECT_FALSE(PC::PacerTierUtil::SeesWhereFramesWereShown(duration));
+  EXPECT_FALSE(Reaches(duration, PacerTier::AfterDurationTimerWaitForPresent));
+  EXPECT_EQ(Rate(duration).Tier, PacerTier::TimerWaitForPresent);
+  EXPECT_TRUE(Rate(duration).HoldsByFrameCallback);
+  // A wait for a present raises that one, as it sees where frames were shown. So do display times, and then the callback is
+  // not what holds the loop: the display's side places the frames, and the loop follows its slip
+  EXPECT_TRUE(PC::HasCapability(Rate(duration).RaisesTier, wait));
+  EXPECT_TRUE(PC::HasCapability(Rate(duration).RaisesTier, shown));
+  EXPECT_FALSE(HoldsByFrameCallback(PacerCapabilities(Duration | callback | shown)));
+  EXPECT_EQ(Rate(PacerCapabilities(Duration | callback | shown)), Rate(PacerCapabilities(Duration | shown)));
+  // With a time on the present those display times do not place the frames, and the callback holds the loop
+  EXPECT_TRUE(HoldsByFrameCallback(PacerCapabilities(TimedPresent | Duration | callback | shown)));
+  // A wait for a present adds no tier to one the callback holds, and takes the mark away
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(callback)).RaisesTier, wait));
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(callback | TimedPresent)).RaisesTier, wait));
+  EXPECT_FALSE(Rate(PacerCapabilities(callback | wait)).HoldsByFrameCallback);
+  // And it raises what nothing holds, but for what it can not hold
+  EXPECT_TRUE(PC::HasCapability(Rate(PacerCapabilities()).RaisesTier, callback));
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(vblank)).RaisesTier, callback));
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(wait)).RaisesTier, callback));
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(Duration | shown)).RaisesTier, callback));
 }
 
 TEST(PacerTier, TheOrderIsWhoPlacesTheFrameThenWhatHoldsTheLoopThenWhereTheRefreshesAre)
@@ -426,7 +483,8 @@ TEST(PacerTier, ARatingIsTheBestTierWhatWouldRaiseItAndWhetherDisplayTimesAreRep
             (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent, false, false}));
   // A present at a time, and nothing else: a duration raises nothing, a display's side that skips neither
   EXPECT_EQ(Rate(PacerCapabilities(TimedPresent)),
-            (PacerRating{PacerTier::AtTimeTimerPeriodOnly, PacerCapability::WaitForPresent | PacerCapability::VBlankTimes, true, false}));
+            (PacerRating{PacerTier::AtTimeTimerPeriodOnly,
+                         PacerCapability::WaitForPresent | PacerCapability::FrameCallback | PacerCapability::VBlankTimes, true, false}));
   // All three: the best tier, and nothing raises it
   EXPECT_EQ(Rate(PacerCapabilities(TimedPresent | PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)),
             (PacerRating{PacerTier::AtTimeVBlankWaitForPresent, PacerCapability::NoCapabilities, true, false}));
@@ -493,6 +551,7 @@ TEST(PacerTier, EverySetIsRatedAtTheBestTierItReachesAndNeverBelowASetItContains
       ASSERT_EQ(rating.RaisesTier == PacerCapability::NoCapabilities, rating.Tier == PacerTier::AtTimeVBlankWaitForPresent) << bits;
       ASSERT_EQ(rating.SkipsOverdue, set.Has(Skips)) << bits;
       ASSERT_EQ(rating.ReportsDisplayTimes, set.Has(PacerCapability::DisplayTimes)) << bits;
+      ASSERT_EQ(rating.HoldsByFrameCallback, PC::PacerTierUtil::HoldsByFrameCallback(set)) << bits;
       ASSERT_EQ(rating.DisplaySideHolds, PC::PacerTierUtil::DisplaySideHolds(set)) << bits;
 
       // One capability more: the rating is never worse, it is better exactly where the rating said it would be, and the
@@ -550,6 +609,7 @@ namespace
   static_assert(Text::MajorTierCount * PC::PacerTierUtil::SubTiersPerMajorTier == Text::TierCount);
   static_assert(Text::DisplayTimesMark == "+");
   static_assert(Text::SkipsOverdueMark == "s");
+  static_assert(Text::FrameCallbackMark == "c");
   static_assert(Text::NameOf(PacerCapability::VBlankTimes) == "vertical blank times");
   // The counts are the enums': the lowest tier's number, and a bit per capability
   static_assert(Text::TierCount == static_cast<uint32_t>(PacerTier::TimerPeriodOnly));
