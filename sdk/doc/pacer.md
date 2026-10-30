@@ -622,7 +622,7 @@ regenerates them with `pacer-sim --golden` (built with the tests when the pacer 
   gives it. 170 runs: the five ways of pacing of major tier 3, both aims and seventeen cases (light work, GPU work of 90 and
   130 % of a refresh, a frame that runs long, a slow display, two frames in flight, vertical blanks at which no frame is taken,
   a time on the present, a minimum duration, a swap interval on the present, the wait for the GPU's work, display reports,
-  changes of the active set, an application that stops pacing and starts again, 60 Hz). A line per run with the length and the CRC-32 of its frames as text, and the eight runs
+  changes of the active set, an application that stops pacing and starts again, 60 Hz). A line per run with the length and the CRC-32 of its frames as text, and the ten runs
   with GPU work nobody reports written whole.
 
 The simulation and `pacer-sim` are test code, built with the tests only and never part of the library. The display model's
