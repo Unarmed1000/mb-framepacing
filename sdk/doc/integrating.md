@@ -30,7 +30,7 @@ each version (`SHA256SUMS`):
 ```cmake
 include(FetchContent)
 FetchContent_Declare(mb_framepacing
-  URL https://github.com/Unarmed1000/mb-framepacing/releases/download/sdk-v0.1.0-alpha.7/mb-framepacing-cpp-0.1.0-alpha.7.tar.gz
+  URL https://github.com/Unarmed1000/mb-framepacing/releases/download/sdk-v0.1.0-alpha.8/mb-framepacing-cpp-0.1.0-alpha.8.tar.gz
   URL_HASH SHA256=<from SHA256SUMS>
   FIND_PACKAGE_ARGS 0.1 CONFIG COMPONENTS marker)      # an installed copy of a compatible version wins
 set(MB_FRAMEPACING_BUILD_DATA OFF)   # optional: leave the data module (and nlohmann/json) out
@@ -43,7 +43,7 @@ target_link_libraries(my_game PRIVATE mb_framepacing::marker)
 ```cmake
 FetchContent_Declare(mb_framepacing
   GIT_REPOSITORY https://github.com/Unarmed1000/mb-framepacing.git
-  GIT_TAG sdk-v0.1.0-alpha.7
+  GIT_TAG sdk-v0.1.0-alpha.8
   GIT_SHALLOW TRUE
   SOURCE_SUBDIR sdk/cpp)
 ```
@@ -70,7 +70,7 @@ data module out):
 
 ```sh
 conan remote add mb-framepacing <checkout>/sdk/cpp/conan --type local-recipes-index
-conan install --requires mb-framepacing/0.1.0-alpha.7 --build=missing -s compiler.cppstd=20
+conan install --requires mb-framepacing/0.1.0-alpha.8 --build=missing -s compiler.cppstd=20
 ```
 
 ```cmake
