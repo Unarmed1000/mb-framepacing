@@ -955,7 +955,7 @@ higher refresh rate a return that late would read as a blank more. The refresh p
 
 Decision 22, built on 2026-10-30 at the first integration's report that the floor had no signal the pacer used: the lowest
 configuration has a call for a new frame and nothing else from the display, and that reached no tier. **Checked on the simulation
-only: no compositor has run it.**
+and on one test compositor ("First runs", below): no real compositor or GPU has run it.**
 
 **What the signal is**, in the words of Wayland's protocol
 ([`wl_surface.frame`](https://wayland.app/protocols/wayland#wl_surface:request:frame)): a notification "when it is a good time to
@@ -983,8 +983,8 @@ for this same call,
 [as SDL's commit says of Wayland without the FIFO protocol](https://github.com/libsdl-org/SDL/commit/d7b63cc71d94588a80994db2b88e228735c61f5c),
 and then the call for the present before the last has come before the wait starts. Given at the depth of a wait for a present the
 wait holds nothing: in the table below that run is within 0.13 ms of the timer in every row, with the loop held in the present and
-its frame already drawn. Whether a given present waits is not read from Mesa's source; the one Linux run on record (a virtual
-machine, "A loop the system holds") had a present that waited a third of a refresh, which fits and proves nothing.
+its frame already drawn. That a present waits was taken from SDL's commit and not read from Mesa's source; the first runs below
+show it.
 
 **The time is the end of the wait.** Nothing is given per callback. The event's own time is not taken: no rule has a use for it,
 and it is a millisecond with an undefined base.
@@ -1019,11 +1019,48 @@ where it did:
   frame is on its refresh. **Calls up to two refreshes late**, some of them together: no two frames start less than half a
   refresh apart.
 
-**What it does not answer.** A present that does not return while a window is not shown is out of the pacer's reach: no rule runs
-until it returns. SDL's commit says that a FIFO present blocks while a window is obscured without the FIFO protocol, and Vulkan only
-asks for "finite time"; the simulation has a present that gives up, by its own setting. What a compositor's call does on a real
-system, with a real present, is the first thing to measure ("What is still missing"), and the tier's rank against 3.4 is a proposal
-as every order here is.
+**First runs** (the first integration's Vulkan and OpenGL ES 3 FramePacing samples at 6d24273e, 2026-10-30; its own test compositor:
+the core protocol only, no FIFO protocol and no presentation-time, which answers the calls and calls a frame shown at the first tick
+of a 60 Hz timer after its commit; Mesa 26.0.8 on a software GPU, libwayland 1.24.0, a window of 640 by 360, FIFO, no other load
+reported; a run of 700 frames, about 610 of them after the first 90; display times are that compositor's own). **A test compositor
+and a software GPU: this says that it works, and nothing of what a real display or compositor does.** A window that is not shown is
+simulated, by holding back every call for 3 or 4 s.
+
+| Run, medians in ms           | The wait for the call | The present | A frame's start to its display | Shown more than 2 ms off a refresh |
+| ---------------------------- | --------------------- | ----------- | ------------------------------ | ---------------------------------- |
+| Vulkan, 3.4, smoothness      |                       | 16.32       | 32.95                          | 0                                  |
+| Vulkan, 3.3c, smoothness     | 12.55                 | 3.71        | 16.30                          | 2                                  |
+| Vulkan, 3.4, low latency     |                       | 3.32        | 17.82                          | 0                                  |
+| Vulkan, 3.3c, low latency    | 12.76                 | 3.51        | 16.30                          | 0                                  |
+| OpenGL ES, 3.4, smoothness   |                       | 15.53       | 30.57                          | 4                                  |
+| OpenGL ES, 3.3c, smoothness  | 14.52                 | 1.52        | 16.48                          | 0                                  |
+| OpenGL ES, 3.4, low latency  |                       | 1.58        | 14.59                          | 2                                  |
+| OpenGL ES, 3.3c, low latency | 14.54                 | 1.53        | 16.44                          | 5                                  |
+
+- **The present waits for the call, and the wait takes that out of it.** With the aim of smoothness the time moved from the present
+  to the wait, and the frame is shown a refresh sooner. What is left of the present at 3.3c is not waiting: without a call to wait for
+  (Vulkan's MAILBOX, 3.4, low latency) it is 3.77 ms on this software GPU. So one present nearer stands, on this run. 699 waits in each
+  run of 700, none ran out, and `LastPresentBlocked()` was the present's time in every run.
+- **Low latency against a timer:** 16.30 against 17.82 ms on Vulkan, 16.44 against 14.59 ms on OpenGL ES: a timer that lands well can
+  be sooner, as the table above has it.
+- **The model's sum holds:** a refresh and the display's lead, less the call's delay. This compositor has no lead to speak of, so
+  about 16 ms where the model's 5 ms gives 21.
+- **Calls that are held back stop the loop inside the present.** On FIFO one wait ran out (66.7 ms is that timeout at 60 Hz; 67.8 ms
+  on Vulkan, 78.3 ms on OpenGL ES, about 12 ms over, not explained) and the next present did not return: 2,932.0 ms on Vulkan and
+  2,924.5 ms on OpenGL ES of a hold of 3 s, and 3,000.7 ms for a present with the pacer off, with the thread in Mesa's WSI in
+  `wl_display_dispatch_queue`. So the two waits that stop the waits are not made, `WorkingTier()` does not fall to 3.4, and no
+  rule runs. The loop went on by itself when the calls were back. MAILBOX went on presenting through the hold.
+
+**What the simulation adds to that.** A present that waits as long as the calls stay away gives the same: 2,933.7 ms of a hold of 3 s,
+and the waits never stop. A present of more than 2 s (the frame window's length) starts the frames again, and nothing is lost.
+A shorter one is one frame that is late by it: the animation time is that far behind the clock, as after any pause. A present of
+1.9 to 2.0 s, just under the frame window, took the swap interval to 2 for 62 frames, and it came back by itself. That is a window
+that was not shown and a narrow band, so nothing was changed for it.
+
+**What it does not answer.** Whether a real compositor holds calls back like this, and what a present does then: that needs a real
+one. Whether the waits stop as built on a present that goes on (MAILBOX should show it; those runs did not say). The tier's rank
+against 3.4 is a proposal, as every order here is. And a loop that stands in its present stands with its application's thread, which
+no pacer can help: a present mode that does not wait for the call, or the FIFO protocol, can.
 
 ## Every time is in nanoseconds
 
@@ -2222,10 +2259,9 @@ measured only where a section above says so.
    the low-latency aim followed looks like in a capture (is the start a refresh later the right answer, and is a display
    that has no frame waiting moved once and no more, as the rule is built to).
 
-9. **The frame callback measured** (decision 22, 2026-10-30: built against the simulation): on a compositor with the core protocol
-   alone, whether the present waits for the same call, whether it returns while the window is not shown, whether one present nearer
-   is right, and what a frame's start to its display is against 3.4 with both aims. Not built: with low latency, a start held after
-   the call.
+9. **The frame callback measured** (decision 22, 2026-10-30: first runs on a test compositor, "The frame callback"): on a real
+   compositor and GPU, with both aims, against 3.4, with a capture; whether a real compositor holds calls back and what a present
+   does then; the waits stopping on a present that goes on. Not built: with low latency, a start held after the call.
 
 Not planned, and written down above: a pacer that relies on a display's side that skips (the "s"); an aim the pacer picks;
 pacing by display times beyond the display's slip in major tier 2 (decision 20); variable refresh.
@@ -2475,7 +2511,7 @@ pacing by display times beyond the display's slip in major tier 2 (decision 20);
     `PresentWaitRule`'s. On a grid on the clock only, one present nearer than a wait for a present, and never with display times that
     reach major tier 2 (`PacerTierUtil::FrameCallbackCanHold`). The sub tier stays the same rank in every major tier
     (decision 21) as far as the major tier allows: 1.3 with the callback, and none of major tier 2, which has to see where frames were
-    shown. Revisit when a compositor has been measured.
+    shown. Revisit when a real compositor has been measured.
 
 ## What changes for whom
 

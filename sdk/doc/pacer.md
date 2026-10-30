@@ -41,7 +41,8 @@ every measurement so far with its conditions, the decisions and what is still mi
 | The wait for the GPU's work, on that system: 96 runs with GPU work of 68 % and 129 % of a refresh, against the application's own wait for a frame slot                                                         | A GPU's limit on any other machine or scene                                                                                                                                                                     |
 | An application that stops pacing and starts again: every call while it is off, and the frames on their refreshes again afterwards (simulated)                                                                  | Pacing switched off and on, on any system                                                                                                                                                                       |
 | The display's side placing a frame after the one before (major tier 2): a display that holds a frame a refresh, both aims, on the grid and on the vertical blanks, one and two refreshes per frame (simulated) | The display's slip followed from display times on any system                                                                                                                                                    |
-| A frame callback as what holds the loop: a compositor model that calls after it repainted, both aims, wherever the loop started, calls that stop, late and together (simulated)                                | A frame callback on any compositor                                                                                                                                                                              |
+| A frame callback as what holds the loop: a compositor model that calls after it repainted, both aims, wherever the loop started, calls that stop, late and together (simulated)                                | A frame callback on a real compositor or a real GPU                                                                                                                                                             |
+| A frame callback on one test compositor, with Vulkan and OpenGL ES 3 on a software GPU: the wait holds the loop, and takes the time out of the present (by the compositor's own display times)                 | The stop of the waits on any system: a FIFO present stood through calls that were held back                                                                                                                     |
 |                                                                                                                                                                                                                | Vsync off; a variable refresh rate ([below](#a-variable-refresh-rate))                                                                                                                                          |
 
 It is here to be tried and measured (the marker and the tools exist for exactly that), not to be relied on.
@@ -268,12 +269,17 @@ above does not change, and nothing is called per callback**: the plan's wait for
 - **The time in the event is not taken**: it is in milliseconds, with a base the protocol leaves undefined.
 - **It paces nothing else.** With vertical blank times, or a wait for a present, the callback is not used. It does not reach
   major tier 2, which has to see where a frame was shown.
-- **When calls stop** it is the pacer's, as for a wait for a present: two waits that run out stop the waits, the frames go on on
-  the timer at their swap interval, `WorkingTier()` falls to 3.4, none of those frames is judged, and the waits start again by
-  themselves. The application keeps asking for a call at each present, reports what happened, and has no timer of its own for
-  it. It may bound the calls it has outstanding while a window is not shown. `ForgetPresents()` after a new swap chain, as ever.
-- **A present can wait for the same call.** Nothing in the pacer runs while a present has not returned: whether a present on a
-  window that is not shown returns is the platform's, and is to be tried before it is relied on.
+- **When calls stop and the presents go on** it is the pacer's, as for a wait for a present: two waits that run out stop the
+  waits, the frames go on on the timer at their swap interval, `WorkingTier()` falls to 3.4, none of those frames is judged, and
+  the waits start again by themselves. The application keeps asking for a call at each present, reports what happened, and has
+  no timer of its own for it. It may bound the calls it has outstanding while a window is not shown. `ForgetPresents()` after a
+  new swap chain, as ever.
+- **A present can wait for the same call, and then the presents do not go on.** A FIFO present without Wayland's FIFO protocol
+  waits for the call after the present before it, which is what the wait before the frame takes out of the present. While
+  calls are held back such a present does not return: one wait runs out, the next present stands until the calls are back, and
+  the waits never stop, as that takes two. Nothing of the pacer runs meanwhile, and the application's thread stands with it. The
+  loop goes on by itself afterwards. Seen on one test compositor, with Vulkan and OpenGL ES ([the record](pacer-design.md#the-frame-callback)
+  has the numbers), and SDL says the same of Wayland. A present mode that does not wait for the call goes on through it.
 
 ## The two aims
 

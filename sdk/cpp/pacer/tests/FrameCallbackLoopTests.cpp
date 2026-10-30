@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// EXPERIMENTAL. The frame callback as what holds the loop, on the simulation's display (SimulateTierLoop): tier 3.3c. The
-// simulation only: no compositor has run it, and the knobs here are what the window protocol allows, not a description of any
-// system. A compositor is a display that takes a frame a while before its vertical blank and calls for a new one just after that.
+// EXPERIMENTAL. The frame callback as what holds the loop, on the simulation's display (SimulateTierLoop): tier 3.3c. The knobs
+// here are what the window protocol allows, not a description of any system (sdk/doc/pacer-design.md has the one test compositor
+// it has run on). A compositor is a display that takes a frame a while before its vertical blank and calls for a new one just
+// after that.
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
@@ -210,8 +211,7 @@ TEST(FrameCallbackLoop, CallbacksThatStopStopTheWaitsAndTheFramesGoOnAsBefore)
 
 TEST(FrameCallbackLoop, APresentThatWaitsForACallbackThatDoesNotComeIsNoMoreThanItsOwnTime)
 {
-  // A present that gives up after two refreshes: the loop goes on at that rate, and is back when the calls are. Whether a real
-  // present gives up at all is for a system to show: one that does not return holds the loop where no rule of the pacer runs
+  // A present that gives up after two refreshes: the loop goes on at that rate, and is back when the calls are
   Sim::LoopSettings settings = Loop(PC::PacerAim::LowLatency);
   settings.Frames = 1'500;
   settings.FrameCallbackGaps = {{10'000'000'000, 5'000'000'000}};
@@ -220,6 +220,41 @@ TEST(FrameCallbackLoop, APresentThatWaitsForACallbackThatDoesNotComeIsNoMoreThan
   EXPECT_EQ(frames.back().SwapInterval, 1u);
   EXPECT_FALSE(frames.back().PresentWaitsStopped);
   EXPECT_EQ(OffTheSwapInterval(frames, frames.size() - 120u, frames.size(), period), 0);
+}
+
+TEST(FrameCallbackLoop, APresentThatWaitsForCallsThatStayAwayHoldsTheLoopUntilTheyAreBack)
+{
+  for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
+  {
+    for (const int64_t milliseconds : {500, 1'000, 3'000, 4'000})
+    {
+      // As on the first test compositor: a FIFO present does not return while the calls are held back. One wait runs out, and
+      // the present after it stands, so the two waits that stop the waits never happen and no plan is made until it returns
+      Sim::LoopSettings settings = Loop(aim);
+      settings.Frames = 1'500;
+      settings.PresentWaitsForFrameCallbackNanoseconds = 10'000'000'000;
+      const int64_t hold = milliseconds * 1'000'000;
+      settings.FrameCallbackGaps = {{10'000'000'000, hold}};
+      const std::vector<Sim::LoopFrame> frames = Sim::SimulateTierLoop(settings, PacerCapability::FrameCallback);
+      const int64_t period = PeriodNanoseconds(settings);
+
+      int64_t longest = 0;
+      std::size_t longestAt = 0;
+      for (std::size_t index = 0; index < frames.size(); ++index)
+      {
+        const int64_t blocked = frames[index].PresentReturnNanoseconds - frames[index].PresentNanoseconds;
+        longestAt = blocked > longest ? index : longestAt;
+        longest = std::max(longest, blocked);
+        ASSERT_FALSE(frames[index].PresentWaitsStopped) << index;
+      }
+      EXPECT_GT(longest, hold - (10 * period)) << milliseconds;
+      EXPECT_LT(longest, hold) << milliseconds;
+      // The loop goes on by itself, on its refreshes and at the swap interval it had
+      EXPECT_EQ(frames.back().SwapInterval, 1u) << milliseconds;
+      EXPECT_EQ(OffTheSwapInterval(frames, longestAt + 120u, frames.size(), period), 0) << milliseconds;
+      EXPECT_LT(frames.back().ShownNanoseconds - frames.back().StartNanoseconds, 2 * period) << milliseconds;
+    }
+  }
 }
 
 TEST(FrameCallbackLoop, CallsThatComeTogetherDoNotRunTheLoopAhead)
