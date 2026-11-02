@@ -7,7 +7,7 @@
   <ItemGroup>
     <PackageVersion Include="NLog" Version="6.2.2" />
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.13" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.14" />
     <PackageVersion Include="ZXing.Net" Version="0.16.11" />
     <!-- GUI -->
     <PackageVersion Include="Avalonia" Version="12.1.4" />
