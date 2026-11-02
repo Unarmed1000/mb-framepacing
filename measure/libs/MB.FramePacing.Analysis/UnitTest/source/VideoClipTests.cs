@@ -163,10 +163,19 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(run.Frames, Has.Count.EqualTo(manifest.FrameCount), "the manifest's presented frames");
       Assert.That(run.Counts.SkippedFrameIndices, Is.EqualTo(manifest.ExpectedSkippedFrameIndices), $"{clip}: frame indices never presented");
       Assert.That(run.Counts.OutOfOrderCaptures, Is.EqualTo(manifest.ExpectedOutOfOrderCaptures), $"{clip}: captures out of order");
-      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule), "the markers carry the pacer's schedule");
+      Assert.That(
+        run.Pacing!.Source,
+        Is.EqualTo(
+          Enumerable.Range(0, manifest.FrameCount).Any(i => manifest.SwapIntervalRefreshes(i).HasValue)
+            ? PacingSource.TargetFrameTime
+            : PacingSource.Schedule
+        ),
+        "the pacer's target in the markers, else its schedule (on demand)"
+      );
       Assert.That(run.Warnings, Has.None.Contains("Vsync is probably off"), $"{clip}: every clip is presented with vsync");
       long refresh = run.Pacing.RefreshPeriod.Nanoseconds;
-      Assert.That(refresh, Is.AnyOf(16_666_666L, 16_666_667L), "the refresh is the capture period: 1/60 s to the nanosecond");
+      long wholeNanoseconds = NanosecondTimeSpan.NanosecondsPerSecond / manifest.Fps;
+      Assert.That(refresh, Is.InRange(wholeNanoseconds, wholeNanoseconds + 1), "the refresh is the capture period: a refresh to the nanosecond");
 
       // Lateness is measured from the run's on-time frames: the earliest (shown - intended) of the frames on time (an out-of-order frame is early)
       long onTime = Enumerable
@@ -247,11 +256,12 @@ namespace MB.FramePacing.Analysis.UnitTest
           where + ": delta time jitter"
         );
         Assert.That(frame.TargetFrameTime?.Nanoseconds, Is.EqualTo(manifest.TargetRefreshes(i) * refresh), where + ": target");
-        long? intended = manifest.IntendedStepNanoseconds(i);
-        Assert.That(frame.PacingError?.Nanoseconds, Is.EqualTo(manifest.DisplayStepNanoseconds(i) - intended), where + ": pacing error");
+        // The target in the capture's whole refreshes; on demand the step to its intended time as it is
+        long? against = manifest.SwapIntervalRefreshes(i) is { } swapInterval ? swapInterval * refresh : manifest.IntendedStepNanoseconds(i);
+        Assert.That(frame.PacingError?.Nanoseconds, Is.EqualTo(manifest.DisplayStepNanoseconds(i) - against), where + ": pacing error");
         Assert.That(
           frame.PredictionError?.Nanoseconds,
-          Is.EqualTo(manifest.IsJudged(i) ? manifest.AnimationStepNanoseconds(i) - intended : null),
+          Is.EqualTo(manifest.IsJudged(i) ? manifest.AnimationStepNanoseconds(i) - against : null),
           where + ": prediction error (not judged from a static frame)"
         );
       }

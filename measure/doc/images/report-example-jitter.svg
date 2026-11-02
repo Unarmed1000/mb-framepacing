@@ -53,6 +53,11 @@
   .held-late { stroke: #e5534b; stroke-width: 2.5; fill: none; }
   .bar-range { fill: #e5534b; fill-opacity: 0.3; }
   .static-band { fill: #a371f7; fill-opacity: 0.14; }
+  .invalid-band { fill: #8b949e; fill-opacity: 0.16; }
+  .invalid-hatch { stroke: #8b949e; stroke-opacity: 0.4; stroke-width: 1; fill: none; }
+  .invalid-text { font-size: 11px; fill: #adbac7; letter-spacing: 0.04em; }
+  .older-band { fill: #db61a2; fill-opacity: 0.22; }
+  .older-text { font-size: 11px; fill: #db61a2; letter-spacing: 0.04em; }
   .static-text { font-size: 11px; fill: #a371f7; letter-spacing: 0.04em; }
   .strip-static-a { fill: #a371f7; fill-opacity: 0.55; }
   .strip-static-b { fill: #a371f7; fill-opacity: 0.85; }
@@ -136,7 +141,7 @@
 <text x="874.0" y="90.0" text-anchor="start" class="vsync-n">preferred 60 fps</text>
 <rect class="tile pacing-band" x="20" y="1252" width="1140" height="52" rx="10"/>
 <text x="34.0" y="1273.0" text-anchor="start"><tspan class="label">PACER</tspan><tspan class="vsync-target">   pacer or limiter: no</tspan><tspan class="vsync-n">   no frame carries the paced flag</tspan></text>
-<text x="1146.0" y="1273.0" text-anchor="end" class="vsync-n">measured against the pacer's schedule in the markers</text>
+<text x="1146.0" y="1273.0" text-anchor="end" class="vsync-n">measured against the pacer's target frame time in the markers</text>
 <text x="34.0" y="1293.0" text-anchor="start"><tspan class="vsync-n">–</tspan><tspan class="vsync-n"> paced flag</tspan><tspan class="vsync-target">      99 %</tspan><tspan class="vsync-n"> schedule (intended display times)</tspan><tspan class="vsync-target">      ✓</tspan><tspan class="vsync-n"> target frame time: 60 fps</tspan><tspan class="vsync-target">      ✓</tspan><tspan class="vsync-n"> preferred frame time: 60 fps</tspan></text>
 <rect class="tile" x="20.0" y="118" width="276.0" height="64" rx="10"/>
 <text x="34.0" y="138.0" text-anchor="start" class="label">AVERAGE FPS</text>
@@ -149,7 +154,7 @@
 <text x="610.0" y="162.0" text-anchor="start"><tspan class="tile-value">-</tspan><tspan class="vsync-n">  needs 1,000 frames</tspan></text>
 <rect class="tile" x="884.0" y="118" width="276.0" height="64" rx="10"/>
 <text x="898.0" y="138.0" text-anchor="start" class="label">FRAMES VISIBLY OFF</text>
-<text x="898.0" y="162.0" text-anchor="start"><tspan class="tile-value warn">461</tspan><tspan class="vsync-n">  96.2 %</tspan></text>
+<text x="898.0" y="162.0" text-anchor="start"><tspan class="tile-value warn">465</tspan><tspan class="vsync-n">  97.1 %</tspan></text>
 <rect class="tile" x="20.0" y="194" width="276.0" height="64" rx="10"/>
 <text x="34.0" y="214.0" text-anchor="start" class="label">ERROR P99</text>
 <text x="34.0" y="238.0" text-anchor="start"><tspan class="tile-value">10.0 ms</tspan></text>
@@ -599,7 +604,7 @@
 <rect class="bar-jitter" x="1021.98" y="385.0" width="1.55" height="46.0"/>
 <rect class="bar-jitter" x="1024.12" y="385.0" width="1.55" height="13.7"/>
 <rect class="bar-jitter" x="1026.27" y="378.2" width="1.55" height="6.8"/>
-<rect class="bar" x="1028.42" y="385.0" width="1.55" height="6.5"/>
+<rect class="bar-jitter" x="1028.42" y="385.0" width="1.55" height="6.5"/>
 <rect class="bar-jitter" x="1030.56" y="376.2" width="1.55" height="8.8"/>
 <rect class="bar-jitter" x="1032.71" y="385.0" width="1.55" height="10.1"/>
 <rect class="bar-jitter" x="1034.85" y="373.9" width="1.55" height="11.1"/>
@@ -617,7 +622,7 @@
 <rect class="bar-jitter" x="1060.60" y="377.5" width="1.55" height="7.5"/>
 <rect class="bar-jitter" x="1062.75" y="348.5" width="1.55" height="36.5"/>
 <rect class="bar-jitter" x="1064.90" y="377.8" width="1.55" height="7.2"/>
-<rect class="bar" x="1067.04" y="385.0" width="1.55" height="6.5"/>
+<rect class="bar-jitter" x="1067.04" y="385.0" width="1.55" height="6.5"/>
 <rect class="bar-jitter" x="1069.19" y="377.5" width="1.55" height="7.5"/>
 <rect class="bar-jitter" x="1071.33" y="385.0" width="1.55" height="7.2"/>
 <rect class="bar-jitter" x="1073.48" y="376.8" width="1.55" height="8.2"/>
@@ -644,10 +649,10 @@
 <rect class="bar-jitter" x="1118.54" y="377.5" width="1.55" height="7.5"/>
 <rect class="bar-jitter" x="1120.69" y="385.0" width="1.55" height="9.1"/>
 <rect class="bar-jitter" x="1122.83" y="378.2" width="1.55" height="6.8"/>
-<rect class="bar" x="1124.98" y="385.0" width="1.55" height="6.5"/>
+<rect class="bar-jitter" x="1124.98" y="385.0" width="1.55" height="6.5"/>
 <rect class="bar-jitter" x="1127.12" y="327.0" width="1.55" height="58.0"/>
 <rect class="bar-jitter" x="1129.27" y="385.0" width="1.55" height="8.5"/>
-<rect class="bar" x="1131.42" y="385.0" width="1.55" height="6.5"/>
+<rect class="bar-jitter" x="1131.42" y="385.0" width="1.55" height="6.5"/>
 <rect class="bar-jitter" x="1133.56" y="372.6" width="1.55" height="12.4"/>
 <rect class="bar-jitter" x="1135.71" y="385.0" width="1.55" height="10.4"/>
 <rect class="bar-jitter" x="1137.85" y="377.5" width="1.55" height="7.5"/>
@@ -1151,7 +1156,7 @@
 <rect class="strip-jitter" x="1022.5" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1024.6" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1026.8" y="1080" width="1.1" height="28" rx="2"/>
-<rect class="strip-a" x="1028.9" y="1080" width="1.1" height="28" rx="2"/>
+<rect class="strip-jitter" x="1028.9" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1031.1" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1033.2" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1035.4" y="1080" width="1.1" height="28" rx="2"/>
@@ -1169,7 +1174,7 @@
 <rect class="strip-jitter" x="1061.1" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1063.2" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1065.4" y="1080" width="1.1" height="28" rx="2"/>
-<rect class="strip-a" x="1067.5" y="1080" width="1.1" height="28" rx="2"/>
+<rect class="strip-jitter" x="1067.5" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1069.7" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1071.8" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1074.0" y="1080" width="1.1" height="28" rx="2"/>
@@ -1196,10 +1201,10 @@
 <rect class="strip-jitter" x="1119.0" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1121.2" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1123.3" y="1080" width="1.1" height="28" rx="2"/>
-<rect class="strip-b" x="1125.5" y="1080" width="1.1" height="28" rx="2"/>
+<rect class="strip-jitter" x="1125.5" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1127.6" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1129.8" y="1080" width="1.1" height="28" rx="2"/>
-<rect class="strip-a" x="1131.9" y="1080" width="1.1" height="28" rx="2"/>
+<rect class="strip-jitter" x="1131.9" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1134.1" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1136.2" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="1138.4" y="1080" width="1.1" height="28" rx="2"/>
@@ -1230,7 +1235,7 @@
 <text x="20.0" y="1340.0" text-anchor="start" class="label">NOTES</text>
 <text x="20.0" y="1364.0" text-anchor="start" class="sub">Resolution 16.7 ms (one capture period); error threshold 1 ms.</text>
 <text x="20.0" y="1383.0" text-anchor="start" class="sub">Every frame is drawn.</text>
-<text x="20.0" y="1402.0" text-anchor="start" class="sub">Cause: mostly delta time jitter: an even display with uneven animation steps (0 error frame(s) at uneven display, 461 on an even display).</text>
+<text x="20.0" y="1402.0" text-anchor="start" class="sub">Cause: mostly delta time jitter: an even display with uneven animation steps (0 error frame(s) at uneven display, 465 on an even display).</text>
 <text x="20.0" y="1421.0" text-anchor="start" class="sub">480 presented frames from 480 captures: 480 decoded, 0 undecodable, 0 torn, 0 not recorded; 0 dropped by the source, 0 missed. 0 frame indices never captured, 1 segment(s).</text>
 <text x="20.0" y="1440.0" text-anchor="start" class="sub">Planned time from present to screen: median 6.7 ms (0.4 refreshes), 1.7 ms to 11.7 ms (the pacer's intended display time: its plan, not a measurement).</text>
 <text x="20.0" y="1459.0" text-anchor="start" class="sub">Present to screen, beyond the run's quickest frame: median 4.9 ms, p95 10.0 ms, max 10.0 ms (0.6 refreshes). A whole refresh more that stays is a queue that filled; the quickest</text>

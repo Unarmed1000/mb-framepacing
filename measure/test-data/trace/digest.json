@@ -11,15 +11,15 @@
   "snapshotTraceNs": 103983333333,
   "snapshotClockNs": 98983333333,
   "captureAlone": {
-    "length": 315495,
-    "sha256": "8280298acf7e51e723c22227ac72c24f9bc0ac13455509ada5051be1756a6339"
+    "length": 315259,
+    "sha256": "5eb71e7c5936046c67c298b814b220309f7a01bb96d898723c5fb2f3b0f2213f"
   },
   "augmented": {
-    "length": 443538,
-    "sha256": "690643536c5cfdf766448712be921350268ac5a012706ad32a4cb8974cb5126c"
+    "length": 443302,
+    "sha256": "6009d1be2d72890c5a6833fffa919c7e175a71feef0b2f81e8bb55ae9de3101d"
   },
   "augmentedPieces": {
-    "length": 443666,
-    "sha256": "509cb149d462277f05a3aaafc26115abed2d2d912189ebf9adf43de11ea32cae"
+    "length": 443430,
+    "sha256": "443e4327047d83821f403dccb70245c06b20fe2c3c3725cf9986687c88f8c6bd"
   }
 }

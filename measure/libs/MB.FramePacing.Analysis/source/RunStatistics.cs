@@ -23,7 +23,7 @@ namespace MB.FramePacing.Analysis
     Statistics AbsoluteAnimationErrorMs,
     Statistics DriftMs,
     Statistics OnScreenMs,
-    // Presented frames whose |animation error| exceeds the error threshold (TimelineResult.ErrorThreshold)
+    // Presented frames that count as an animation error (AnimationErrorRule): beyond the error threshold (TimelineResult.ErrorThreshold)
     long FramesWithAnimationError,
     // Gamers Nexus's "error per frame": the mean |animation error| of the frames with one
     double ErrorPerFrameMs,
@@ -80,7 +80,7 @@ namespace MB.FramePacing.Analysis
           animationSteps.Add(frame.AnimationDelta!.Value);
           errors.Add(error);
           absoluteErrors.Add(absolute);
-          if (capturePeriod > NanosecondTimeDuration.Zero && absolute > threshold)
+          if (capturePeriod > NanosecondTimeDuration.Zero && AnimationErrorRule.Counts(frame, threshold))
             ++visibleErrors;
           absoluteErrorNanoseconds += Math.Abs(error.Nanoseconds);
           errorDisplayNanoseconds += frame.DisplayDelta!.Value.Nanoseconds;

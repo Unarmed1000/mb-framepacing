@@ -35,7 +35,7 @@
     },
     "recordCount": 486,
     "captureIndexSum": 117855,
-    "hostNsSum": 129183602400,
+    "hostNsSum": 131325075200,
     "deviceNsCount": 486,
     "deviceNsSum": 1964250000000,
     "sourceDropsSum": 0,
@@ -78,7 +78,7 @@
         "excludedStaticFrames": 0,
         "uncertainSteps": 0,
         "cpuBusyCount": 388,
-        "pacingSource": "Schedule",
+        "pacingSource": "TargetFrameTime",
         "lateFrames": 33,
         "refreshPeriodNs": 16666667,
         "targetFrameNs": 16666667,
@@ -149,7 +149,7 @@
         },
         "targetNs": {
           "count": 388,
-          "sum": 8000000160
+          "sum": 6466666796
         },
         "markerPreferredNs": {
           "count": 388,
@@ -164,12 +164,12 @@
           "sum": 6466666796
         },
         "pacingErrorNs": {
-          "count": 386,
-          "sum": 0
+          "count": 387,
+          "sum": 1533333204
         },
         "predictionErrorNs": {
-          "count": 386,
-          "sum": 0
+          "count": 387,
+          "sum": 1533333204
         },
         "latenessNs": {
           "count": 387,
@@ -223,7 +223,7 @@
     },
     "captureNsSum": 1964250000000,
     "frameIndexSum": 280133,
-    "hostNsSum": 129183602400,
+    "hostNsSum": 131325075200,
     "sourceDropsSum": 0,
     "missedSum": 0,
     "syncCount": 0,

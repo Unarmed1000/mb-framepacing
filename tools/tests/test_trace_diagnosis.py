@@ -24,7 +24,6 @@ from trace_diagnosis import (
     PRESENT_NAME_PREFIX,
     PRESENT_NOT_ACCEPTED,
     PRESENT_PAST_DUE,
-    SHOWN_SOONER,
     SKIPPED_BEFORE,
     SWAP_CHAIN_RECREATED_NAME,
     SWAP_INTERVAL_CHANGE_NAME,
@@ -71,35 +70,38 @@ def _due(frame: FrameRow) -> int:
 
 
 class GoldenAloneTests(unittest.TestCase):
-    """The golden capture's markers alone: its 33 late frames and 33 frames shown a refresh too soon."""
+    """The golden capture's markers alone: its 33 late frames and 92 frames off their target of one refresh."""
 
     def test_the_markers_alone_say_why_most_frames_went_wrong(self) -> None:
         diagnoses = diagnose(frames(), {}, {}, [], PERIOD_NS, summary().error_threshold_ns)
         wrong = [d for d in diagnoses if d.went_wrong]
         self.assertEqual(len(diagnoses), 388)
         self.assertEqual(sum(1 for d in wrong if d.what == VERDICT_LATE), 33)
-        self.assertEqual(sum(1 for d in wrong if d.what == VERDICT_OFF), 33)
+        self.assertEqual(sum(1 for d in wrong if d.what == VERDICT_OFF), 92)
         # A late frame's CPU work was longer than its intended period, but for two
         late = [d for d in wrong if d.what == VERDICT_LATE]
         self.assertEqual(sum(1 for d in late if d.first == CPU_LONGER), 31)
         self.assertEqual(sum(1 for d in late if d.first == NOTHING_FOUND), 2)
-        # A frame off by a refresh was shown a refresh sooner than its intended period of two
+        # Frames off their target: their CPU work was longer than it, or they caught up a refresh on their step, or nothing says why
         off = [d for d in wrong if d.what == VERDICT_OFF]
-        self.assertTrue(all(d.first == SHOWN_SOONER for d in off))
-        self.assertTrue(all(d.facts[0].value_ns == 16_666_667 or d.facts[0].value_ns == 16_666_668 for d in off), [d.facts[0] for d in off])
+        self.assertEqual(sum(1 for d in off if d.first == CPU_LONGER), 49)
+        self.assertEqual(sum(1 for d in off if d.first == NOTHING_FOUND), 10)
+        caught_up = [d for d in off if d.first == ANIMATION_STEP]
+        self.assertEqual(len(caught_up), 33)
+        self.assertTrue(all(abs(d.facts[0].value_ns - PERIOD_NS) <= 2 for d in caught_up), [d.facts[0] for d in caught_up])
         # No frame on time has a fact
         self.assertTrue(all(not d.facts for d in diagnoses if not d.went_wrong))
 
     def test_the_summary_holds_each_fact_against_the_frames_on_time(self) -> None:
         diagnoses = diagnose(frames(), {}, {}, [], PERIOD_NS, summary().error_threshold_ns)
         lines = summary_lines(diagnoses, name_programs=True)
-        self.assertEqual(lines[0], "388 frames, 66 of them went wrong: 33 late, 33 off")
-        self.assertIn(f"  {CPU_LONGER}: 31 of 66 (47 %), on time 0 of 322 (0 %)", lines)
-        self.assertIn(f"  {SHOWN_SOONER}: 33 of 66 (50 %), on time 0 of 322 (0 %)", lines)
-        self.assertIn("Bursts: 8 of 3 or more frames in a row, the longest 4 from #492", lines)
+        self.assertEqual(lines[0], "388 frames, 125 of them went wrong: 92 off, 33 late")
+        self.assertIn(f"  {CPU_LONGER}: 80 of 125 (64 %), on time 0 of 263 (0 %)", lines)
+        self.assertIn(f"  {ANIMATION_STEP}: 33 of 125 (26 %), on time 0 of 263 (0 %)", lines)
+        self.assertIn("Bursts: 15 of 3 or more frames in a row, the longest 26 from #541", lines)
         # Every frame that went wrong is in the frame lines, its facts under it
         text = frame_lines(diagnoses, name_programs=True)
-        self.assertEqual(sum(1 for line in text if line.startswith("#")), 66)
+        self.assertEqual(sum(1 for line in text if line.startswith("#")), 125)
         self.assertEqual(text[0], "#480 late, animation error -16.67 ms")
         self.assertEqual(text[1], "  its CPU work took 20.81 ms, its intended period 16.67 ms")
 
@@ -107,7 +109,7 @@ class GoldenAloneTests(unittest.TestCase):
         diagnoses = diagnose(frames(), {}, {}, [], PERIOD_NS, summary().error_threshold_ns)
         rows = list(csv.reader(io.StringIO(to_csv(diagnoses))))
         self.assertEqual(rows[0], ["frameIndex", "what", "animationErrorNs", "first", "facts"])
-        self.assertEqual(len(rows), 67)
+        self.assertEqual(len(rows), 126)
         self.assertEqual(rows[1], ["480", "late", "-16666667", CPU_LONGER, f"{CPU_LONGER}=4140688"])
 
 

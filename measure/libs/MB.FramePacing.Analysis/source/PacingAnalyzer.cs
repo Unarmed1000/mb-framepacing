@@ -25,18 +25,24 @@ namespace MB.FramePacing.Analysis
     /// and returns the run's pacing. Display time steps are whole refreshes, so everything is compared with half a refresh of slack.
     /// <list type="bullet">
     /// <item>
-    /// A frame is late when its display time step is longer than both its animation time step and its intended period, each by half a
-    /// refresh or more (the steps are whole refreshes): the frame before it stayed on screen longer than this frame was animated for and
-    /// longer than the pacer intended. The intended period is the marker's target frame time, else the step between the plan's intended
-    /// display times, else the preferred frame time, the target frame rate given to the tools or one refresh (one target per frame the
-    /// target dropped before it). An application that presents on demand intends no period: none of its frames is late. A static or an
-    /// uncertain step has no animation error and so no late frame.
+    /// A frame's target is a fixed number of refreshes, whatever happened to the frames around it: the marker's target frame time, else the
+    /// plan's step per frame index, else the preferred frame time, the target frame rate given to the tools or one refresh. A drop does not
+    /// change it, so a frame after a dropped one is off its target, and there is no grid: each frame is measured from where the last shown
+    /// frame appeared, so a pacer that moves its plan after a loss and one that returns to it are both read as they were shown.
     /// </item>
     /// <item>
-    /// With intended display times (<see cref="PacingSource.Schedule"/>) every frame gets a pacing error (display time step minus intended step) and a
-    /// prediction error (animation step minus intended step); the animation error is prediction minus pacing error. Its lateness is how long
-    /// after its intended time it appeared, measured from the run's on-time frames: a value of its own that the late verdict does not use (a
-    /// frame that stays behind its plan after a hitch has a step that is right).
+    /// A frame is late when its display time step is longer than both its animation time step and its target, each by half a refresh or more
+    /// (the steps are whole refreshes): the frame before it stayed on screen longer than this frame was animated for and longer than the
+    /// pacer intended. An application that presents on demand intends no period: none of its frames is late. A static or an uncertain step
+    /// has no animation error and so no late frame.
+    /// </item>
+    /// <item>
+    /// With a target the application gave every frame gets a pacing error (display time step minus target) and a prediction error (animation
+    /// step minus target); the animation error is prediction minus pacing error (<see cref="AnimationErrorRule"/>).
+    /// </item>
+    /// <item>
+    /// With intended display times a frame's lateness is how long after its intended time it appeared, measured from the run's on-time frames:
+    /// a value of its own that the late verdict does not use (a frame that stays behind its plan after a hitch has a step that is right).
     /// </item>
     /// </list>
     /// </summary>
@@ -51,8 +57,11 @@ namespace MB.FramePacing.Analysis
       // Half a refresh, cut to the nanosecond
       var half = NanosecondTimeDuration.FromNanoseconds(refresh.Nanoseconds / 2);
       bool schedule = frames.Count(f => f.IntendedDisplayTime != default) >= Math.Max(2, frames.Count / 2);
+      var onDemandTime = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
       var source =
-        schedule ? PacingSource.Schedule
+        frames.Any(f => f.MarkerTargetFrameTime != NanosecondTimeDuration.Zero && f.MarkerTargetFrameTime != onDemandTime)
+          ? PacingSource.TargetFrameTime
+        : schedule ? PacingSource.Schedule
         : frames.Any(f => f.MarkerTargetFrameTime != NanosecondTimeDuration.Zero) ? PacingSource.TargetFrameTime
         : frames.Any(f => f.MarkerPreferredFrameTime != NanosecondTimeDuration.Zero) ? PacingSource.PreferredFrameTime
         : targetFps is > 0 ? PacingSource.GivenTarget
@@ -73,8 +82,6 @@ namespace MB.FramePacing.Analysis
         scheduleOffset = OnTimeOffset(offsets.Values, half);
       }
 
-      // Frames the target dropped before each frame: without a schedule, the frame after them is due their frame times later too
-      var dropped = DroppedFrames.Before(frames);
       var pacingErrors = new NanosecondList();
       var predictionErrors = new NanosecondList();
       long late = 0;
@@ -89,38 +96,34 @@ namespace MB.FramePacing.Analysis
           schedule && previous != null && frame.IntendedDisplayTime != default && previous.IntendedDisplayTime != default
             ? frame.IntendedDisplayTime - previous.IntendedDisplayTime
             : null;
-        // What the frame is measured against: the schedule's step, the pacer's target, else the rate the application wants (a game that
-        // wants 30 fps on 60 Hz aims for two refreshes), else the rate given to the tools, else one refresh. An application that presents on
-        // demand has no interval to aim for: no target, so only a schedule can make its frames late. Without a schedule, a frame after
-        // frames the target dropped is due one frame time per frame later (1 + dropped): the drop explains the longer step, not lateness
+        // What the frame is measured against: the pacer's target, else the plan's step per frame index, else the rate the application wants
+        // (a game that wants 30 fps on 60 Hz aims for two refreshes), else the rate given to the tools, else one refresh. An application
+        // that presents on demand has no interval to aim for: no target, so only a schedule can give it one, the step to this frame
         var markerTarget = frame.MarkerTargetFrameTime;
         var markerWants = frame.MarkerPreferredFrameTime;
-        var onDemandTime = MB.FramePacing.MarkerDecoding.MarkerPayload.OnDemandFrameTime;
-        bool onDemand = markerTarget == onDemandTime || (markerTarget == NanosecondTimeDuration.Zero && markerWants == onDemandTime);
-        NanosecondTimeDuration? aim =
-          intendedStep is { } step ? WholeRefreshes(new NanosecondTimeDuration(step), refresh)
-          : onDemand ? null
+        bool onDemand = AnimationErrorRule.IsOnDemand(markerTarget, markerWants);
+        NanosecondTimeDuration? planned = intendedStep is { Nanoseconds: > 0 } step ? new NanosecondTimeDuration(step) : null;
+        NanosecondTimeDuration? target =
+          onDemand ? (planned is { } wait ? WholeRefreshes(wait, refresh) : null)
           : markerTarget != NanosecondTimeDuration.Zero ? WholeRefreshes(markerTarget, refresh)
+          : planned is { } planStep
+            ? WholeRefreshes(NanosecondTimeDuration.FromNanoseconds(planStep.Nanoseconds / (long)(frame.FrameIndex - previous!.FrameIndex)), refresh)
           : markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh)
           : givenTarget;
-        NanosecondTimeDuration? target =
-          aim is { } frameAim && !intendedStep.HasValue ? NanosecondTimeDuration.FromNanoseconds((1 + dropped[i]) * frameAim.Nanoseconds) : aim;
-        // The run's target is what its frames aimed at: a frame after dropped ones is due later, but it aimed at the same interval (an
-        // application that renders faster than the display skips indices before nearly every frame)
-        if (frame.DisplayDelta.HasValue && aim is { } runAim)
+        if (frame.DisplayDelta.HasValue && target is { } runAim)
           aims.Add(runAim);
+        // The target is the application's word, or only the tools' default: a game at 30 fps with no pacing fields is not off every other frame
+        bool applicationTarget = onDemand
+          ? planned.HasValue
+          : markerTarget != NanosecondTimeDuration.Zero || planned.HasValue || markerWants != NanosecondTimeDuration.Zero || targetFps is > 0;
         // What the application wants: only its marker can say so (a lowered pacer and a 30 fps lock target the same); else the rate given
         // to the tools, else one refresh
         NanosecondTimeDuration? preferred =
           markerWants == onDemandTime ? null
           : markerWants != NanosecondTimeDuration.Zero ? WholeRefreshes(markerWants, refresh)
           : givenTarget;
-        // The period the pacer intended for this frame: its target frame time (the interval it aims for before the frame), else the step
-        // between the plan's intended times, else what the application wants or the tools were given, one target per frame the target
-        // dropped. The target frame time comes first: a pacer that plans the next frame from where the frame before was shown makes the
-        // plan's step a refresh longer after a lost one, and a second lost refresh in a row would not count
-        // Without a target frame time that is the frame's target, worked out above in the same order (IntendedPeriods)
-        NanosecondTimeDuration? intendedPeriod = IntendedPeriods.Of(markerTarget, target, dropped[i], refresh);
+        // The period the pacer intended for this frame: its target (IntendedPeriods), none on demand
+        NanosecondTimeDuration? intendedPeriod = IntendedPeriods.Of(markerTarget, target, refresh);
         // A static step (nothing animated while the frame before was on screen) has no prediction error; its pacing error still counts
         bool animates = (frame.Flags & PresentedFrameFlags.StaticBefore) == 0;
 
@@ -128,13 +131,18 @@ namespace MB.FramePacing.Analysis
         bool uncertain = (frame.Flags & PresentedFrameFlags.UncertainStep) != 0;
         NanosecondTimeSpan? pacingError = null;
         NanosecondTimeSpan? predictionError = null;
-        if (!uncertain && intendedStep is { } intended && frame.DisplayDelta is { } displayStep && frame.AnimationDelta is { } animationStep)
+        // Measured against the target; on demand against the plan's step as it is, which no refresh rounds
+        NanosecondTimeSpan? intended =
+          !applicationTarget ? null
+          : onDemand ? intendedStep
+          : target!.Value.Value;
+        if (!uncertain && intended is { } against && frame.DisplayDelta is { } displayStep && frame.AnimationDelta is { } animationStep)
         {
-          pacingError = displayStep - intended;
+          pacingError = displayStep - against;
           pacingErrors.Add(pacingError.Value);
           if (animates)
           {
-            predictionError = animationStep - intended;
+            predictionError = animationStep - against;
             predictionErrors.Add(predictionError.Value);
           }
         }
@@ -220,9 +228,13 @@ namespace MB.FramePacing.Analysis
     /// Which cause each frame with an error counts for: bad pacing (uneven) or delta time jitter (even). A frame of delta time jitter whose
     /// animation timer is off by less than its intended period, and that is not late, gets <see cref="PresentedFrameFlags.DeltaTimeJitter"/>.
     /// <list type="bullet">
-    /// <item>With the pacer's schedule the animation error splits exactly: the frame counts for the larger of its pacing and prediction error.</item>
     /// <item>
-    /// Otherwise (no schedule, or a frame without a split) it is bad pacing when this or the previous frame was shown off its target (or
+    /// With a target the application gave the animation error splits exactly: the frame counts for the larger of its pacing and prediction
+    /// error, and for bad pacing when the display missed the target by half a refresh or more, here or on the frame before (the frame after a
+    /// hold catches up), or frame indices were skipped before it, whatever the animation did: none of that is the timer's fault.
+    /// </item>
+    /// <item>
+    /// Otherwise (a frame without a split) it is bad pacing when this or the previous frame was shown off its target (or
     /// after skipped frames, or torn), else delta time jitter. A display changes frames on refreshes, so a display time step counts as off its
     /// target from half a refresh on, whatever captured it.
     /// </item>
@@ -243,11 +255,14 @@ namespace MB.FramePacing.Analysis
       for (int i = 0; i < frames.Count; ++i)
       {
         var frame = frames[i];
-        if (frame.AnimationError is not { } error || error.Duration() <= errorThreshold)
+        if (frame.AnimationError is not { } error || !AnimationErrorRule.Counts(frame, errorThreshold))
           continue;
         bool pacing =
           frame.PacingError is { } p && frame.PredictionError is { } q
-            ? p.Duration() >= q.Duration()
+            ? frame.SkippedBefore > 0
+              || p.Duration() >= half
+              || p.Duration() >= q.Duration()
+              || (i > 0 && frames[i - 1].Segment == frame.Segment && frames[i - 1].PacingError is { } before && before.Duration() >= half)
             : OffTarget(frame) || frame.SkippedBefore > 0 || (i > 0 && frames[i - 1].Segment == frame.Segment && OffTarget(frames[i - 1]));
         if (pacing)
         {
@@ -255,7 +270,12 @@ namespace MB.FramePacing.Analysis
           continue;
         }
         ++even;
-        if ((frame.Flags & PresentedFrameFlags.Late) == 0 && intendedPeriods[i] is { } period && error.Duration() < period.Value)
+        // Off by less than the period: a whole period off is more than jitter, whatever a nanosecond's rounding says
+        if (
+          (frame.Flags & PresentedFrameFlags.Late) == 0
+          && intendedPeriods[i] is { } period
+          && error.Duration().Nanoseconds + AnimationErrorRule.RoundingNanoseconds < period.Nanoseconds
+        )
           frames[i] = frame with { Flags = frame.Flags | PresentedFrameFlags.DeltaTimeJitter };
       }
       return (uneven, even);

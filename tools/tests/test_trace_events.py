@@ -78,6 +78,22 @@ class OnScreenTests(unittest.TestCase):
         self.assertEqual(verdict(MadeFrame(1, 0, animation_error_ns=-4_000_000, flags=("StaticAfter",)), THRESHOLD_NS), "off")
         self.assertEqual(verdict(MadeFrame(1, 0, animation_error_ns=1_000_001), THRESHOLD_NS), "off")
         self.assertEqual(verdict(MadeFrame(1, 0, animation_error_ns=1_000_000), THRESHOLD_NS), "on time")
+
+        # A frame that replaces a dropped one: the stop and the jump cancel in the sum, and it is off; on demand it has no target to be off
+        def dropped(target_ns: int | None, preferred_ns: int | None) -> MadeFrame:
+            return MadeFrame(
+                1,
+                0,
+                animation_error_ns=0,
+                pacing_error_ns=16_666_667,
+                prediction_error_ns=16_666_667,
+                marker_target_ns=target_ns,
+                marker_preferred_ns=preferred_ns,
+            )
+
+        self.assertEqual(verdict(dropped(16_666_667, None), THRESHOLD_NS), "off")
+        self.assertEqual(verdict(dropped(0xFFFF_FFFF, None), THRESHOLD_NS), "on time")
+        self.assertEqual(verdict(dropped(None, 0xFFFF_FFFF), THRESHOLD_NS), "on time")
         self.assertEqual(verdict(MadeFrame(1, 0, flags=("StaticAfter", "UncertainStep")), THRESHOLD_NS), "static")
         self.assertEqual(verdict(MadeFrame(1, 0, flags=("UncertainStep",)), THRESHOLD_NS), "unknown")
         self.assertEqual(verdict(MadeFrame(1, 0), THRESHOLD_NS), "on time")

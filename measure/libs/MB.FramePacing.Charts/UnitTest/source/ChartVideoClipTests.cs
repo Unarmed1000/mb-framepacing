@@ -56,7 +56,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// 2 s late share at every frame. The display time step and frametime scales leave static frames out (their holds and frametimes are
     /// idle waits, drawn at the top edge), and a violet band behind every stretch of static frames, with the key saying so, on every panel.
     /// </summary>
-    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.NamesDrawnPerFrame))]
     public void TimelineCard_MatchesTheManifest(string clip)
     {
       var (manifest, _, chart) = Analyze(clip);
@@ -68,18 +68,33 @@ namespace MB.FramePacing.Charts.UnitTest
       // The frames with an animation error: a step from a static frame is not judged
       var judged = measured.Where(manifest.IsJudged).ToArray();
       double Seconds(int i) => (manifest.ShownNanoseconds(i) - manifest.ShownNanoseconds(0)) / (double)NanosecondTimeSpan.NanosecondsPerSecond;
-      double Error(int i) => Ms(manifest.AnimationErrorNanoseconds(i)!.Value);
+      // What the panel draws of a frame: its error where it arrives, and the stop where the motion stood still
+      double OnArrival(int i) => Ms(manifest.OnArrivalNanoseconds(i)!.Value);
+      double? Stop(int i) => manifest.StopNanoseconds(i) is { } stop ? Ms(stop) : null;
 
       var error = drawing.Plots.Single(p => p.Id == ReportItem.AnimationError);
       // Symmetric, covering every error unless a few are a hitch far beyond the rest (the report's rule, ChartScale): those reach the edge
-      double limit = ChartScale.ErrorLimit(judged.Select(Error).ToList());
+      // A frame's place on the scale: the larger of its error where it arrives and the stop while it was on screen, the next frame's
+      double limit = ChartScale.ErrorLimit(
+        Enumerable
+          .Range(0, manifest.FrameCount)
+          .Select(i =>
+            (
+              Arrival: i > 0 && manifest.IsJudged(i) ? OnArrival(i) : (double?)null,
+              Stopped: i + 1 < manifest.FrameCount && manifest.IsJudged(i + 1) ? Stop(i + 1) : null
+            )
+          )
+          .Where(p => p.Arrival.HasValue || p.Stopped.HasValue)
+          .Select(p => Math.Max(Math.Abs(p.Arrival ?? 0), Math.Abs(p.Stopped ?? 0)))
+          .ToList()
+      );
       Assert.That((error.YFrom, error.YTo), Is.EqualTo((-limit, limit)), $"{clip}: symmetric scale");
       // A refresh line at every whole refresh an error reaches (within a tenth of one), inside the scale
       double refreshMs = (chart.Run.Pacing?.RefreshPeriod ?? chart.CapturePeriod).Value.TotalMilliseconds;
       var expectedLines = new List<double>();
       foreach (int sign in new[] { 1, -1 })
       {
-        double reach = judged.Select(i => sign * Error(i)).Max();
+        double reach = judged.Select(i => Math.Max(sign * OnArrival(i), sign * (Stop(i) ?? 0))).Max();
         for (int k = 1; k * refreshMs < error.YTo && k * refreshMs <= reach + (0.1 * refreshMs); ++k)
           expectedLines.Add(sign * k * refreshMs);
       }
@@ -88,9 +103,23 @@ namespace MB.FramePacing.Charts.UnitTest
         Assert.That(lines, Is.EqualTo(expectedLines).Within(0.05 * (error.YTo - error.YFrom) / (error.Bottom - error.Top)), $"{clip}: refresh lines");
       var band = drawing.FlatShapes.OfType<RectShape>().Single(r => r.Class == "band");
       Assert.That(error.ValueY(band.Y.Value), Is.EqualTo(1.0).Within(1e-9), $"{clip}: 1 ms threshold band");
-      var withError = judged.Where(i => manifest.AnimationErrorNanoseconds(i) != 0).ToArray();
-      var bars = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class is "bar" or "bar-jitter").ToArray();
+      var withError = judged.Where(i => manifest.OnArrivalNanoseconds(i) != 0).ToArray();
+      var stopped = judged.Where(i => manifest.StopNanoseconds(i).HasValue).ToArray();
+      var allBars = drawing.FlatShapes.OfType<RectShape>().Where(r => r.Class is "bar" or "bar-jitter").ToArray();
+      Assert.That(allBars, Has.Length.EqualTo(withError.Length + stopped.Length), $"{clip}: a bar per error and per stop");
+      var bars = allBars.Take(withError.Length).ToArray();
+      var stopBars = allBars.Skip(withError.Length).ToArray();
       Assert.That(bars.Select(b => error.ValueX(b.X.Value)), Is.EqualTo(withError.Select(Seconds)).Within(1e-9), $"{clip}: a bar per error");
+      // A stop stands where the frame before should have changed: one target after it appeared, on a refresh it repeated
+      Assert.That(
+        stopBars.Select(b => error.ValueX(b.X.Value)),
+        Is.EqualTo(
+            stopped.Select(i => Seconds(i - 1) + (manifest.MeasuredAgainstNanoseconds(i)!.Value / (double)NanosecondTimeSpan.NanosecondsPerSecond))
+          )
+          .Within(1e-6),
+        $"{clip}: a bar per stop"
+      );
+      Assert.That(stopBars.Select(b => b.Class), Is.All.EqualTo("bar"), $"{clip}: a stop is no jitter");
       Assert.That(
         bars.Select(b => b.Class == "bar-jitter"),
         Is.EqualTo(withError.Select(manifest.IsDeltaTimeJitter)),
@@ -99,7 +128,7 @@ namespace MB.FramePacing.Charts.UnitTest
       double zeroY = error.PixelY(0);
       for (int k = 0; k < bars.Length; ++k)
       {
-        double expected = Error(withError[k]);
+        double expected = OnArrival(withError[k]);
         bool up = bars[k].Y.Value < zeroY - 1e-9;
         Assert.That(up, Is.EqualTo(expected > 0), $"{clip}: frame {withError[k]} shown too soon or too late");
         if (Math.Abs(error.PixelY(expected) - zeroY) >= 1)
@@ -119,7 +148,7 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(step.YTo, Is.EqualTo(ChartScale.StepTop(animating, refreshMs)).Within(1e-9), $"{clip}: the step scale leaves static holds out");
       // Each hold in its kind's class: late, an older frame came back while it was the newest, frames the target dropped before the next,
       // as planned (a clip has no capture gap)
-      var holds = new[] { "held", "held-late", "held-older", "held-dropped", "held-unknown" }.SelectMany(cls =>
+      var holds = new[] { "held", "held-late", "held-older", "held-failed", "held-dropped", "held-unknown" }.SelectMany(cls =>
         Segments(drawing, cls).Select(h => (h, Class: cls))
       );
       var drawn = holds.OrderBy(h => h.h.X0).ToArray();
@@ -139,6 +168,7 @@ namespace MB.FramePacing.Charts.UnitTest
         string expectedClass =
           manifest.OlderFramesAfter(i - 1).Count > 0 ? "held-older"
           : manifest.IsLate(i) ? "held-late"
+          : manifest.PresentFailedBefore(i) ? "held-failed"
           : manifest.DroppedBefore(i) > 0 ? "held-dropped"
           : "held";
         Assert.That(holdClass, Is.EqualTo(expectedClass), $"{clip}: hold {i}'s kind");
@@ -227,7 +257,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// The animation time step over the display time step (opt-in): every frame's animation time step on its hold, from the previous frame's
     /// display time until its own, on the panel's scale (which covers the animation time steps too), as one joined line.
     /// </summary>
-    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.NamesDrawnPerFrame))]
     public void AnimationTimeStep_MatchesTheManifest(string clip)
     {
       var (manifest, _, chart) = Analyze(clip);
@@ -256,7 +286,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// count high (shape numbers are exact), the threshold and median lines; the percentile curve at every 0.1 percentile and the drift of
     /// every frame (path points, written with one decimal: within 0.05 px).
     /// </summary>
-    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.NamesDrawnPerFrame))]
     public void DistributionCards_MatchTheManifest(string clip)
     {
       var (manifest, report, _) = Analyze(clip);
@@ -364,7 +394,7 @@ namespace MB.FramePacing.Charts.UnitTest
     /// The SVG report of each clip, drawn from what the analysis wrote: a bar per frame with an animation error, a held step per frame (red for
     /// the ones before a late frame), and the refresh strip's cells, late ones red, as the manifest gives them.
     /// </summary>
-    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.Names))]
+    [TestCaseSource(typeof(VideoClips), nameof(VideoClips.NamesDrawnPerFrame))]
     public void ReportSvg_MatchesTheManifest(string clip)
     {
       var (manifest, report, _) = Analyze(clip);
@@ -376,13 +406,13 @@ namespace MB.FramePacing.Charts.UnitTest
       var measured = Enumerable.Range(1, manifest.FrameCount - 1).ToArray();
       Assert.That(
         Of("bar").Count() + Of("bar-jitter").Count(),
-        Is.EqualTo(measured.Count(i => manifest.AnimationErrorNanoseconds(i) is { } e && e != 0)),
-        $"{clip}: a bar per frame with an error"
+        Is.EqualTo(measured.Sum(manifest.ErrorBars)),
+        $"{clip}: a bar where a frame arrives with an error, and one where the motion stopped"
       );
       Assert.That(Of("bar-jitter").Count(), Is.EqualTo(measured.Count(manifest.IsDeltaTimeJitter)), $"{clip}: a jitter bar per frame with jitter");
       int Segments(string cls) => Of(cls).Sum(e => ((string)e.Attribute("d")!).Count(c => c == 'M'));
       Assert.That(
-        new[] { "held", "held-late", "held-older", "held-dropped", "held-unknown" }.Sum(Segments),
+        new[] { "held", "held-late", "held-older", "held-failed", "held-dropped", "held-unknown" }.Sum(Segments),
         Is.EqualTo(measured.Length),
         $"{clip}: a hold per frame until the next"
       );
@@ -392,47 +422,62 @@ namespace MB.FramePacing.Charts.UnitTest
         $"{clip}: red when the next frame is late, unless an older frame came back"
       );
       var all = Enumerable.Range(0, manifest.FrameCount).ToArray();
-      // Per frame: the refreshes it was seen in, the last ones orange where frames the target dropped before the next were due (each a
-      // target frame time after the one before), the rest red for a late frame, violet for a static one; then pink refreshes that showed an
-      // older frame out of order; any others the capture did not tell (grey)
-      long Repeats(int i) =>
-        i + 1 < manifest.FrameCount
-          ? Math.Min(manifest.SeenRefreshes(i) - 1, manifest.DroppedBefore(i + 1) * Math.Max(1, manifest.TargetRefreshes(i + 1) ?? 1))
-          : 0;
-      long Own(int i) => manifest.SeenRefreshes(i) - Repeats(i);
-      int StaticCells() => Of("strip-static-a").Count() + Of("strip-static-b").Count();
-      Assert.That(Of("strip-dropped").Count(), Is.EqualTo(all.Sum(Repeats)), $"{clip}: an orange cell where a dropped frame was due");
-      Assert.That(
-        Of("strip-older").Count(),
-        Is.EqualTo(all.Sum(i => manifest.OlderFramesAfter(i).Count)),
-        $"{clip}: a pink cell per refresh that showed an older frame"
-      );
-      Assert.That(
-        StaticCells(),
-        Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !manifest.IsLate(i) && !manifest.IsDeltaTimeJitter(i)).Sum(Own)),
-        $"{clip}: a violet cell per refresh of every static frame"
-      );
-      Assert.That(
-        Of("strip-jitter").Count(),
-        Is.EqualTo(all.Where(manifest.IsDeltaTimeJitter).Sum(Own)),
-        $"{clip}: a jitter cell per refresh of every frame with jitter"
-      );
-      Assert.That(Of("strip-late").Count(), Is.EqualTo(all.Where(manifest.IsLate).Sum(Own)), $"{clip}: a red cell per refresh of every late frame");
-      Assert.That(
-        Of("strip-late").Count()
-          + Of("strip-jitter").Count()
-          + Of("strip-a").Count()
-          + Of("strip-b").Count()
-          + StaticCells()
-          + Of("strip-dropped").Count(),
-        Is.EqualTo(all.Sum(i => (int)manifest.SeenRefreshes(i))),
-        $"{clip}: a cell per refresh a frame was seen in"
-      );
-      Assert.That(
-        Of("neutral").Count(),
-        Is.EqualTo(all.Sum(i => manifest.RefreshesOnScreen(i) - manifest.SeenRefreshes(i) - manifest.OlderFramesAfter(i).Count)),
-        $"{clip}: the refreshes the capture did not tell"
-      );
+      // A clip longer than the test clips' 8 s has no room for a cell per refresh: the strip is drawn per pixel column, with nothing to count here
+      if (manifest.RefreshCount <= 480)
+      {
+        // Per frame: the refreshes it was seen in, the last ones orange where frames the target dropped before the next were due (each a
+        // target frame time after the one before), the rest red for a late frame, violet for a static one; then pink refreshes that showed an
+        // older frame out of order; any others the capture did not tell (grey)
+        long Repeats(int i) =>
+          i + 1 < manifest.FrameCount
+            ? Math.Min(manifest.SeenRefreshes(i) - 1, manifest.DroppedBefore(i + 1) * Math.Max(1, manifest.TargetRefreshes(i + 1) ?? 1))
+            : 0;
+        // The last of them tan where the frame just before the next one failed to present
+        long Failed(int i) =>
+          i + 1 < manifest.FrameCount && manifest.PresentFailedBefore(i + 1)
+            ? Math.Min(Repeats(i), Math.Max(1, manifest.TargetRefreshes(i + 1) ?? 1))
+            : 0;
+        long Own(int i) => manifest.SeenRefreshes(i) - Repeats(i);
+        int StaticCells() => Of("strip-static-a").Count() + Of("strip-static-b").Count();
+        Assert.That(
+          Of("strip-dropped").Count(),
+          Is.EqualTo(all.Sum(i => Repeats(i) - Failed(i))),
+          $"{clip}: an orange cell where a dropped frame was due"
+        );
+        Assert.That(Of("strip-failed").Count(), Is.EqualTo(all.Sum(Failed)), $"{clip}: a tan cell where the frame whose present failed was due");
+        Assert.That(
+          Of("strip-older").Count(),
+          Is.EqualTo(all.Sum(i => manifest.OlderFramesAfter(i).Count)),
+          $"{clip}: a pink cell per refresh that showed an older frame"
+        );
+        Assert.That(
+          StaticCells(),
+          Is.EqualTo(all.Where(i => manifest.IsStatic(i) && !manifest.IsLate(i) && !manifest.IsDeltaTimeJitter(i)).Sum(Own)),
+          $"{clip}: a violet cell per refresh of every static frame"
+        );
+        Assert.That(
+          Of("strip-jitter").Count(),
+          Is.EqualTo(all.Where(manifest.IsDeltaTimeJitter).Sum(Own)),
+          $"{clip}: a jitter cell per refresh of every frame with jitter"
+        );
+        Assert.That(Of("strip-late").Count(), Is.EqualTo(all.Where(manifest.IsLate).Sum(Own)), $"{clip}: a red cell per refresh of every late frame");
+        Assert.That(
+          Of("strip-late").Count()
+            + Of("strip-jitter").Count()
+            + Of("strip-a").Count()
+            + Of("strip-b").Count()
+            + StaticCells()
+            + Of("strip-dropped").Count()
+            + Of("strip-failed").Count(),
+          Is.EqualTo(all.Sum(i => (int)manifest.SeenRefreshes(i))),
+          $"{clip}: a cell per refresh a frame was seen in"
+        );
+        Assert.That(
+          Of("neutral").Count(),
+          Is.EqualTo(all.Sum(i => manifest.RefreshesOnScreen(i) - manifest.SeenRefreshes(i) - manifest.OlderFramesAfter(i).Count)),
+          $"{clip}: the refreshes the capture did not tell"
+        );
+      }
       // The application side: a frametime step per frame whose next frame (the next frame index) carries a CPU start too, a CPU busy bar per
       // frame that has one
       int frameTimes = Enumerable

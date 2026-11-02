@@ -220,7 +220,7 @@ namespace MB.FramePacing.Analysis.UnitTest
         frames.Add((i == 9 ? 2 : 1, 16L, intended, 16 * Ms));
       var run = Analyze(PacedRows(frames));
 
-      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.Schedule));
+      Assert.That(run.Pacing!.Source, Is.EqualTo(PacingSource.TargetFrameTime), "the pacer's target comes before its plan");
       Assert.That(IsLate(run.Frames[10]));
       Assert.That(run.Frames.Count(IsLate), Is.EqualTo(1), "only the frame whose step was long");
       Assert.That(run.Frames[20].Lateness?.Nanoseconds, Is.EqualTo(16 * Ms), "a refresh behind its intended time");
@@ -498,14 +498,14 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     [Test]
-    public void RunTarget_IsWhatTheFramesAimedAt_NotTheirDueTimeAfterDroppedFrames()
+    public void Target_IsFixed_ADropDoesNotStretchIt()
     {
       // An application that renders three frames per refresh and shows the newest: two indices skipped before every frame, no marker target
       var run = Analyze(WithIndexSteps(Rows(Steady(60)), _ => 3));
       var pacing = run.Pacing!;
 
       Assert.That(run.Frames.Skip(1).All(f => f.SkippedBefore == 2));
-      Assert.That(run.Frames[1].TargetFrameTime!.Value.Nanoseconds, Is.EqualTo(3 * Refresh), "each frame is due its dropped frames' times later");
+      Assert.That(run.Frames[1].TargetFrameTime!.Value.Nanoseconds, Is.EqualTo(Refresh), "the frame's target, whatever was dropped before it");
       Assert.That(pacing.TargetFrameTime.Nanoseconds, Is.EqualTo(Refresh), "the run aimed at one refresh");
       Assert.That(pacing.LateFrames, Is.Zero);
     }

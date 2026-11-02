@@ -148,10 +148,8 @@ namespace MB.FramePacing.Charts
       var header = Header(title, description);
       var parts = new List<CardShape>();
 
-      // Each frame's intended period, as the late verdict measures it (IntendedPeriods: the marker's target frame time
-      // first), from the frames the target dropped before each frame of the whole run
-      var dropped = DroppedFrames.Before(run.Frames);
-      NanosecondTimeDuration? IntendedPeriod(int index) => IntendedPeriods.Of(frames[index], dropped[section.Start + index], refresh);
+      // Each frame's intended period, as the late verdict measures it (IntendedPeriods: the marker's target frame time first)
+      NanosecondTimeDuration? IntendedPeriod(int index) => IntendedPeriods.Of(frames[index], refresh);
 
       // Refresh lines: bright where a frame could be aimed at its intended period (whole periods after the previous frame appeared), faint
       // where it could not; a vsync where a frame appeared is always bright (a frame shown sooner than its period appears on one the period

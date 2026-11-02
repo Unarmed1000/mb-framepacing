@@ -47,6 +47,9 @@ namespace MB.FramePacing.Analysis.UnitTest
     public static IEnumerable<string> Names() =>
       System.IO.Directory.GetDirectories(Directory()).Where(d => File.Exists(Path.Combine(d, "video.mp4"))).Select(Path.GetFileName).Order()!;
 
+    /// <summary>The clips with room on a card for every frame: longer ones are drawn per pixel column, and the tests that read a card frame by frame leave them out.</summary>
+    public static IEnumerable<string> NamesDrawnPerFrame() => Names().Where(name => name != "30-stress");
+
     public static string Directory()
     {
       var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);

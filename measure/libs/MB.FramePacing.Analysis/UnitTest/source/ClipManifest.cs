@@ -45,18 +45,22 @@ namespace MB.FramePacing.Analysis.UnitTest
     string SequenceId,
     long?[] RenderedRefresh,
     long[] RenderedAnimationNs,
-    int?[] RenderedLate,
+    decimal?[] RenderedLate,
     long?[] RenderedSwapInterval,
     long?[] RenderedPreferredInterval,
+    long?[] RenderedTargetNs,
+    long?[] RenderedPreferredNs,
     long[] RenderedCpuStartNs,
     long[] RenderedCpuBusyNs,
     bool[] RenderedStaticAfter,
     bool[] RenderedStaticBefore,
+    bool[] RenderedPresentFailedBefore,
     int[] Screen,
     int[] Presented,
     long ExpectedSkippedFrameIndices,
     long ExpectedOutOfOrderCaptures,
-    int[]? ExpectedStaticSteps
+    int[]? ExpectedStaticSteps,
+    IReadOnlyList<(string Name, int FirstFrame, int FrameCount)> Scenarios
   )
   {
     /// <summary>The analysis's |animation error| threshold: the slack of the static guess's clock rule.</summary>
@@ -77,13 +81,17 @@ namespace MB.FramePacing.Analysis.UnitTest
       var frames = box.GetProperty("frames");
       decimal fps = video.GetProperty("fps").GetDecimal();
       T[] Array<T>(string name, Func<JsonElement, T> read) => frames.GetProperty(name).EnumerateArray().Select(read).ToArray();
-      // The static flags per rendered frame (the idle clips); all false when a clip has none
+      // The flags per rendered frame (static: the idle clips, present failed: the stress clips); all false when a clip has none
       bool[] Flags(string name) =>
         frames.TryGetProperty(name, out var element)
           ? element.EnumerateArray().Select(e => e.GetBoolean()).ToArray()
           : new bool[frames.GetProperty("refresh").GetArrayLength()];
       T? Nullable<T>(JsonElement element, Func<JsonElement, T> read)
         where T : struct => element.ValueKind == JsonValueKind.Null ? null : read(element);
+      // A rate as a swap interval: whole refreshes, up, as the tools round it (a rate above the display's is one refresh)
+      long SwapInterval(JsonElement rate) => (long)Math.Ceiling(fps / rate.GetDecimal());
+      // A rate as a marker's frame time: whole nanoseconds, rounded half to even like the generator
+      long FrameTimeNs(JsonElement rate) => (long)Math.Round(NanosecondTimeSpan.NanosecondsPerSecond / rate.GetDecimal(), MidpointRounding.ToEven);
 
       var refresh = Array("refresh", e => Nullable(e, x => x.GetInt64()));
       int refreshCount = video.GetProperty("frameCount").GetInt32();
@@ -108,13 +116,16 @@ namespace MB.FramePacing.Analysis.UnitTest
         video.GetProperty("sequenceId").GetString()!,
         refresh,
         Array("animationNs", e => e.GetInt64()),
-        Array("late", e => Nullable(e, x => x.GetInt32())),
-        Array("targetFps", e => Nullable(e, x => WholeNumber(fps / x.GetDecimal(), "swap interval"))),
-        Array("preferredFps", e => Nullable(e, x => WholeNumber(fps / x.GetDecimal(), "preferred swap interval"))),
+        Array("late", e => Nullable(e, x => x.GetDecimal())),
+        Array("targetFps", e => Nullable(e, SwapInterval)),
+        Array("preferredFps", e => Nullable(e, SwapInterval)),
+        Array("targetFps", e => Nullable(e, FrameTimeNs)),
+        Array("preferredFps", e => Nullable(e, FrameTimeNs)),
         Array("cpuStartNs", e => e.GetInt64()),
         Array("cpuBusyNs", e => e.GetInt64()),
         Flags("staticAfter"),
         Flags("staticBefore"),
+        Flags("presentFailedBefore"),
         screen,
         presented,
         Expected("skippedFrameIndices"),
@@ -123,7 +134,14 @@ namespace MB.FramePacing.Analysis.UnitTest
         expected is { } given
         && given.TryGetProperty("staticSteps", out var staticSteps)
           ? staticSteps.EnumerateArray().Select(e => e.GetInt32()).ToArray()
-          : null
+          : null,
+        // The stretches of rendered frames a scripted clip is made of (the stress clips)
+        box.TryGetProperty("scenarios", out var scenarios)
+          ? scenarios
+            .EnumerateArray()
+            .Select(s => (s.GetProperty("name").GetString()!, s.GetProperty("firstFrame").GetInt32(), s.GetProperty("frameCount").GetInt32()))
+            .ToArray()
+          : []
       );
     }
 
@@ -136,7 +154,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       int loop = refresh >= 0 ? refresh / RefreshCount : ((refresh + 1) / RefreshCount) - 1;
       int within = (int)(refresh - ((long)loop * RefreshCount));
       int frame = Screen[within];
-      long intendedRefresh = RenderedRefresh[frame]!.Value - RenderedLate[frame]!.Value + ((long)loop * RefreshCount);
+      decimal intendedRefresh = RenderedRefresh[frame]!.Value - RenderedLate[frame]!.Value + ((long)loop * RefreshCount);
       var kind =
         refresh < 0 ? MarkerKind.SequenceStart
         : refresh >= RefreshCount ? MarkerKind.SequenceEnd
@@ -148,13 +166,16 @@ namespace MB.FramePacing.Analysis.UnitTest
           RunId,
           ((ulong)(loop + 1) * FirstFrameIndex) + (ulong)frame,
           (RenderedStaticAfter[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticAfter : MB.FramePacing.Marker.MarkerFlags.NoFlags)
-            | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.NoFlags),
+            | (RenderedStaticBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.StaticBefore : MB.FramePacing.Marker.MarkerFlags.NoFlags)
+            | (
+              RenderedPresentFailedBefore[frame] ? MB.FramePacing.Marker.MarkerFlags.PresentFailedBefore : MB.FramePacing.Marker.MarkerFlags.NoFlags
+            ),
           new NanosecondTimeSpan(RenderedAnimationNs[frame] + (loop * DurationNs)),
-          MarkerFrameTime(RenderedPreferredInterval[frame]),
-          MarkerFrameTime(RenderedSwapInterval[frame]),
+          MarkerFrameTime(RenderedPreferredNs[frame]),
+          MarkerFrameTime(RenderedTargetNs[frame]),
           // The display's refresh period: one refresh, rounded as the frame times are
           NanosecondTimeDuration.FromNanoseconds(MarkerRefreshNs(1)),
-          new NanosecondTickCount(MarkerRefreshNs(intendedRefresh)),
+          new NanosecondTickCount(MarkerTimeNs(intendedRefresh)),
           new NanosecondTickCount(RenderedCpuStartNs[frame] + (loop * DurationNs)),
           NanosecondTimeDuration.FromNanoseconds(RenderedCpuBusyNs[frame])
         )
@@ -200,7 +221,7 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// took. Frames were dropped before the next presented frame (none of them shown out of order), and either that frame carries
     /// StaticBefore, or the clip uses the static flags on frames it shows, the next frame is on demand or the hold is half a refresh beyond
     /// what the frames in between were due, and the animation clock stood still: the animation step is at most one frame time per frame
-    /// rendered in between and two refreshes or more short of the display step (the frame time: the next frame's target, else the animation
+    /// rendered in between and two frame times or more short of the display step (the frame time: the next frame's target, else the animation
     /// step into the held frame).
     /// </summary>
     public bool IsAssumedStatic(int frame)
@@ -227,7 +248,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       long hold = DisplayStepNanoseconds(frame + 1);
       long animation = AnimationStepNanoseconds(frame + 1);
       // Half a refresh is cut to the nanosecond, as the analysis has it
-      return (onDemand || hold >= due + (refresh / 2)) && animation <= due + ErrorThresholdNanoseconds && animation <= hold - (2 * refresh);
+      return (onDemand || hold >= due + (refresh / 2)) && animation <= due + ErrorThresholdNanoseconds && animation <= hold - (2 * frameTime);
     }
 
     /// <summary>Nothing animates while presented frame <paramref name="frame"/> is on screen: by the flags, or assumed when the guess is on.</summary>
@@ -244,12 +265,9 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     public long? AnimationErrorNanoseconds(int frame) => IsJudged(frame) ? AnimationStepNanoseconds(frame) - DisplayStepNanoseconds(frame) : null;
 
-    /// <summary>
-    /// The period the pacer intended for the frame (frame 1 on): its swap interval, one per frame the target dropped before it; null on
-    /// demand. The clips' markers always carry a target frame time, which comes first.
-    /// </summary>
+    /// <summary>The period the pacer intended for the frame (frame 1 on): its swap interval; a drop does not change it; null on demand.</summary>
     public long? IntendedPeriodNanoseconds(int frame) =>
-      SwapIntervalRefreshes(frame) is { } refreshes ? (1 + DroppedBefore(frame)) * refreshes * (RefreshNanoseconds(1) - RefreshNanoseconds(0)) : null;
+      SwapIntervalRefreshes(frame) is { } refreshes ? refreshes * (RefreshNanoseconds(1) - RefreshNanoseconds(0)) : null;
 
     /// <summary>
     /// The frame is late (frame 1 on): its display time step is longer than both its animation time step and its intended period, each by
@@ -267,20 +285,67 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
+    /// The stop the animation error panel draws for the frame (frame 1 on), or null: with a target, the frame before stayed half a refresh or
+    /// more too long, and the motion fell behind by that (AnimationErrorRule).
+    /// </summary>
+    public long? StopNanoseconds(int frame)
+    {
+      if (AnimationErrorNanoseconds(frame) is null || !SwapIntervalRefreshes(frame).HasValue || MeasuredAgainstNanoseconds(frame) is not { } against)
+        return null;
+      long tooLong = DisplayStepNanoseconds(frame) - against;
+      return tooLong >= (RefreshNanoseconds(1) - RefreshNanoseconds(0)) / 2 ? -tooLong : null;
+    }
+
+    /// <summary>What the animation error panel draws where the frame arrives (frame 1 on): the error, less its stop, and no bar for a rounding.</summary>
+    public long? OnArrivalNanoseconds(int frame)
+    {
+      if (AnimationErrorNanoseconds(frame) is not { } error)
+        return null;
+      if (StopNanoseconds(frame) is not { } stop)
+        return error;
+      long left = error - stop;
+      return Math.Abs(left) < AnimationErrorRule.RoundingNanoseconds ? 0 : left;
+    }
+
+    /// <summary>The animation error panel's bars for the frame (frame 1 on).</summary>
+    public int ErrorBars(int frame) => (OnArrivalNanoseconds(frame) is { } left && left != 0 ? 1 : 0) + (StopNanoseconds(frame).HasValue ? 1 : 0);
+
+    /// <summary>
+    /// The frame counts as an animation error (frame 1 on): the sum, or with a target either part against it, is beyond the threshold
+    /// (AnimationErrorRule).
+    /// </summary>
+    public bool CountsAsAnimationError(int frame)
+    {
+      if (AnimationErrorNanoseconds(frame) is not { } error)
+        return false;
+      if (Math.Abs(error) > ErrorThresholdNanoseconds)
+        return true;
+      return SwapIntervalRefreshes(frame).HasValue
+        && MeasuredAgainstNanoseconds(frame) is { } against
+        && (
+          Math.Abs(DisplayStepNanoseconds(frame) - against) > ErrorThresholdNanoseconds
+          || Math.Abs(AnimationStepNanoseconds(frame) - against) > ErrorThresholdNanoseconds
+        );
+    }
+
+    /// <summary>
     /// The frame has delta time jitter (frame 1 on): an error beyond the error threshold that the cause split counts as delta time jitter (with a
-    /// schedule: the display time step is nearer the intended step than the animation time step is; without one: neither this step nor the
-    /// one before is off its target and no frame was skipped), off by less than the intended period, and not late.
+    /// target: the display time step is half a refresh or more off it, or nearer it than the animation time step is, is bad pacing; without
+    /// one: neither this step nor the one before is off its target and no frame was skipped), off by less than the intended period, and not late.
     /// </summary>
     public bool IsDeltaTimeJitter(int frame)
     {
-      if (frame <= 0 || AnimationErrorNanoseconds(frame) is not { } error || Math.Abs(error) <= ErrorThresholdNanoseconds || IsLate(frame))
+      if (frame <= 0 || !CountsAsAnimationError(frame) || AnimationErrorNanoseconds(frame) is not { } error || IsLate(frame))
         return false;
-      if (IntendedPeriodNanoseconds(frame) is not { } period || Math.Abs(error) >= period)
+      if (IntendedPeriodNanoseconds(frame) is not { } period || Math.Abs(error) + AnimationErrorRule.RoundingNanoseconds >= period)
         return false;
       long refresh = RefreshNanoseconds(1) - RefreshNanoseconds(0);
       bool OffTarget(int f) => TargetRefreshes(f) is { } target && Math.Abs(DisplayStepNanoseconds(f) - (target * refresh)) >= refresh / 2;
-      bool pacing = IntendedStepNanoseconds(frame) is { } intended
-        ? Math.Abs(DisplayStepNanoseconds(frame) - intended) >= Math.Abs(AnimationStepNanoseconds(frame) - intended)
+      bool pacing = MeasuredAgainstNanoseconds(frame) is { } against
+        ? SkippedBefore(frame) > 0
+          || Math.Abs(DisplayStepNanoseconds(frame) - against) >= refresh / 2
+          || (frame > 1 && MeasuredAgainstNanoseconds(frame - 1) is { } before && Math.Abs(DisplayStepNanoseconds(frame - 1) - before) >= refresh / 2)
+          || Math.Abs(DisplayStepNanoseconds(frame) - against) >= Math.Abs(AnimationStepNanoseconds(frame) - against)
         : OffTarget(frame) || SkippedBefore(frame) > 0 || (frame > 1 && OffTarget(frame - 1));
       return !pacing;
     }
@@ -289,24 +354,34 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// How many refreshes after the one it was rendered for the frame is first shown (negative: early, out of order). Its place against the
     /// pacer's plan, which is the frame's lateness and not whether it is late: a frame that stays behind after a hitch has a step that is right.
     /// </summary>
-    public int LateRefreshes(int frame) => RenderedLate[Presented[frame]]!.Value;
+    public decimal LateRefreshes(int frame) => RenderedLate[Presented[frame]]!.Value;
 
     public long CpuStartNanoseconds(int frame) => RenderedCpuStartNs[Presented[frame]];
 
     public long CpuBusyNanoseconds(int frame) => RenderedCpuBusyNs[Presented[frame]];
 
     /// <summary>The intended display time the frame's marker carries (the pacer's clock starts at the clip's first refresh; 0 = unknown).</summary>
-    public long IntendedNanoseconds(int frame) => MarkerRefreshNs(FirstRefresh(frame) - RenderedLate[Presented[frame]]!.Value);
+    public long IntendedNanoseconds(int frame) => MarkerTimeNs(FirstRefresh(frame) - RenderedLate[Presented[frame]]!.Value);
 
     /// <summary>The intended step to <paramref name="frame"/>, when both markers carry an intended display time.</summary>
     public long? IntendedStepNanoseconds(int frame) =>
       IntendedNanoseconds(frame) != 0 && IntendedNanoseconds(frame - 1) != 0 ? IntendedNanoseconds(frame) - IntendedNanoseconds(frame - 1) : null;
 
-    /// <summary>The frame's target in refreshes: its intended step when there is one, else the pacer's swap interval (null on demand).</summary>
+    /// <summary>The frame's target in refreshes: the pacer's swap interval, which a drop does not change; on demand the step to its intended time, if any.</summary>
     public long? TargetRefreshes(int frame) =>
-      IntendedStepNanoseconds(frame).HasValue
-        ? (FirstRefresh(frame) - RenderedLate[Presented[frame]]!.Value) - (FirstRefresh(frame - 1) - RenderedLate[Presented[frame - 1]]!.Value)
-        : RenderedSwapInterval[Presented[frame]];
+      RenderedSwapInterval[Presented[frame]]
+      ?? (
+        IntendedStepNanoseconds(frame).HasValue
+          ? (long)
+            Math.Ceiling(
+              (FirstRefresh(frame) - RenderedLate[Presented[frame]]!.Value) - (FirstRefresh(frame - 1) - RenderedLate[Presented[frame - 1]]!.Value)
+            )
+          : null
+      );
+
+    /// <summary>What the frame's pacing and prediction errors are measured against: its target; on demand the step to its intended time as it is.</summary>
+    public long? MeasuredAgainstNanoseconds(int frame) =>
+      SwapIntervalRefreshes(frame) is { } refreshes ? refreshes * (RefreshNanoseconds(1) - RefreshNanoseconds(0)) : IntendedStepNanoseconds(frame);
 
     /// <summary>The pacer's swap interval before the frame (the marker's target frame time), in refreshes; null on demand.</summary>
     public long? SwapIntervalRefreshes(int frame) => RenderedSwapInterval[Presented[frame]];
@@ -355,6 +430,10 @@ namespace MB.FramePacing.Analysis.UnitTest
     public long DroppedBefore(int frame) =>
       frame > 0 ? Enumerable.Range(Presented[frame - 1] + 1, Presented[frame] - Presented[frame - 1] - 1).Count(o => !Screen.Contains(o)) : 0;
 
+    /// <summary>The frame's marker says the present of the frame just before it failed, and that frame was never on screen.</summary>
+    public bool PresentFailedBefore(int frame) =>
+      frame > 0 && RenderedPresentFailedBefore[Presented[frame]] && !Screen.Contains(Presented[frame] - 1);
+
     /// <summary>The judged animation errors up to the frame, since the clip's first frame (animation minus display time without static steps).</summary>
     public long DriftNanoseconds(int frame) => Enumerable.Range(1, frame).Sum(f => AnimationErrorNanoseconds(f) ?? 0);
 
@@ -368,9 +447,13 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// <summary><paramref name="refreshes"/> refreshes as a marker carries them: whole nanoseconds, rounded half to even like the generator.</summary>
     private long MarkerRefreshNs(long refreshes) => RoundedDivision(refreshes * NanosecondTimeSpan.NanosecondsPerSecond, Fps);
 
-    /// <summary>A marker's target or preferred frame time: whole refreshes in nanoseconds, or on demand.</summary>
-    private NanosecondTimeDuration MarkerFrameTime(long? refreshes) =>
-      refreshes is { } count ? NanosecondTimeDuration.FromNanoseconds(MarkerRefreshNs(count)) : MB.FramePacing.Marker.Payload.OnDemandFrameTime;
+    /// <summary>A time <paramref name="refreshes"/> into the clip as a marker carries it (a pacer may plan between refreshes), rounded half to even like the generator.</summary>
+    private long MarkerTimeNs(decimal refreshes) =>
+      (long)Math.Round(refreshes * NanosecondTimeSpan.NanosecondsPerSecond / Fps, MidpointRounding.ToEven);
+
+    /// <summary>A marker's target or preferred frame time, or on demand.</summary>
+    private static NanosecondTimeDuration MarkerFrameTime(long? nanoseconds) =>
+      nanoseconds is { } value ? NanosecondTimeDuration.FromNanoseconds(value) : MB.FramePacing.Marker.Payload.OnDemandFrameTime;
 
     private static long WholeNumber(decimal value, string what) =>
       value == decimal.Truncate(value) ? (long)value : throw new InvalidDataException($"{value} {what} is not a whole number");

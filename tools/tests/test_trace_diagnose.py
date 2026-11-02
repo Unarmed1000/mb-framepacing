@@ -72,11 +72,11 @@ class DiagnoseTests(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("run-1-trace.csv: the join of 388 frames", done.stdout)
         self.assertIn("run-1-augmented.pftrace: part 2 of the frame record for 387 frames, 2 moments of the run", done.stdout)
-        self.assertIn("388 frames, 66 of them went wrong: 33 late, 33 off", done.stdout)
+        self.assertIn("388 frames, 125 of them went wrong: 92 off, 33 late", done.stdout)
         text = (self.analysis / "run-1-diagnosis.txt").read_text(encoding="utf-8")
         self.assertTrue(text.startswith("busy-full-rate: what went wrong\n"), text[:200])
         rows = list(csv.DictReader(io.StringIO((self.analysis / "run-1-diagnosis.csv").read_text(encoding="utf-8"))))
-        self.assertEqual(len(rows), 66)
+        self.assertEqual(len(rows), 125)
         # The example's GPU work ends two milliseconds after its present: after the refresh for the late frames whose present
         # was near it, so part 2 is read and held against the capture's refreshes
         late = {f.frame_index for f in frames() if "Late" in f.flags}
@@ -98,7 +98,7 @@ class DiagnoseTests(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("no run-1-trace.csv: no trace was joined", done.stdout)
         self.assertIn("no run-1-augmented.pftrace", done.stdout)
-        self.assertIn("CPU work longer than intended: 31 of 66 (47 %)", done.stdout)
+        self.assertIn("CPU work longer than intended: 80 of 125 (64 %)", done.stdout)
 
     def test_what_ran_while_the_application_waited_for_a_cpu(self) -> None:
         device = self.work / "device.pftrace"

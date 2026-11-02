@@ -17,9 +17,18 @@ namespace MB.FramePacing.Analysis
   /// <param name="MainMarkerFirstSeenTime">EXPERIMENTAL camera captures: when the main marker (which identifies the frame) first showed it.</param>
   /// <param name="IntendedDisplayTime">From the marker: when the pacer intended the frame to be shown (its steady clock), 0 = unknown.</param>
   /// <param name="MarkerTargetFrameTime">From the marker: the pacer's target frame time, 0 = unknown.</param>
-  /// <param name="TargetFrameTime">The frame time this frame is measured against, in whole refreshes (<see cref="RunPacing.Source"/>).</param>
-  /// <param name="PacingError">With a schedule: the display time step minus the intended step.</param>
-  /// <param name="PredictionError">With a schedule: the animation time step minus the intended step.</param>
+  /// <param name="TargetFrameTime">
+  /// The frame time this frame is measured against, in whole refreshes (<see cref="RunPacing.Source"/>). A drop does not change it. On demand
+  /// there is none, but for the plan's step.
+  /// </param>
+  /// <param name="PacingError">
+  /// With a target the application gave: the display time step minus the target (on demand, minus the plan's step), the frame before staying
+  /// too long or too short. The animation error is the prediction error minus this.
+  /// </param>
+  /// <param name="PredictionError">
+  /// With a target the application gave: the animation time step minus the target (on demand, minus the plan's step), the animation moving
+  /// too far or too short.
+  /// </param>
   /// <param name="Lateness">With a schedule: how long after its intended time the frame appeared, relative to the run's on-time frames.</param>
   /// <param name="CpuStartTime">From the marker: the CPU start time, when the CPU started working on the frame (the pacer's clock), 0 = unknown.</param>
   /// <param name="CpuBusy">From the marker: CPU busy, how long the CPU worked on the frame before presenting it, 0 = unknown.</param>

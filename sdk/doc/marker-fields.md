@@ -64,9 +64,8 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **Value:** `+1` for every frame the application renders, including the frames that show the start and end markers and the frames
   that never reach the display. A frame keeps its index for every refresh it stays on screen. `u64`: it never wraps.
 - **What the analysis does:**
-  - A frame index skipped over a capture without gaps, and never shown later, is a **dropped frame**. Without the pacer's schedule,
-    the frame after dropped frames is due one target frame time per dropped frame later, so its longer step is on its target:
-    frames were dropped, the step is not off.
+  - A frame index skipped over a capture without gaps, and never shown later, is a **dropped frame**. A drop does not change the
+    target frame time, so the frame after dropped frames is off its target: the motion stopped, then jumped.
   - An index that goes back by at most 1000 is an older frame shown again after a newer one: **out of order**. The newer frame
     stays the one presented.
   - An index that goes back by more than 1000 starts a new segment, with a warning (an application that restarted). Steps are never
@@ -224,9 +223,9 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
 - **Changes:** on the frame where the pacer changes its rate (an adaptive pacer dropping from 60 to 30 fps writes `33'333'333` from the first
   frame it paces at 30).
 - **Unknown (`0`):** the preferred frame time stands in, then `--target-fps`, then one refresh.
-- **What the analysis does:** without the pacer's schedule, every frame's display time step is measured against its target
-  (rounded up to whole refreshes, as above, and one target per dropped frame longer after dropped frames). A step half a refresh or
-  more off it is **off its target**: the report draws the target as a reference line, and an animation error at such a step counts
+- **What the analysis does:** every frame's display time step is measured against its target (rounded up to whole refreshes, as
+  above; a target that is not whole refreshes, or under one, gets a warning at the top of the report and a band behind the panels).
+  A step half a refresh or more off it is **off its target**: the report draws the target as a reference line, and an animation error at such a step counts
   as bad pacing; one at an even step counts as delta time jitter. An on-demand frame has no target. A frame's target frame time
   is also its intended period, which a late frame is measured against with its animation time step (see "Animation time").
 - **Goes wrong when:** it holds the display's refresh period while a frame limiter holds a lower rate: every limited frame's step is

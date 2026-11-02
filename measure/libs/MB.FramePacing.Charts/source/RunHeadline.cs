@@ -33,11 +33,36 @@ namespace MB.FramePacing.Charts
       var pacing = run.Pacing;
       double thresholdMs = chart.ErrorThreshold.Value.TotalMilliseconds;
       int measured = s.AbsoluteAnimationErrorMs.Count;
+      // The errors the panel draws: a stop and what the frame then moved are two, where the animation error adds them up
+      var data = RunChartData.Of(chart);
+      var panel = data.AbsolutePanelErrors;
+      var stops = data.Stops;
+      var onArrival = data.ErrorsOnArrival;
+      int frameCount = run.Frames.Count;
+      bool anyStop = stops.Frames.CountIn(0, frameCount) > 0;
+      var (panelStart, panelEnd) = panel.Of(0, frameCount);
+      double Percentile(double fraction, double ofTheSum) =>
+        anyStop && panelEnd > panelStart ? panel.Values.PercentileMs(panelStart, panelEnd, fraction) : ofTheSum;
+      static double Ms(long nanoseconds) => nanoseconds / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
+      double lowest = s.AnimationErrorMs.Min;
+      double highest = s.AnimationErrorMs.Max;
+      if (anyStop)
+      {
+        var (stopStart, stopEnd) = stops.Of(0, frameCount);
+        var (arrivalStart, arrivalEnd) = onArrival.Of(0, frameCount);
+        lowest = Ms(stops.Values.KthSmallest(stopStart, stopEnd, 0));
+        highest = 0;
+        if (arrivalEnd > arrivalStart)
+        {
+          lowest = Math.Min(lowest, Ms(onArrival.Values.KthSmallest(arrivalStart, arrivalEnd, 0)));
+          highest = Ms(onArrival.Values.KthSmallest(arrivalStart, arrivalEnd, arrivalEnd - arrivalStart - 1));
+        }
+      }
       // The largest error either way: shown too soon (positive) or too late (negative)
-      double worst = Math.Max(s.AnimationErrorMs.Max, -s.AnimationErrorMs.Min);
+      double worst = Math.Max(highest, -lowest);
       string worstWay =
         worst <= 0 ? string.Empty
-        : -s.AnimationErrorMs.Min >= s.AnimationErrorMs.Max ? "too late"
+        : -lowest >= highest ? "too late"
         : "too soon";
       var tiles = new[]
       {
@@ -82,11 +107,18 @@ namespace MB.FramePacing.Charts
           s.FramesWithAnimationError > 0,
           $"Frames whose animation time is off by more than the error threshold ({Invariant(thresholdMs, "0.###")} ms)."
         ),
-        ErrorPercentile(ReportItem.ErrorP99, "Error p99", s.AbsoluteAnimationErrorMs.P99, measured, "99", RunStatistics.MinFramesForOnePercentLow),
+        ErrorPercentile(
+          ReportItem.ErrorP99,
+          "Error p99",
+          Percentile(0.99, s.AbsoluteAnimationErrorMs.P99),
+          measured,
+          "99",
+          RunStatistics.MinFramesForOnePercentLow
+        ),
         ErrorPercentile(
           ReportItem.ErrorP999,
           "Error p99.9",
-          s.AbsoluteAnimationErrorMs.P999,
+          Percentile(0.999, s.AbsoluteAnimationErrorMs.P999),
           measured,
           "99.9",
           RunStatistics.MinFramesForPointOnePercentLow
@@ -335,17 +367,34 @@ namespace MB.FramePacing.Charts
 
     /// <summary>
     /// The card's warning band: its title and lines, the display and the capture disagreeing (<see cref="RefreshWarning"/>) first, then the
-    /// run's vsync warning (<see cref="VsyncOffCheck"/>: the setup is the run's, so a section shows it too). No lines when neither applies.
+    /// run's vsync warning (<see cref="VsyncOffCheck"/>: the setup is the run's, so a section shows it too), then a target the display can not
+    /// show (<see cref="InvalidTargetCheck"/>) and frames out of order (<see cref="OutOfOrderCheck"/>), of the section's frames. No lines when
+    /// none applies.
     /// </summary>
     public static (string Title, IReadOnlyList<string> Lines) Warning(RunSection section)
     {
-      var refresh = RefreshWarning(section);
-      var vsyncOff = section.Data.VsyncOff;
-      string title =
-        refresh.Count > 0 && vsyncOff.Count > 0 ? "The display and the capture disagree, and vsync is probably off"
-        : refresh.Count > 0 ? "The display and the capture disagree"
-        : "Vsync is probably off";
-      return (title, refresh.Concat(vsyncOff).ToArray());
+      var data = section.Data;
+      PresentedFrame[] Frames() => data.Frames.Skip(section.Start).Take(section.FrameCount).ToArray();
+      var parts = new (string Title, IReadOnlyList<string> Lines)[]
+      {
+        ("the display and the capture disagree", RefreshWarning(section)),
+        ("vsync is probably off", data.VsyncOff),
+        (
+          "the target is not whole refreshes",
+          data.InvalidTargets.CountIn(section.Start, section.End) > 0 ? InvalidTargetCheck.Lines(Frames(), data.Refresh) : Array.Empty<string>()
+        ),
+        (
+          "frames came back out of order",
+          data.OutOfOrder.CountIn(section.Start, section.End) > 0 ? OutOfOrderCheck.Lines(Frames()) : Array.Empty<string>()
+        ),
+      };
+      var shown = parts.Where(p => p.Lines.Count > 0).ToArray();
+      if (shown.Length == 0)
+        return ("Warning", Array.Empty<string>());
+      string title = shown[0].Title;
+      for (int i = 1; i < shown.Length; ++i)
+        title += (i == shown.Length - 1 ? ", and " : ", ") + shown[i].Title;
+      return (char.ToUpperInvariant(title[0]) + title[1..], shown.SelectMany(p => p.Lines).ToArray());
     }
 
     /// <summary>The refresh periods the section's markers carry that do not agree with the refresh the analysis measured with.</summary>

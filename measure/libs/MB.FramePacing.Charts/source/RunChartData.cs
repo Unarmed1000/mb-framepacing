@@ -32,6 +32,13 @@ namespace MB.FramePacing.Charts
     private readonly Lazy<FrameSequence> m_holds;
     private readonly Lazy<FrameSequence> m_animatingHolds;
     private readonly Lazy<(int Start, int End)[]> m_staticStretches;
+    private readonly Lazy<(int Start, int End)[]> m_invalidTargetStretches;
+    private readonly Lazy<(int Start, int End)[]> m_outOfOrderStretches;
+    private readonly Lazy<RankBits> m_invalidTargets;
+    private readonly Lazy<RankBits> m_outOfOrder;
+    private readonly Lazy<FrameSequence> m_errorsOnArrival;
+    private readonly Lazy<FrameSequence> m_stops;
+    private readonly Lazy<FrameSequence> m_absolutePanelErrors;
     private readonly Lazy<HoldKind[]> m_holdKinds;
     private readonly Dictionary<HoldKind, Lazy<FrameSequence>> m_holdsByKind;
     private readonly Lazy<long[]> m_droppedBefore;
@@ -98,6 +105,30 @@ namespace MB.FramePacing.Charts
         return false;
       });
       m_errors = Once(() => new FrameSequence(count, i => Frames[i].AnimationError?.Nanoseconds));
+      Refresh = run.Run.Pacing?.RefreshPeriod ?? run.CapturePeriod;
+      var measured = Refresh;
+      long? StopOfHold(int i) => HasNext(i) ? AnimationErrorRule.Stop(Frames[i + 1], measured)?.Nanoseconds : null;
+      // A run without a stop (most are): the panel's errors are the animation errors, one and the same sequence
+      var anyStop = Once(() => Enumerable.Range(0, count).Any(i => StopOfHold(i).HasValue));
+      m_errorsOnArrival = Once(() =>
+        anyStop.Value ? new FrameSequence(count, i => AnimationErrorRule.OnArrival(Frames[i], measured)?.Nanoseconds) : Errors
+      );
+      m_stops = Once(() => new FrameSequence(count, StopOfHold));
+      m_absolutePanelErrors = Once(() =>
+        anyStop.Value
+          ? new FrameSequence(
+            count,
+            i =>
+              (StopOfHold(i), AnimationErrorRule.OnArrival(Frames[i], measured)?.Nanoseconds) switch
+              {
+                ({ } stop, { } onArrival) => Math.Max(Math.Abs(stop), Math.Abs(onArrival)),
+                ({ } stop, null) => Math.Abs(stop),
+                (null, { } onArrival) => Math.Abs(onArrival),
+                _ => null,
+              }
+          )
+          : AbsoluteErrors
+      );
       // The same frames as the errors: they share which ones
       m_absoluteErrors = Once(() => new FrameSequence(Errors.Frames, i => Frames[i].AnimationError?.Nanoseconds is { } e ? Math.Abs(e) : null));
       m_frameRateSteps = Once(() =>
@@ -194,7 +225,10 @@ namespace MB.FramePacing.Charts
       m_otherErrors = Once(() =>
         new RankBits(
           count,
-          i => (Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) == 0 && Frames[i].AnimationError?.Nanoseconds is { } e && e != 0
+          i =>
+            (Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) == 0
+            && AnimationErrorRule.OnArrival(Frames[i], measured)?.Nanoseconds is { } e
+            && e != 0
         )
       );
       m_animatingCpuBusy = Once(() =>
@@ -227,6 +261,14 @@ namespace MB.FramePacing.Charts
       m_drift = Once(() => new FrameSequence(count, i => Frames[i].Drift.Nanoseconds));
       m_lateShare = Once(() => run.Run.Pacing is { } pacing ? LateShareData.Create(Frames, pacing) : null);
       m_vsyncOff = Once(() => VsyncOffCheck.Lines(run.Run.Frames));
+      m_invalidTargets = Once(() =>
+      {
+        var invalid = InvalidTargetCheck.Frames(Frames, measured);
+        return new RankBits(count, i => invalid[i]);
+      });
+      m_outOfOrder = Once(() => new RankBits(count, i => Frames[i].OlderFrames is { Count: > 0 }));
+      m_invalidTargetStretches = Once(() => StretchesOf(count, i => InvalidTargets[i]));
+      m_outOfOrderStretches = Once(() => StretchesOf(count, i => OutOfOrder[i]));
       m_segmentEnds = Once(() => Enumerable.Range(0, count).Where(i => !HasNext(i)).ToArray());
       m_events = Once(() => RunEvents.Of(this));
 
@@ -308,6 +350,33 @@ namespace MB.FramePacing.Charts
     public FrameSequence Errors => m_errors.Value;
 
     public FrameSequence AbsoluteErrors => m_absoluteErrors.Value;
+
+    /// <summary>The refresh the analysis measured with.</summary>
+    public NanosecondTimeDuration Refresh { get; }
+
+    /// <summary>What the animation error panel draws where a frame arrives (<see cref="AnimationErrorRule.OnArrival"/>).</summary>
+    public FrameSequence ErrorsOnArrival => m_errorsOnArrival.Value;
+
+    /// <summary>
+    /// What the animation error panel draws where the motion stopped: per frame, the stop (<see cref="AnimationErrorRule.Stop"/>) while it stayed
+    /// on screen too long. The next frame's step says so.
+    /// </summary>
+    public FrameSequence Stops => m_stops.Value;
+
+    /// <summary>The larger of the two sizes the panel draws for each frame: what its scale covers.</summary>
+    public FrameSequence AbsolutePanelErrors => m_absolutePanelErrors.Value;
+
+    /// <summary>The frames that aim at a target the display can not show (<see cref="InvalidTargetCheck"/>).</summary>
+    public RankBits InvalidTargets => m_invalidTargets.Value;
+
+    /// <summary>The frames an older one came back after (<see cref="OutOfOrderCheck"/>).</summary>
+    public RankBits OutOfOrder => m_outOfOrder.Value;
+
+    /// <summary>Runs of consecutive frames with an invalid target, as frame ranges (start, end), in display order.</summary>
+    public IReadOnlyList<(int Start, int End)> InvalidTargetStretches => m_invalidTargetStretches.Value;
+
+    /// <summary>Runs of consecutive frames an older one came back after, as frame ranges (start, end), in display order.</summary>
+    public IReadOnlyList<(int Start, int End)> OutOfOrderStretches => m_outOfOrderStretches.Value;
 
     /// <summary>The display time steps that count toward the frame rate (a static frame's time on screen does not): the histogram's.</summary>
     public FrameSequence FrameRateSteps => m_frameRateSteps.Value;
@@ -425,6 +494,22 @@ namespace MB.FramePacing.Charts
 
     /// <summary>Frame <paramref name="index"/>'s display time in seconds since the run's first frame.</summary>
     public double Seconds(int index) => (Frames[index].FirstSeenTime - Origin).TotalSeconds;
+
+    private (int Start, int End)[] StretchesOf(int count, Func<int, bool> isIn)
+    {
+      var stretches = new List<(int Start, int End)>();
+      for (int i = 0; i < count; ++i)
+      {
+        if (!isIn(i))
+          continue;
+        int end = i + 1;
+        while (end < count && isIn(end) && Frames[end].Segment == Frames[i].Segment)
+          ++end;
+        stretches.Add((i, end));
+        i = end - 1;
+      }
+      return stretches.ToArray();
+    }
 
     /// <summary>
     /// The time on the capture's clock <paramref name="seconds"/> after the run's first frame, rounded to the nearest nanosecond (a

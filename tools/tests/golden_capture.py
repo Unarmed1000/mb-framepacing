@@ -55,6 +55,10 @@ class MadeFrame:
     display_delta_ns: int | None = None
     animation_delta_ns: int | None = None
     animation_error_ns: int | None = None
+    pacing_error_ns: int | None = None
+    prediction_error_ns: int | None = None
+    marker_target_ns: int | None = None
+    marker_preferred_ns: int | None = None
     flags: tuple[str, ...] = ()
     intended_display_ns: int | None = None
     target_ns: int | None = None

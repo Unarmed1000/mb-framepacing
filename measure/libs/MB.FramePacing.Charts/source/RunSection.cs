@@ -66,7 +66,7 @@ namespace MB.FramePacing.Charts
     public static RunSection Whole(ChartRun run)
     {
       var frames = run.Run.Frames;
-      double end = frames.Count > 0 ? (frames[^1].LastSeenTime - frames[0].FirstSeenTime + run.CapturePeriod).TotalSeconds : 1;
+      double end = frames.Count > 0 ? (frames[^1].FirstSeenTime - frames[0].FirstSeenTime + frames[^1].OnScreen).TotalSeconds : 1;
       return new RunSection(run, 0, Math.Max(end, 0.001), 0, frames.Count, wholeRun: true);
     }
 

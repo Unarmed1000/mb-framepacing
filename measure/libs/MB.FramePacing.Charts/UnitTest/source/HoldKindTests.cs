@@ -88,7 +88,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var data = Data(schedule: false, 1, 2, 3, 3, 5, 6, 7);
 
       Assert.That(data.Run.Run.Pacing!.Source, Is.EqualTo(PacingSource.NativeRefresh));
-      Assert.That(data.Frames[3].TargetFrameTime?.Nanoseconds, Is.EqualTo(2 * Period), "frame 5 is due two refreshes after frame 3");
+      Assert.That(data.Frames[3].TargetFrameTime?.Nanoseconds, Is.EqualTo(Period), "a drop does not stretch the target");
       Assert.That(data.Frames.Select(f => f.Flags.HasFlag(PresentedFrameFlags.Late)), Is.All.False);
       Assert.That(data.HoldKinds[2], Is.EqualTo(HoldKind.FramesDropped));
     }

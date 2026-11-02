@@ -109,6 +109,11 @@ mb-framepacing import recording.mkv --display-hz 60 --wait-for-start --stop-at-e
   frame reached the screen after its present (a whole refresh more that stays is a queue that filled; the absolute time is not
   known, as the clocks are tied only by the frames), **why late frames were late** (submitted late: their CPU work or their start;
   or submitted on time and held after the present), and how often the CPU work took its intended period or longer.
+- **Dropped frames count as animation errors** when the application gave a target: the error alone is 0 for a frame that replaces a
+  dropped one, as the stop and the jump cancel, so the error panel draws them apart, a bar down on the refresh where the motion stopped
+  and one where the frame arrives. The `animationErrorNs` column stays the sum, as PresentMon's.
+- **Warnings at the top of the card:** a target frame time that is not a whole number of refreshes, or shorter than one, and any older
+  frame that came back on screen. Both sections are marked behind the panels.
 - `--wait-for-start --stop-at-end`: only the run between its start and end markers is measured.
 - `--charts` also writes the report cards; `--name "menu scroll"` names the run in the reports.
 

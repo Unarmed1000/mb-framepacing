@@ -1,7 +1,8 @@
 # Test clips
 
-Twenty-two 60 Hz clips (1280×720, lossless H.264 4:4:4, 8 s plus 3 refreshes of start and end marker) with the frame marker baked in,
-one folder per scenario, each with its `video.mp4` and the generator's `manifest.json`.
+Thirty-three clips (1280×720, lossless H.264 4:4:4, plus 3 refreshes of start and end marker) with the frame marker baked in, one
+folder per scenario, each with its `video.mp4` and the generator's `manifest.json`. The display runs at 60 Hz and a clip for 8 s, but
+for the stress clips.
 
 **Per rendered frame, the manifest gives:**
 
@@ -58,6 +59,24 @@ The start marker also carries a sequence id: the mode's name, or a UUID made fro
 - `60-static-rests-paused-clock`: every frame rendered, the clock standing still through each rest: the frame that reaches the rest
   pose carries StaticAfter, the frames inside the rest both flags.
 - `60-idle-1fps`: one frame per second while idle, preferring 1 s.
+
+**The stress clips** are a fixed script, with no noise and no random numbers, of lost frames: frames dropped, late, out of order, a
+failed present, next to a rest and next to a change of pace, and how a pacer recovers (it re-aligns, goes back to its grid, or flips to
+a swap interval of 1). Unlike the fault clips, a frame's animation time can lose time here (a dropped frame the clock never counted, a
+late frame whose step stays, a hitch with the clock stopped).
+
+- `60-stress`, `30-stress`, `15-stress`: paced at 60, 30 and 15 Hz on a 60 Hz display; `…-edges`: out of order at the run's edges.
+- `40-stress`: a whole run paced at 25 ms on 60 Hz, a target the display can not show; `60-stress-uneven`: 60 Hz pacing, with short
+  stretches at 25 and 20 ms.
+- `50-stress`, `120-stress`, `144-stress`: other displays, at a target of 1 and of 2 refreshes.
+
+Their manifests have no animation error, and add per box:
+
+- `scenarios`: a stretch of the script, with its `name`, its `firstFrame` (an index into the rendered frames, not a marker's frame
+  index) and its `frameCount`;
+- per rendered frame, `presentFailedBefore`: the marker says the present of the frame before failed.
+
+`fault.kind` is `scripted`. What each scenario must give is not in the clips: `StressClipTests` holds it, in a table written by hand.
 
 `measure/libs/MB.FramePacing.Analysis/UnitTest/source/VideoClipTests.cs` imports every clip through ffmpeg and checks the analysis
 against its manifest, frame by frame (skipped without ffmpeg); `ClipManifest` reads the manifests.

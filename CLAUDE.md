@@ -62,7 +62,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | `measure/VERSION`                                 | Version of the tools (released with `tools-v*` tags)                                                                 |
 | `measure/app/`, `measure/libs/`, `measure/tools/` | CLI, Avalonia GUI, MarkerDecoding/Capture/TraceJoin/Analysis/Charts libraries (+ `UnitTest/`), DocImages, Benchmarks |
 | `measure/doc/`                                    | Usage, install guides, live capture and camera (both experimental), the README images (`measure/doc/images`)         |
-| `measure/test-data/videos/`                       | 60 Hz test clips with manifests from mb-framepacing-explained, `VideoClipTests`                                      |
+| `measure/test-data/videos/`                       | Test clips with manifests from mb-framepacing-explained, `VideoClipTests`, the stress clips' `StressClipTests`       |
 | `measure/test-data/trace/`, `frame-logs/`         | Made-up traces and frame logs with what the scripts gave for them: what the C# ports are held to                     |
 | `doc/`                                            | Project docs: releasing, roadmap                                                                                     |
 | `pacer-captures/`                                 | Capture sessions of the pacer: results documents, charts, `runs.csv`; the zips are assets of a GitHub release        |
@@ -730,7 +730,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - **Reference lines** (`frame-time-lines`, shown by default): the target (light grey) and preferred frame time (amber, only where it
       differs) as dashed stepped lines on the display time step panel (whole refreshes, `FrameTimeRounding.WholeRefreshes`, the
       analysis's rule) and the frametime panel (as written). Per hold, the values of the frame that ends it (`FrameReference`: the
-      marker's, else the analysis's fallbacks, without the schedule's step or the 1 + dropped multiple); `RunChartData.StepReferences`
+      marker's, else the analysis's fallbacks, without the schedule's step); `RunChartData.StepReferences`
       / `FrameTimeReferences` are stretches of equal values, and the scales take the animating frames' values (static ones stay out).
     - **Events panel** (`events`, under the strip, at every zoom): two lanes never mixed up, **frames** (dropped by the target, out of
       order, torn) and **capture** (not recorded, dropped by the source, missed, not decoded), one mark per pixel column and lane, the
@@ -779,15 +779,34 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - **Late is one rule** (the user, 2026-10-14, option 1: "I never said refresh period I said INTENDED period"): a frame is late
       when its display time step is longer than both its animation time step and its **intended period**, each by half a refresh
       or more (`AnimationError <= -half` and `display >= period + half`). Half a refresh is the tolerance only. The intended
-      period (`PacingAnalyzer`): the marker's target frame time, else the step between the plan's intended display times, else the
-      preferred frame time, else `--target-fps`, else one refresh, in whole refreshes and times (1 + dropped); on demand there is
-      none and the frame is never late. The target frame time comes before the plan's step: a pacer that plans from where the
-      frame before was shown lengthens the step after a lost refresh, and a second loss in a row would not count. **Never a
+      period (`PacingAnalyzer`, `IntendedPeriods`) is the frame's target; on demand there is none and the frame is never late.
+      **The `1 + dropped` of 2026-10-14 is gone** (the user, 2026-11-02): a drop stretched the target, which excused it. **Never a
       frame's position** against a clock or a plan: a pacer's animation timer and the display diverge for good after a lost
       refresh, and only the frame whose step was long is late. `Lateness` (with a schedule: how long after its intended time a
       frame appeared) is that position: a value in the CSV and the hover that no flag or colour follows from. A static or an
-      uncertain step has no late frame. On the 22 clips: 231 late frames, `60-naive-5ms` none (it had 64 by the rule of
-      2026-10-13, which only compared the two steps).
+      uncertain step has no late frame. On the 22 clips before the stress clips: 231 late frames, `60-naive-5ms` none (it had 64
+      by the rule of 2026-10-13, which only compared the two steps).
+    - **What counts as an animation error** (`AnimationErrorRule`; the user, 2026-11-02: "a pacer that works properly can only
+      target a FIXED number of refresh period intervals"): `animationErrorNs` stays PresentMon's sum (checked in its source: a dropped
+      frame has no value, the next frame is measured from the last shown one), but the sum cancels a stop against a jump: a, a, c is
+      2 - 2 = 0. So a frame counts when the sum or either part against its target is beyond the threshold: **stop or rush** (target
+      - display step, `pacingErrorNs` with its sign turned) and **step** (animation step - target, `predictionErrorNs`). **There is no
+        grid and nothing is re-aligned:** the target is a length and each frame is measured from where the last frame appeared, so a
+        pacer that re-aligns after a loss and one that returns to its grid are both read as shown; a fixed grid would call every frame
+        after a re-align off. `framesWithAnimationError`, the cause and the error tiles (p99, p99.9, worst) use the parts;
+        `AnimationErrorMs`, error per frame and percent error stay the sum. On demand, static steps and runs with only the one-refresh
+        default keep the sum. The panel draws a stop as a bar of its own on the refresh the frame should have changed
+        (`RunChartData.Stops`, `ErrorsOnArrival`). **`StressClipTests` holds a hand-written table per scenario** of 11 stress clips:
+        never fill it in from what the tools print.
+    - **A target the display can not show** (`InvalidTargetCheck`; the user, 2026-11-02): a marker's target frame time (else the
+      plan's step per frame index, never the preferred frame time) that is not a whole number of refreshes, or under one. Judged by
+      the real refreshes, as `FrameTimeRounding.WholeRefreshes` rounds it, with no allowance for its cadence; a warning at the top
+      of the report and a band behind the panels (`invalid-band`). **Frames out of order** get the same (`OutOfOrderCheck`,
+      `older-band`; the text says what was seen and names the compositor and the capture chain, as either can reorder frames). The
+      warning band holds the bands' key. The target's band is grey and hatched, as cyan is torn on the same card and no colour alone
+      tells the bands apart for every reader (explained's advice, the user's choice); the card says "not whole refreshes", never
+      "invalid", as a target within the rounding's slack is legal. A key that does not fit beside its panel's title stays where it is
+      and the title goes a line up (the user: the legend below the title, "two lines is fine").
     - The pacer's `DisplayErrorCounter` counts by the same rule (the user's go, 2026-10-14): `TierPacer` gives it each frame's
       intended period in refreshes (the swap interval while pacing, the preferred swap interval while not; 0 = on demand). While
       pacing that changes no count (the golden runs are byte for byte the same); only a frame not paced counts differently.
@@ -799,13 +818,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - The pacer's frame window count (`FrameWindowState::LateFrames`) is another thing, "did not make its time": open as decision
       18 of `sdk/doc/pacer-design.md`.
     - Every frame's **target** (what the display time steps, the cause and the late share's amber are measured against; not late)
-      comes from, in order: the pacer's intended display times in the markers (`PacingSource.Schedule`: lateness against the
-      schedule, and the animation error split into pacing and prediction error), its target frame time in the markers, the target
-      frame rate (`--target-fps`, GUI "Target frame rate", stored in capture.json, overridable at analysis time), and otherwise one
-      refresh (the native rate). Without a schedule, a frame after frames the target dropped (`DroppedFrames`) is due one target per
-      frame later (1 + dropped): dropped, not off its target. The synthetic game writes a schedule; its prediction error is 0 by
-      construction. **The run's target** (`RunPacing.TargetFrameTime`, `pacing.targetFrameNs`, "measured against a ... target") is
-      the median of what the frames aimed at, without the 1 + dropped (the user, 2026-10-28: an unpaced 50 Hz run read 40 ms), and
+      comes from, in order: the pacer's target frame time in the markers, the plan's step per frame index (`PacingSource.Schedule`;
+      on demand the step to the frame's intended time as it is), the preferred frame time, the target frame rate (`--target-fps`, GUI
+      "Target frame rate", stored in capture.json, overridable at analysis time), and otherwise one refresh (the native rate). A drop
+      never changes it. The synthetic game writes a schedule. **The run's target** (`RunPacing.TargetFrameTime`,
+      `pacing.targetFrameNs`, "measured against a ... target") is the median of what the frames aimed at, and
       the DISPLAY box's "target N refreshes" is `FrameReference.Target`'s.
     - **Vsync probably off** (the user, 2026-10-28, skips only, not tearing): `VsyncOffCheck`, at least 90 % of the judged frames
       (and 30 of them) with frames dropped before them: a run warning and a line in the card's band (`RunHeadline.Warning`,
@@ -874,7 +891,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       dropped frames"): on the frame after one whose present call failed (it did not queue the frame: `VK_ERROR_OUT_OF_DATE_KHR`,
       a DXGI error, `eglSwapBuffers` false; not `VK_SUBOPTIMAL_KHR` or `DXGI_STATUS_OCCLUDED`). It speaks for frame index - 1 only.
       No Unity provider (Unity gives scripts no present result). The tools keep it as `PresentedFrameFlags.PresentFailedBefore`;
-      `DroppedFrames.Before` stays every frame never shown (the pacing's 1 + dropped), `PresentFailedBefore` is that one frame
+      `DroppedFrames.Before` stays every frame never shown, `PresentFailedBefore` is that one frame
       and `ByTargetBefore` the rest: summary.json `counts.droppedFrames` is by the target, `counts.presentFailedFrames` (required)
       the failed ones, and the vsync-off check counts by the target only. The report: `HoldKind.PresentFailed`,
       `RunEventKind.PresentFailed`, the strip's last refreshes before the next frame, all tan (`#c69c6d`, `*-failed`,
@@ -890,7 +907,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     `GuiSettings.AssumeStatic`): `TimelineAnalyzer.AssumeStatic` flags a frame `StaticAfter | StaticAssumed` when a frame the target
     dropped took the rest's flag: the next presented frame carries `StaticBefore` for a frame never shown, or (the flag lost) the run
     uses static flags, the next frame is on demand or later than the frames in between were due, and the animation clock stood still
-    (animation step at most one frame time per rendered frame and two refreshes short of the display step; the frame time is the next
+    (animation step at most one frame time per rendered frame and two frame times short of the display step; the frame time is the next
     frame's target or preferred frame time, else the animation step into the held frame). Never across a capture gap or for a camera.
     The report's description and the hover say "assumed"; `ClipManifest.IsAssumedStatic` mirrors the rule for the clip tests.
   - **Field order:** every payload type (C++ and C# `Payload`, Python `Payload`, the tools' `MarkerPayload`) lists its fields in the
@@ -1009,7 +1026,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
   - **A change to the payload's bytes also needs new test clips** (`measure/test-data/videos`: their markers are in the pixels, and their manifests hold `animationNs`, `cpuStartNs` and `cpuBusyNs`,
     each value rounded once from the exact time).
     mb-framepacing-explained makes them from a local, unpublished commit of this repository (it fetches a named branch into its
-    submodule, exports into its own folder and never writes here). Copy the 22 folders unchanged, then `update_test_data.py`,
+    submodule, exports into its own folder and never writes here). Copy the 33 folders unchanged, then `update_test_data.py`,
     DocImages and `camera_rate_table.py --update-doc`. The format change, the golden data and the clips go in one commit: `master`
     never holds clips its own tools refuse. The sister repository and the applications that embed the SDK move their pins after.
 - **Verify the GUI without touching the desktop:** `dotnet run --project measure/tools/DocImages -c Release -- <scratch dir>` renders

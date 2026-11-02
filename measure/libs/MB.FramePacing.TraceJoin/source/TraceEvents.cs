@@ -83,17 +83,39 @@ namespace MB.FramePacing.TraceJoin
     /// beyond <paramref name="errorThresholdNs"/> otherwise), static (nothing animates while it is on screen), unknown (a step across a
     /// capture gap), or on time.
     /// </summary>
+    // A marker's frame time on demand: 0xFFFFFFFF
+    private const long OnDemandFrameNs = 4294967295;
+
     public static string VerdictOf(FrameRow frame, long errorThresholdNs)
     {
       if (frame.Flags.Contains("Late"))
         return "late";
       if (frame.Flags.Contains("DeltaTimeJitter"))
         return "delta time jitter";
-      if (frame.AnimationError is { } error && Math.Abs(error.Nanoseconds) > errorThresholdNs)
+      if (CountsAsAnimationError(frame, errorThresholdNs))
         return "off";
       if (frame.Flags.Contains("StaticAfter"))
         return "static";
       return frame.Flags.Contains("UncertainStep") ? "unknown" : "on time";
+    }
+
+    /// <summary>
+    /// The analysis's AnimationErrorRule, on what a frames file holds: the animation error, or either of its parts against a target the application
+    /// gave, is beyond the threshold. A frame that replaces a dropped one has no error by the sum, the stop and the jump cancelling, and is off
+    /// all the same.
+    /// </summary>
+    private static bool CountsAsAnimationError(FrameRow frame, long errorThresholdNs)
+    {
+      if (frame.AnimationError is not { } error)
+        return false;
+      if (Math.Abs(error.Nanoseconds) > errorThresholdNs)
+        return true;
+      bool noTarget = frame.MarkerTargetFrameTime is not { Nanoseconds: > 0 };
+      bool onDemand =
+        frame.MarkerTargetFrameTime?.Nanoseconds == OnDemandFrameNs || (noTarget && frame.MarkerPreferredFrameTime?.Nanoseconds == OnDemandFrameNs);
+      if (onDemand || frame.PacingError is not { } pacing || frame.PredictionError is not { } prediction)
+        return false;
+      return Math.Abs(pacing.Nanoseconds) > errorThresholdNs || Math.Abs(prediction.Nanoseconds) > errorThresholdNs;
     }
 
     public static IReadOnlyList<TraceEvent> OnScreen(

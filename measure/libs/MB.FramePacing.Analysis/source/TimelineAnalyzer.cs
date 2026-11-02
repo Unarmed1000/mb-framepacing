@@ -400,6 +400,10 @@ namespace MB.FramePacing.Analysis
         warnings.Add(slowCapture);
       if (VsyncOffCheck.Warning(frames) is { } vsyncOff)
         warnings.Add(vsyncOff);
+      if (pacing != null && InvalidTargetCheck.Warning(frames, pacing.RefreshPeriod) is { } invalidTarget)
+        warnings.Add(invalidTarget);
+      if (OutOfOrderCheck.Warning(frames) is { } outOfOrderFrames)
+        warnings.Add(outOfOrderFrames);
       return new RunAnalysis(
         run.RunId,
         run.SequenceId,
@@ -686,16 +690,15 @@ namespace MB.FramePacing.Analysis
     ///    held the rest; or
     /// 2. the flag itself was lost, which takes all of: the run uses a static flag on another frame; B is presented on demand, or A's hold
     ///    is half a refresh or more beyond what the frames in between were due; and the animation clock stood still across the hold (the
-    ///    animation step is no more than one frame time per frame rendered in between, and two refreshes or more short of the display
-    ///    step). The frame time is B's target or preferred frame time, else the animation step into A. A stall with a running clock, or an
-    ///    ordinary dropped frame, is neither.
+    ///    animation step is no more than one frame time per frame rendered in between, and two frame times or more short of the display
+    ///    step, as a frame that is only late is a frame time short). The frame time is B's target or preferred frame time, else the animation
+    ///    step into A. A stall with a running clock, or an ordinary dropped frame, is neither.
     /// </summary>
     private static void AssumeStatic(List<FrameBuilder> builders, NanosecondTimeDuration refresh, NanosecondTimeDuration threshold)
     {
       var onDemandTime = MarkerPayload.OnDemandFrameTime;
       // Half a refresh, cut to the nanosecond
       var halfRefresh = NanosecondTimeDuration.FromNanoseconds(refresh.Nanoseconds / 2);
-      var twoRefreshes = refresh + refresh;
       bool usesStaticFlags = builders.Any(b => b.StaticAfter || b.StaticBefore);
       // The frame indices each segment showed out of order: skipped, but not dropped
       var older = builders
@@ -730,7 +733,7 @@ namespace MB.FramePacing.Analysis
           var hold = b.FirstSeenTime - a.FirstSeenTime;
           var animation = b.AnimationTime - a.AnimationTime;
           bool waited = onDemand || hold >= due + halfRefresh;
-          bool clockStoodStill = animation <= due + threshold && animation <= hold - twoRefreshes;
+          bool clockStoodStill = animation <= due + threshold && animation <= hold - (frameTime + frameTime);
           if (!waited || !clockStoodStill)
             continue;
         }
@@ -784,7 +787,9 @@ namespace MB.FramePacing.Analysis
         bool staticStep = previous is { StaticAfter: true };
         NanosecondTimeSpan? error = displayDelta.HasValue && !staticStep && !uncertainStep ? animationDelta!.Value - displayDelta.Value : null;
         drift += error ?? NanosecondTimeSpan.Zero;
-        var onScreen = hasNext ? builders[i + 1].FirstSeenTime - b.FirstSeenTime : b.LastSeenTime - b.FirstSeenTime + period;
+        // The last frame stays until its last sighting, or the last older frame that came back after it
+        var lastTime = b.OlderFrames is { Count: > 0 } older && older[^1].CaptureTime > b.LastSeenTime ? older[^1].CaptureTime : b.LastSeenTime;
+        var onScreen = hasNext ? builders[i + 1].FirstSeenTime - b.FirstSeenTime : lastTime - b.FirstSeenTime + period;
         // The frametime reaches to the next frame's CPU start: only known when the next frame index was captured, and when that start
         // is not before this one. A clock that went backwards says nothing of how long the frame took: unknown, and never a 0 that
         // would look like a measurement

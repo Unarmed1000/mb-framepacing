@@ -134,6 +134,9 @@ namespace MB.FramePacing.Charts
         lines.Add($"display time step {Ms(display)} ms");
       if (frame.AnimationError is { } error)
         lines.Add($"animation error {Ms(error, sign: true)} ms");
+      // A frame the display held too long: what the sum cancels, the motion standing still and what the frame then moved
+      if (AnimationErrorRule.Stop(frame, m_section.Data.Refresh) is { } stop)
+        lines.Add($"the motion stopped {Ms(stop, sign: true)} ms, then moved {Ms(frame.PredictionError!.Value, sign: true)} ms off its target");
       if (frame.Lateness is { } lateness)
         lines.Add($"lateness {Ms(lateness, sign: true)} ms");
       if (frame.FrameTime is { } frameTime)

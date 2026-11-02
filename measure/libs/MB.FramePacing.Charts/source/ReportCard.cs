@@ -60,6 +60,21 @@ namespace MB.FramePacing.Charts
     private const double MinCellPixels = 2;
     private const double MinBarHeight = 0.8;
 
+    // A band of a frame or two would be too thin to see on a whole run
+    private const double MinBandWidth = 3;
+
+    private const double HatchSpacing = 8;
+
+    private const string InvalidTargetLabel = "target not whole refreshes";
+
+    private const string OutOfOrderLabel = "out of order";
+
+    // How wide a panel's title is per character, in card units (11 px, semi-bold, 0.08 em letter spacing): measured on rendered cards
+    private const double TitleCharacterWidth = 7.6;
+
+    // How far a panel's title goes up when its key does not fit beside it
+    private const double TitleLineAbove = 14;
+
     // A pixel column's middle 90 % (holds: its median) is drawn solid and the rest faint only when 5 % is at least one frame; a column with
     // fewer frames draws all of them solid
     private const int MinFramesForTypical = 20;
@@ -189,12 +204,14 @@ namespace MB.FramePacing.Charts
       }
       var (warningTitle, warning) = options.IsShown(ReportItem.Warning) ? RunHeadline.Warning(section) : (string.Empty, Array.Empty<string>());
       var pacingBand = options.IsShown(ReportItem.Pacing) ? RunHeadline.Pacing(section) : null;
-      var layout = Layout.For(options, top.Count, tiles.Count, displayH, warning.Count, notes.Count, pacingBand != null);
+      var bandKey = warning.Count > 0 ? WarningBandKey(section) : new List<TextRun>();
+      int warningLines = warning.Count + (bandKey.Count > 0 ? 1 : 0);
+      var layout = Layout.For(options, top.Count, tiles.Count, displayH, warningLines, notes.Count, pacingBand != null);
       var parts = Header(title, top, options.IsShown(ReportItem.Title));
       if (display != null)
         DisplayBox(parts, display, width, displayH);
       if (layout.WarningY is { } warningY)
-        WarningBand(parts, warningTitle, warning, warningY, width);
+        WarningBand(parts, warningTitle, warning, bandKey, warningY, width);
       if (layout.PacingY is { } pacingY && pacingBand != null)
         PacingBand(parts, pacingBand, pacingY, width);
 
@@ -411,14 +428,41 @@ namespace MB.FramePacing.Charts
     /// The warning across the card under its header (<see cref="RunHeadline.Warning"/>): an amber band with a sign and words, not a
     /// colour alone, as the panels' colours are verdicts (red late, yellow delta time jitter).
     /// </summary>
-    private static void WarningBand(List<CardShape> parts, string title, IReadOnlyList<string> lines, double y, double width)
+    private static void WarningBand(
+      List<CardShape> parts,
+      string title,
+      IReadOnlyList<string> lines,
+      IReadOnlyList<TextRun> bandKey,
+      double y,
+      double width
+    )
     {
-      parts.Add(new RectShape("warn-band", N(20, 0), N(y, 1), N(width - 40, 0), N(WarningBandH(lines.Count), 0), "10"));
+      int lineCount = lines.Count + (bandKey.Count > 0 ? 1 : 0);
+      parts.Add(new RectShape("warn-band", N(20, 0), N(y, 1), N(width - 40, 0), N(WarningBandH(lineCount), 0), "10"));
       parts.Add(
         new TextRunsShape(34, y + WarningFirstLine, new[] { new TextRun("\u26A0 WARNING", "warn-label"), new TextRun("   " + title, "warn-title") })
       );
       for (int i = 0; i < lines.Count; ++i)
         parts.Add(new TextShape(34, y + WarningFirstLine + WarningTitleGap + (i * WarningLineH), lines[i], "warn-text", "start"));
+      if (bandKey.Count > 0)
+        parts.Add(new TextRunsShape(34, y + WarningFirstLine + WarningTitleGap + (lines.Count * WarningLineH), bandKey));
+    }
+
+    /// <summary>What the bands behind the panels mean, for the section's warnings: none when it has neither band.</summary>
+    private static List<TextRun> WarningBandKey(RunSection section)
+    {
+      var runs = new List<TextRun>();
+      void Add(string colour, string text)
+      {
+        runs.Add(new TextRun(runs.Count == 0 ? "Marked behind the panels: " : "   ", "warn-text"));
+        runs.Add(new TextRun("\u25A0 ", colour));
+        runs.Add(new TextRun(text, "warn-text"));
+      }
+      if (section.Data.InvalidTargets.CountIn(section.Start, section.End) > 0)
+        Add("invalid-text", "hatched grey: the target is not whole refreshes");
+      if (section.Data.OutOfOrder.CountIn(section.Start, section.End) > 0)
+        Add("key-pink", "pink: an older frame came back");
+      return runs;
     }
 
     /// <summary>
@@ -566,10 +610,15 @@ namespace MB.FramePacing.Charts
     /// A panel's key, right aligned on the baseline <paramref name="y"/>: per item a swatch and its word, as one line of text runs, so whatever
     /// draws it lays the pieces out (no width is guessed). A swatch is a coloured character in the colour of the data it stands for (the
     /// <c>key-</c> classes): ■ for a fill, ━ for a line (<c>Line</c>), ┅ for the refresh line, ▾ for the strip's mark, and ▐▌ in two colours
-    /// for colours that alternate per frame (two classes).
+    /// for colours that alternate per frame (two classes). The panel's title in <paramref name="parts"/>, on the same baseline, goes a line up
+    /// when the key is too long to stand beside it: the key is then the line below the title.
     /// </summary>
-    private static List<CardShape> Key(double right, double y, IReadOnlyList<(string[] Classes, string Text, bool Line)> items)
+    private static List<CardShape> Key(List<CardShape> parts, double right, double y, IReadOnlyList<(string[] Classes, string Text, bool Line)> items)
     {
+      int titleAt = parts.FindLastIndex(shape => shape is TextShape { Class: "label" } text && Math.Abs(text.Y - y) < 0.5);
+      double keyWidth = items.Sum(item => SmallTextWidth(item.Text) + 18);
+      if (titleAt >= 0 && parts[titleAt] is TextShape title && (title.Content.Length * TitleCharacterWidth) + keyWidth + 60 > right - 20)
+        parts[titleAt] = title with { Y = title.Y - TitleLineAbove };
       var runs = new List<TextRun>();
       foreach (var (classes, text, line) in items)
       {
@@ -746,6 +795,85 @@ namespace MB.FramePacing.Charts
       return bands.Count > 0;
     }
 
+    /// <summary>
+    /// The bands of pacing that is not valid behind a panel, from <paramref name="top"/> to <paramref name="bottom"/>, each in its own colour as
+    /// static frames' are: a target the display can not show, and frames an older one came back after. The warning band has their key: they
+    /// only come with its warnings, and a panel's key has no room for them.
+    /// </summary>
+    private static void PacingBands(List<CardShape> parts, PanelView view, double top, double bottom, bool label = false)
+    {
+      StretchBands(
+        parts,
+        view,
+        top,
+        bottom,
+        view.Data.InvalidTargetStretches,
+        "invalid-band",
+        label ? InvalidTargetLabel : null,
+        "invalid-text",
+        hatched: true
+      );
+      StretchBands(
+        parts,
+        view,
+        top,
+        bottom,
+        view.Data.OutOfOrderStretches,
+        "older-band",
+        label ? OutOfOrderLabel : null,
+        "older-text",
+        hatched: false
+      );
+    }
+
+    /// <summary>A band per stretch of frames: from its first frame's display time to the end of its last one's time on screen, at least a few pixels wide.</summary>
+    private static void StretchBands(
+      List<CardShape> parts,
+      PanelView view,
+      double top,
+      double bottom,
+      IReadOnlyList<(int Start, int End)> stretches,
+      string bandClass,
+      string? label,
+      string labelClass,
+      bool hatched
+    )
+    {
+      var data = view.Data;
+      var section = view.Section;
+      var hatch = new StringBuilder();
+      foreach (var (start, end) in stretches)
+      {
+        if (end <= section.Start || start >= section.End)
+          continue;
+        var last = data.Frames[end - 1];
+        double x0 = Math.Max(PlotX0 - 1, view.XOfFrame(Math.Max(start, section.Start)));
+        double x1 = Math.Min(view.EndX, view.XOf(data.Seconds(end - 1) + last.OnScreen.TotalSeconds));
+        if (x1 <= x0)
+          continue;
+        double bandWidth = Math.Max(MinBandWidth, x1 - x0);
+        view.Move(parts, new RectShape(bandClass, N(x0, 1), N(top, 1), N(bandWidth, 1), N(bottom - top, 1)), top, bottom);
+        if (hatched)
+          AddHatch(hatch, x0, top, bandWidth, bottom - top);
+        if (label != null && bandWidth >= SmallTextWidth(label) + 12)
+          view.Move(parts, new TextShape(x0 + 6, top + 13, label, labelClass, "start"), top, bottom);
+      }
+      view.MovePath(parts, "invalid-hatch", hatch, top, bottom);
+    }
+
+    /// <summary>Lines at 45 degrees across a rectangle: a colour alone does not tell the bands apart for every reader.</summary>
+    private static void AddHatch(StringBuilder path, double x, double y, double width, double height)
+    {
+      for (double c = HatchSpacing; c < width + height; c += HatchSpacing)
+      {
+        double x0 = x + Math.Max(0, c - height);
+        double y0 = y + Math.Min(c, height);
+        double x1 = x + Math.Min(c, width);
+        double y1 = y + Math.Max(0, c - width);
+        path.Append($"M{N(x0, 1)} {N(y0, 1)}L{N(x1, 1)} {N(y1, 1)}");
+      }
+    }
+
     private static double NanosecondsMs(long nanoseconds) => nanoseconds / (double)NanosecondTimeSpan.NanosecondsPerMillisecond;
 
     private static double MaxMs(WaveletMatrix values, int start, int end) => NanosecondsMs(values.KthSmallest(start, end, end - start - 1));
@@ -754,7 +882,7 @@ namespace MB.FramePacing.Charts
     {
       var section = view.Section;
       var data = view.Data;
-      var absolute = data.AbsoluteErrors;
+      var absolute = data.AbsolutePanelErrors;
       var (scaleStart, scaleEnd) = absolute.Of(view.ScaleFrames.Start, view.ScaleFrames.End);
       double limit =
         scaleEnd > scaleStart
@@ -780,12 +908,17 @@ namespace MB.FramePacing.Charts
 
       // A line at every whole number of refreshes an error reaches, over the frames the scale covers: an error of a refresh or more is a
       // frame shown a whole refresh early or late
-      var errors = data.Errors;
+      var errors = data.ErrorsOnArrival;
+      var stops = data.Stops;
       var (rangeStart, rangeEnd) = errors.Of(view.ScaleFrames.Start, view.ScaleFrames.End);
-      if (rangeEnd > rangeStart)
+      var (stopsStart, stopsEnd) = stops.Of(view.ScaleFrames.Start, view.ScaleFrames.End);
+      if (rangeEnd > rangeStart || stopsEnd > stopsStart)
       {
-        double lowest = NanosecondsMs(errors.Values.KthSmallest(rangeStart, rangeEnd, 0));
-        double highest = MaxMs(errors.Values, rangeStart, rangeEnd);
+        double lowest = Math.Min(
+          rangeEnd > rangeStart ? NanosecondsMs(errors.Values.KthSmallest(rangeStart, rangeEnd, 0)) : 0,
+          stopsEnd > stopsStart ? NanosecondsMs(stops.Values.KthSmallest(stopsStart, stopsEnd, 0)) : 0
+        );
+        double highest = rangeEnd > rangeStart ? MaxMs(errors.Values, rangeStart, rangeEnd) : 0;
         foreach (double position in ChartScale.ErrorRefreshTicks(refreshMs, limit, lowest, highest))
         {
           double y = YOf(position);
@@ -799,29 +932,38 @@ namespace MB.FramePacing.Charts
       }
       if (StaticBands(parts, view, errorY, errorY + ErrorH, label: true))
         panelKey.Add(g_staticKey);
+      PacingBands(parts, view, errorY, errorY + ErrorH, label: true);
       var clipped = new List<(double X, double Value, bool Top)>();
       // A frame with jitter is drawn in the jitter colour; a pixel column of many frames is when every frame with an error in it has jitter
       bool anyJitter = false;
       if (view.PerFrame)
       {
         double barW = Math.Max(1.0, (section.FrameCount > 0 ? view.PixelsPerFrame : view.PlotX1 - PlotX0) - 0.6);
-        foreach (int i in errors.FramesIn(section.Start, section.End))
+        void ErrorBar(double x, double value, string barClass)
         {
-          double value = data.Frames[i].AnimationError!.Value.TotalMilliseconds;
-          if (Math.Abs(value) < 1e-9)
-            continue;
-          double x = view.XOfFrame(i);
           var (y0, y1) = (Math.Min(zeroY, YOf(value)), Math.Max(zeroY, YOf(value)));
-          bool jitter = (data.Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) != 0;
-          anyJitter |= jitter;
-          view.Move(
-            parts,
-            new RectShape(jitter ? "bar-jitter" : "bar", N(x, 2), N(y0, 1), N(barW, 2), N(Math.Max(MinBarHeight, y1 - y0), 1)),
-            errorY,
-            errorY + ErrorH
-          );
+          view.Move(parts, new RectShape(barClass, N(x, 2), N(y0, 1), N(barW, 2), N(Math.Max(MinBarHeight, y1 - y0), 1)), errorY, errorY + ErrorH);
           if (Math.Abs(value) > limit)
             clipped.Add((x + (barW / 2), value, value > 0));
+        }
+        foreach (int i in errors.FramesIn(section.Start, section.End))
+        {
+          double value = AnimationErrorRule.OnArrival(data.Frames[i], data.Refresh)!.Value.TotalMilliseconds;
+          if (Math.Abs(value) < 1e-9)
+            continue;
+          bool jitter = (data.Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) != 0;
+          anyJitter |= jitter;
+          ErrorBar(view.XOfFrame(i), value, jitter ? "bar-jitter" : "bar");
+        }
+        // A stop on the refresh where the frame should have changed: one target after it appeared
+        foreach (int i in stops.FramesIn(section.Start, section.End))
+        {
+          var next = data.Frames[i + 1];
+          ErrorBar(
+            view.XOf(data.Seconds(i) + next.TargetFrameTime!.Value.Value.TotalSeconds),
+            AnimationErrorRule.Stop(next, data.Refresh)!.Value.TotalMilliseconds,
+            "bar"
+          );
         }
       }
       else
@@ -845,12 +987,16 @@ namespace MB.FramePacing.Charts
         foreach (var (column, frameStart, frameEnd) in view.Columns(section.Start, section.End))
         {
           var (start, end) = errors.Of(frameStart, frameEnd);
+          var (stopStart, stopEnd) = stops.Of(frameStart, frameEnd);
           int count = end - start;
-          if (count == 0)
+          if (count == 0 && stopEnd == stopStart)
             continue;
-          double min = NanosecondsMs(errors.Values.KthSmallest(start, end, 0));
-          double max = MaxMs(errors.Values, start, end);
-          bool jitter = data.OtherErrors.CountIn(frameStart, frameEnd) == 0 && data.DeltaTimeJitter.CountIn(frameStart, frameEnd) > 0;
+          double min = count > 0 ? NanosecondsMs(errors.Values.KthSmallest(start, end, 0)) : 0;
+          double max = count > 0 ? MaxMs(errors.Values, start, end) : 0;
+          if (stopEnd > stopStart)
+            min = Math.Min(min, NanosecondsMs(stops.Values.KthSmallest(stopStart, stopEnd, 0)));
+          bool jitter =
+            stopEnd == stopStart && data.OtherErrors.CountIn(frameStart, frameEnd) == 0 && data.DeltaTimeJitter.CountIn(frameStart, frameEnd) > 0;
           anyJitter |= jitter;
           if (count >= MinFramesForTypical)
           {
@@ -873,7 +1019,7 @@ namespace MB.FramePacing.Charts
       }
       if (anyJitter)
         panelKey.Insert(1, (new[] { "bar-jitter" }, "delta time jitter: off by less than the intended period", false));
-      parts.AddRange(Key(view.PlotX1, errorY - 16, panelKey));
+      parts.AddRange(Key(parts, view.PlotX1, errorY - 16, panelKey));
       parts.Add(new LineShape("zero-line", N(PlotX0, 0), N(zeroY, 0), N(view.PlotX1, 0), N(zeroY, 0)));
       parts.Add(new TextShape(PlotX0 - 10, zeroY + 4, "0", "vsync-n", "end"));
       ClipMarks(
@@ -966,12 +1112,13 @@ namespace MB.FramePacing.Charts
       parts.Add(new TextShape(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
       if (StaticBands(parts, view, stepY, stepY + StepH, label: false))
         panelKey.Add(g_staticKey);
+      PacingBands(parts, view, stepY, stepY + StepH);
       // The reference lines under the holds; the key names them when they are drawn
       var clipped = new List<(double X, double Value, bool Top)>();
       var lines = new List<CardShape>();
       if (frameTimeLines)
         ReferenceKey(panelKey, ReferenceLines(lines, view, data.StepReferences, holdEnd, YOf, top, stepY, stepY + StepH, clipped));
-      parts.AddRange(Key(view.PlotX1, stepY - 16, panelKey));
+      parts.AddRange(Key(parts, view.PlotX1, stepY - 16, panelKey));
       parts.AddRange(lines);
       if (animation)
         AnimationSteps(parts, view, holdEnd, YOf, X1, stepY);
@@ -1247,6 +1394,7 @@ namespace MB.FramePacing.Charts
       parts.Add(new TextShape(PlotX0 - 10, YOf(0) + 4, "0", "vsync-n", "end"));
       if (StaticBands(parts, view, frameTimeY, frameTimeY + FrameTimeH, label: false))
         panelKey.Add(g_staticKey);
+      PacingBands(parts, view, frameTimeY, frameTimeY + FrameTimeH);
       var clipped = new List<(double X, double Value, bool Top)>();
       var lines = new List<CardShape>();
       if (frameTimeLines)
@@ -1257,7 +1405,7 @@ namespace MB.FramePacing.Charts
           ReferenceLines(lines, view, data.FrameTimeReferences, spanEnd, YOf, top, frameTimeY, frameTimeY + FrameTimeH, clipped)
         );
       }
-      parts.AddRange(Key(view.PlotX1, frameTimeY - 16, panelKey));
+      parts.AddRange(Key(parts, view.PlotX1, frameTimeY - 16, panelKey));
       parts.AddRange(lines);
 
       var busy = new StringBuilder();
@@ -1377,6 +1525,7 @@ namespace MB.FramePacing.Charts
         );
       }
       bool staticLate = StaticBands(parts, view, lateY, lateY + LateH, label: false);
+      PacingBands(parts, view, lateY, lateY + LateH);
       // Red where a frame in the window was late (on screen longer than it was animated for and than intended), amber where frames were only on
       // screen longer than the application prefers, green otherwise; each stretch starts
       // where the previous one ended, so the line is whole
@@ -1443,7 +1592,7 @@ namespace MB.FramePacing.Charts
       }
       if (staticLate)
         panelKey.Add(g_staticKey);
-      parts.AddRange(Key(view.PlotX1, lateY - 16, panelKey));
+      parts.AddRange(Key(parts, view.PlotX1, lateY - 16, panelKey));
       view.Ticks(parts, lateY + LateH);
     }
 
@@ -1574,7 +1723,7 @@ namespace MB.FramePacing.Charts
       if (anyUnknown)
         panelKey.Add((new[] { "neutral" }, "not decoded or not recorded", false));
       parts.RemoveAt(legend);
-      parts.InsertRange(legend, Key(view.PlotX1, stripY - 16, panelKey));
+      parts.InsertRange(legend, Key(parts, view.PlotX1, stripY - 16, panelKey));
       view.Ticks(parts, stripY + StripH);
     }
 
@@ -1716,7 +1865,7 @@ namespace MB.FramePacing.Charts
             )
           );
       }
-      parts.AddRange(Key(view.PlotX1, eventsY - 16, key));
+      parts.AddRange(Key(parts, view.PlotX1, eventsY - 16, key));
       view.Ticks(parts, eventsY + EventsH);
     }
 

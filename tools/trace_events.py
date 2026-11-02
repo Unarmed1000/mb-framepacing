@@ -94,6 +94,14 @@ class Frame(TimedFrame, Protocol):
     @property
     def animation_error_ns(self) -> int | None: ...
     @property
+    def pacing_error_ns(self) -> int | None: ...
+    @property
+    def prediction_error_ns(self) -> int | None: ...
+    @property
+    def marker_target_ns(self) -> int | None: ...
+    @property
+    def marker_preferred_ns(self) -> int | None: ...
+    @property
     def flags(self) -> tuple[str, ...]: ...
     @property
     def target_ns(self) -> int | None: ...
@@ -196,14 +204,31 @@ VERDICT_UNKNOWN = "unknown"
 VERDICT_ON_TIME = "on time"
 
 
+# A marker's frame time on demand
+ON_DEMAND_FRAME_NS = 0xFFFF_FFFF
+
+
+def counts_as_animation_error(frame: Frame, error_threshold_ns: int) -> bool:
+    """The analysis's AnimationErrorRule: the animation error, or either of its parts against a target the application gave, is beyond the
+    threshold. A frame that replaces a dropped one has no error by the sum, the stop and the jump cancelling, and is off all the same."""
+    if frame.animation_error_ns is None:
+        return False
+    if abs(frame.animation_error_ns) > error_threshold_ns:
+        return True
+    on_demand = frame.marker_target_ns == ON_DEMAND_FRAME_NS or (not frame.marker_target_ns and frame.marker_preferred_ns == ON_DEMAND_FRAME_NS)
+    if on_demand or frame.pacing_error_ns is None or frame.prediction_error_ns is None:
+        return False
+    return abs(frame.pacing_error_ns) > error_threshold_ns or abs(frame.prediction_error_ns) > error_threshold_ns
+
+
 def verdict(frame: Frame, error_threshold_ns: int) -> str:
-    """What the analysis says of the frame, as one word for its colour: late, delta time jitter, off (an animation error beyond the
-    threshold otherwise), static (nothing animates while it is on screen), unknown (a step across a capture gap), or on time."""
+    """What the analysis says of the frame, as one word for its colour: late, delta time jitter, off (an animation error otherwise),
+    static (nothing animates while it is on screen), unknown (a step across a capture gap), or on time."""
     if "Late" in frame.flags:
         return VERDICT_LATE
     if "DeltaTimeJitter" in frame.flags:
         return VERDICT_DELTA_TIME_JITTER
-    if frame.animation_error_ns is not None and abs(frame.animation_error_ns) > error_threshold_ns:
+    if counts_as_animation_error(frame, error_threshold_ns):
         return VERDICT_OFF
     if "StaticAfter" in frame.flags:
         return VERDICT_STATIC

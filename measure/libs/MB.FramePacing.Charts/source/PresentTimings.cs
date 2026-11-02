@@ -33,7 +33,6 @@ namespace MB.FramePacing.Charts
         presents[i] = f.CpuStartTime.Nanoseconds + f.CpuBusy.Nanoseconds;
         lowest = Math.Min(lowest, f.FirstSeenTime.Nanoseconds - presents[i]!.Value);
       }
-      var dropped = DroppedFrames.Before(frames);
       long half = refresh.Nanoseconds / 2;
       for (int i = 0; i < frames.Count; ++i)
       {
@@ -45,7 +44,7 @@ namespace MB.FramePacing.Charts
         }
         NanosecondTimeSpan? planned = f.IntendedDisplayTime != default ? new NanosecondTimeSpan(f.IntendedDisplayTime.Nanoseconds - present) : null;
         var extra = new NanosecondTimeSpan(f.FirstSeenTime.Nanoseconds - present - lowest);
-        var period = IntendedPeriods.Of(f, dropped[i], refresh);
+        var period = IntendedPeriods.Of(f, refresh);
         bool? workOver = period is { } p ? f.CpuBusy >= p : null;
         LateReason? reason = null;
         // A late frame's present step against its intended period, by the late rule's half refresh: its present came late too, or on time
