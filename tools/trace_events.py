@@ -207,10 +207,14 @@ VERDICT_ON_TIME = "on time"
 # A marker's frame time on demand
 ON_DEMAND_FRAME_NS = 0xFFFF_FFFF
 
+# What a part may be past the threshold by and still be a rounding: the analysis's AnimationErrorRule.RoundingNanoseconds
+ROUNDING_NS = 1000
+
 
 def counts_as_animation_error(frame: Frame, error_threshold_ns: int) -> bool:
     """The analysis's AnimationErrorRule: the animation error, or either of its parts against a target the application gave, is beyond the
-    threshold. A frame that replaces a dropped one has no error by the sum, the stop and the jump cancelling, and is off all the same."""
+    threshold, a part by more than a rounding. A frame that replaces a dropped one has no error by the sum, the stop and the jump cancelling,
+    and is off all the same."""
     if frame.animation_error_ns is None:
         return False
     if abs(frame.animation_error_ns) > error_threshold_ns:
@@ -218,7 +222,7 @@ def counts_as_animation_error(frame: Frame, error_threshold_ns: int) -> bool:
     on_demand = frame.marker_target_ns == ON_DEMAND_FRAME_NS or (not frame.marker_target_ns and frame.marker_preferred_ns == ON_DEMAND_FRAME_NS)
     if on_demand or frame.pacing_error_ns is None or frame.prediction_error_ns is None:
         return False
-    return abs(frame.pacing_error_ns) > error_threshold_ns or abs(frame.prediction_error_ns) > error_threshold_ns
+    return abs(frame.pacing_error_ns) - ROUNDING_NS > error_threshold_ns or abs(frame.prediction_error_ns) - ROUNDING_NS > error_threshold_ns
 
 
 def verdict(frame: Frame, error_threshold_ns: int) -> str:

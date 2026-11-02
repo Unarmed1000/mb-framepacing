@@ -86,6 +86,9 @@ namespace MB.FramePacing.TraceJoin
     // A marker's frame time on demand: 0xFFFFFFFF
     private const long OnDemandFrameNs = 4294967295;
 
+    // What a part may be past the threshold by and still be a rounding: the analysis's AnimationErrorRule.RoundingNanoseconds
+    private const long RoundingNs = 1000;
+
     public static string VerdictOf(FrameRow frame, long errorThresholdNs)
     {
       if (frame.Flags.Contains("Late"))
@@ -101,8 +104,8 @@ namespace MB.FramePacing.TraceJoin
 
     /// <summary>
     /// The analysis's AnimationErrorRule, on what a frames file holds: the animation error, or either of its parts against a target the application
-    /// gave, is beyond the threshold. A frame that replaces a dropped one has no error by the sum, the stop and the jump cancelling, and is off
-    /// all the same.
+    /// gave, is beyond the threshold, a part by more than a rounding. A frame that replaces a dropped one has no error by the sum, the stop and
+    /// the jump cancelling, and is off all the same.
     /// </summary>
     private static bool CountsAsAnimationError(FrameRow frame, long errorThresholdNs)
     {
@@ -115,7 +118,7 @@ namespace MB.FramePacing.TraceJoin
         frame.MarkerTargetFrameTime?.Nanoseconds == OnDemandFrameNs || (noTarget && frame.MarkerPreferredFrameTime?.Nanoseconds == OnDemandFrameNs);
       if (onDemand || frame.PacingError is not { } pacing || frame.PredictionError is not { } prediction)
         return false;
-      return Math.Abs(pacing.Nanoseconds) > errorThresholdNs || Math.Abs(prediction.Nanoseconds) > errorThresholdNs;
+      return Math.Abs(pacing.Nanoseconds) - RoundingNs > errorThresholdNs || Math.Abs(prediction.Nanoseconds) - RoundingNs > errorThresholdNs;
     }
 
     public static IReadOnlyList<TraceEvent> OnScreen(

@@ -375,6 +375,28 @@ namespace MB.FramePacing.Analysis.UnitTest
       );
     }
 
+    /// <summary>
+    /// A clip with no drop and no held frame: four frames have an error of exactly the threshold, and their step is a nanosecond past it only
+    /// where a display step rounds down against a target of whole capture periods. They are no error by the sum and no error by a part.
+    /// </summary>
+    [Test]
+    public void AClipWithNoDrops_HasNoErrorFromARounding()
+    {
+      var run = CaptureAnalyzer
+        .Analyze(VideoClips.Imported("60-naive-5ms", m_ffmpeg, Path.Combine(m_directory, "capture")), new AnalysisOptions())
+        .Timeline.Runs.Single();
+
+      Assert.That(run.Statistics.FramesWithAnimationError, Is.EqualTo(461));
+      foreach (ulong index in new ulong[] { 908, 926, 953, 956 })
+      {
+        var frame = run.Frames.Single(f => f.FrameIndex == index);
+        Assert.That(frame.AnimationError?.Nanoseconds, Is.EqualTo(-1_000_000), $"frame {index}");
+        Assert.That(frame.PredictionError?.Nanoseconds, Is.EqualTo(-1_000_001), $"frame {index}");
+        Assert.That(AnimationErrorRule.Counts(frame, TimelineAnalyzer.DefaultErrorThreshold), Is.False, $"frame {index}");
+        Assert.That(frame.Flags.HasFlag(PresentedFrameFlags.DeltaTimeJitter), Is.False, $"frame {index}");
+      }
+    }
+
     private (IReadOnlyList<PresentedFrame> Frames, long[] Dropped, Row[] Rows, int[] Positions, int Fps) Analysed(string clip, string scenario)
     {
       var manifest = VideoClips.Manifest(clip);

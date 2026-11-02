@@ -789,7 +789,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     - **What counts as an animation error** (`AnimationErrorRule`; the user, 2026-11-02: "a pacer that works properly can only
       target a FIXED number of refresh period intervals"): `animationErrorNs` stays PresentMon's sum (checked in its source: a dropped
       frame has no value, the next frame is measured from the last shown one), but the sum cancels a stop against a jump: a, a, c is
-      2 - 2 = 0. So a frame counts when the sum or either part against its target is beyond the threshold: **stop or rush** (target
+      2 - 2 = 0. So a frame counts when the sum or either part against its target is beyond the threshold (a part by more than
+      `RoundingNanoseconds`, 1 µs: a target of 16 666 667 ns against a display step of 16 666 666 ns put a step of exactly the threshold 1 ns
+      past it, 15 frames of the clips with no drop at all, and every real part on the clips is over 100 µs past): **stop or rush** (target
       - display step, `pacingErrorNs` with its sign turned) and **step** (animation step - target, `predictionErrorNs`). **There is no
         grid and nothing is re-aligned:** the target is a length and each frame is measured from where the last frame appeared, so a
         pacer that re-aligns after a loss and one that returns to its grid are both read as shown; a fixed grid would call every frame

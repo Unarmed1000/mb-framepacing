@@ -311,8 +311,8 @@ namespace MB.FramePacing.Analysis.UnitTest
     public int ErrorBars(int frame) => (OnArrivalNanoseconds(frame) is { } left && left != 0 ? 1 : 0) + (StopNanoseconds(frame).HasValue ? 1 : 0);
 
     /// <summary>
-    /// The frame counts as an animation error (frame 1 on): the sum, or with a target either part against it, is beyond the threshold
-    /// (AnimationErrorRule).
+    /// The frame counts as an animation error (frame 1 on): the sum, or with a target either part against it, is beyond the threshold, a part by
+    /// more than a rounding (AnimationErrorRule).
     /// </summary>
     public bool CountsAsAnimationError(int frame)
     {
@@ -323,8 +323,8 @@ namespace MB.FramePacing.Analysis.UnitTest
       return SwapIntervalRefreshes(frame).HasValue
         && MeasuredAgainstNanoseconds(frame) is { } against
         && (
-          Math.Abs(DisplayStepNanoseconds(frame) - against) > ErrorThresholdNanoseconds
-          || Math.Abs(AnimationStepNanoseconds(frame) - against) > ErrorThresholdNanoseconds
+          Math.Abs(DisplayStepNanoseconds(frame) - against) - AnimationErrorRule.RoundingNanoseconds > ErrorThresholdNanoseconds
+          || Math.Abs(AnimationStepNanoseconds(frame) - against) - AnimationErrorRule.RoundingNanoseconds > ErrorThresholdNanoseconds
         );
     }
 

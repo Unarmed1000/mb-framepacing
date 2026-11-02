@@ -339,6 +339,31 @@ namespace MB.FramePacing.Analysis.UnitTest
       }
     }
 
+    /// <summary>
+    /// A frame's capture is <paramref name="early"/> nanoseconds before its refresh, as a rounded capture time can be, and its animation step is
+    /// 15 ms: the step is 1 ms short of the target of one capture period, and the sum is at a threshold set <paramref name="early"/> nearer. So
+    /// only the step is past the threshold, by <paramref name="early"/>, and the slack is the rounding's and no more.
+    /// </summary>
+    [TestCase(1L, 0)]
+    [TestCase(1000L, 0)]
+    [TestCase(1001L, 1)]
+    public void APart_CountsOnlyPastTheRounding(long early, int errors)
+    {
+      const int Capture = 3 + 10; // after the start markers
+      var frames = Steady(20).Select(f => (f.Item1, f.Item2, 0L, Refresh)).ToList();
+      frames[10] = (1, 15, 0, Refresh);
+      var rows = PacedRows(frames);
+      rows[Capture] = rows[Capture] with { CaptureTime = new NanosecondTickCount((Capture * Refresh) - early) };
+      var options = new TimelineOptions { ErrorThreshold = NanosecondTimeDuration.FromNanoseconds(Ms - early) };
+
+      var run = TimelineAnalyzer.Analyze(rows, options).Runs.Single();
+
+      Assert.That(run.Frames[10].AnimationError?.Nanoseconds, Is.EqualTo(early - Ms), "the sum, at the threshold");
+      Assert.That(run.Frames[10].PredictionError?.Nanoseconds, Is.EqualTo(-Ms), "the step");
+      Assert.That(run.Statistics.FramesWithAnimationError, Is.EqualTo(errors));
+      Assert.That(run.Frames.Count(IsDeltaTimeJitter), Is.EqualTo(errors));
+    }
+
     [Test]
     public void ALateFrame_HasNoDeltaTimeJitter()
     {

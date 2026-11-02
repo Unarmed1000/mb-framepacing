@@ -155,7 +155,7 @@
 <text x="610.0" y="162.0" text-anchor="start"><tspan class="tile-value">-</tspan><tspan class="vsync-n">  needs 1,000 frames</tspan></text>
 <rect class="tile" x="884.0" y="118" width="276.0" height="64" rx="10"/>
 <text x="898.0" y="138.0" text-anchor="start" class="label">FRAMES VISIBLY OFF</text>
-<text x="898.0" y="162.0" text-anchor="start"><tspan class="tile-value warn">454</tspan><tspan class="vsync-n">  98.1 %</tspan></text>
+<text x="898.0" y="162.0" text-anchor="start"><tspan class="tile-value warn">451</tspan><tspan class="vsync-n">  97.4 %</tspan></text>
 <rect class="tile" x="20.0" y="194" width="276.0" height="64" rx="10"/>
 <text x="34.0" y="214.0" text-anchor="start" class="label">ERROR P99</text>
 <text x="34.0" y="238.0" text-anchor="start"><tspan class="tile-value">18.5 ms</tspan></text>
@@ -343,7 +343,7 @@
 <rect class="bar-jitter" x="455.48" y="385.0" width="1.62" height="3.3"/>
 <rect class="bar-jitter" x="457.62" y="385.0" width="1.62" height="17.4"/>
 <rect class="bar-jitter" x="459.77" y="381.1" width="1.62" height="3.9"/>
-<rect class="bar-jitter" x="461.92" y="385.0" width="1.62" height="2.4"/>
+<rect class="bar" x="461.92" y="385.0" width="1.62" height="2.4"/>
 <rect class="bar-jitter" x="464.06" y="385.0" width="1.62" height="3.4"/>
 <rect class="bar-jitter" x="466.21" y="382.2" width="1.62" height="2.8"/>
 <rect class="bar-jitter" x="468.35" y="369.2" width="1.62" height="15.8"/>
@@ -395,7 +395,7 @@
 <rect class="bar-jitter" x="571.35" y="382.2" width="1.62" height="2.8"/>
 <rect class="bar-jitter" x="573.50" y="385.0" width="1.62" height="2.6"/>
 <rect class="bar-jitter" x="575.65" y="381.7" width="1.62" height="3.3"/>
-<rect class="bar-jitter" x="577.79" y="385.0" width="1.62" height="2.4"/>
+<rect class="bar" x="577.79" y="385.0" width="1.62" height="2.4"/>
 <rect class="bar-jitter" x="579.94" y="380.8" width="1.62" height="4.2"/>
 <rect class="bar-jitter" x="582.08" y="385.0" width="1.62" height="20.1"/>
 <rect class="bar-jitter" x="584.23" y="385.0" width="1.62" height="3.1"/>
@@ -514,7 +514,7 @@
 <rect class="bar-jitter" x="835.29" y="370.4" width="1.62" height="14.6"/>
 <rect class="bar-jitter" x="837.44" y="385.0" width="1.62" height="18.5"/>
 <rect class="bar-jitter" x="839.58" y="381.9" width="1.62" height="3.1"/>
-<rect class="bar-jitter" x="841.73" y="385.0" width="1.62" height="2.4"/>
+<rect class="bar" x="841.73" y="385.0" width="1.62" height="2.4"/>
 <rect class="bar-jitter" x="843.88" y="375.2" width="1.62" height="9.8"/>
 <rect class="bar-jitter" x="846.02" y="385.0" width="1.62" height="2.9"/>
 <rect class="bar-jitter" x="848.17" y="380.4" width="1.62" height="4.6"/>
@@ -903,7 +903,7 @@
 <rect class="strip-jitter" x="456.0" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="458.1" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="460.3" y="1080" width="1.1" height="28" rx="2"/>
-<rect class="strip-jitter" x="462.4" y="1080" width="1.1" height="28" rx="2"/>
+<rect class="strip-a" x="462.4" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="464.6" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="466.7" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="468.9" y="1080" width="1.1" height="28" rx="2"/>
@@ -957,7 +957,7 @@
 <rect class="strip-jitter" x="571.9" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="574.0" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="576.1" y="1080" width="1.1" height="28" rx="2"/>
-<rect class="strip-jitter" x="578.3" y="1080" width="1.1" height="28" rx="2"/>
+<rect class="strip-a" x="578.3" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="580.4" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="582.6" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="584.7" y="1080" width="1.1" height="28" rx="2"/>
@@ -1080,7 +1080,7 @@
 <rect class="strip-jitter" x="835.8" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="837.9" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="840.1" y="1080" width="1.1" height="28" rx="2"/>
-<rect class="strip-jitter" x="842.2" y="1080" width="1.1" height="28" rx="2"/>
+<rect class="strip-b" x="842.2" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="844.4" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="846.5" y="1080" width="1.1" height="28" rx="2"/>
 <rect class="strip-jitter" x="848.7" y="1080" width="1.1" height="28" rx="2"/>
@@ -1246,7 +1246,7 @@
 <text x="20.0" y="1340.0" text-anchor="start" class="label">NOTES</text>
 <text x="20.0" y="1364.0" text-anchor="start" class="sub">Resolution 16.7 ms (one capture period); error threshold 1 ms.</text>
 <text x="20.0" y="1383.0" text-anchor="start" class="sub">Every frame is drawn.</text>
-<text x="20.0" y="1402.0" text-anchor="start" class="sub">Cause: mostly delta time jitter: an even display with uneven animation steps (32 error frame(s) at uneven display, 422 on an even display).</text>
+<text x="20.0" y="1402.0" text-anchor="start" class="sub">Cause: mostly delta time jitter: an even display with uneven animation steps (32 error frame(s) at uneven display, 419 on an even display).</text>
 <text x="20.0" y="1421.0" text-anchor="start" class="sub">464 presented frames from 480 captures: 480 decoded, 0 undecodable, 0 torn, 0 not recorded; 0 dropped by the source, 0 missed. 0 frame indices never captured, 1 segment(s).</text>
 <text x="20.0" y="1440.0" text-anchor="start" class="sub">Planned time from present to screen: median 4.2 ms (0.2 refreshes), 4.2 ms to 4.2 ms (the pacer's intended display time: its plan, not a measurement); 16 frames presented after</text>
 <text x="20.0" y="1459.0" text-anchor="start" class="sub">their intended display time are left out.</text>

@@ -94,6 +94,17 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.That(TraceEvents.VerdictOf(Frame(1, 0), ThresholdNs), Is.EqualTo("on time"));
     }
 
+    /// <summary>The sum is the threshold: a part past it by a rounding is no error, with the slack of the analysis.</summary>
+    [TestCase(-1_000_001, "on time")]
+    [TestCase(-1_001_000, "on time")]
+    [TestCase(-1_001_001, "off")]
+    public void AFramesVerdict_APartPastTheThresholdByARounding_IsNotOff(long stepNs, string verdict)
+    {
+      var frame = Frame(1, 0, animationErrorNs: -1_000_000, markerTargetNs: 16_666_667, pacingErrorNs: -1, predictionErrorNs: stepNs);
+
+      Assert.That(TraceEvents.VerdictOf(frame, ThresholdNs), Is.EqualTo(verdict));
+    }
+
     [Test]
     public void OnScreen_TheGoldenCapture()
     {

@@ -210,7 +210,7 @@ Under one track named `mb-framepacing: <run>`, in this order. A slice's argument
 | Capture events                 | The capture's own gaps: captures not decoded, not recorded, dropped by the source or missed                                                                                                                               |
 
 **A frame on screen is coloured by its verdict**, the first that fits: late, delta time jitter, off (it counts as an animation error
-otherwise: the error, or either part of it against the frame's target, is beyond the threshold), static, unknown (a step across a capture gap), on time. The verdict is the slice's correlation id,
+otherwise: the error, or either part of it against the frame's target, is beyond the threshold, a part by more than a rounding of 1 µs), static, unknown (a step across a capture gap), on time. The verdict is the slice's correlation id,
 which the viewer colours by: each verdict has one colour across the trace, and the viewer, not the tools, picks it (a trace can
 not choose a colour), so it is not the report's red and yellow. The track's description has the legend.
 

@@ -94,6 +94,14 @@ class OnScreenTests(unittest.TestCase):
         self.assertEqual(verdict(dropped(16_666_667, None), THRESHOLD_NS), "off")
         self.assertEqual(verdict(dropped(0xFFFF_FFFF, None), THRESHOLD_NS), "on time")
         self.assertEqual(verdict(dropped(None, 0xFFFF_FFFF), THRESHOLD_NS), "on time")
+
+        # A part past the threshold by a rounding is no error: the sum is the threshold, and the slack is that of the analysis
+        def with_step(step_ns: int) -> MadeFrame:
+            return MadeFrame(1, 0, animation_error_ns=-1_000_000, pacing_error_ns=-1, prediction_error_ns=step_ns, marker_target_ns=16_666_667)
+
+        self.assertEqual(verdict(with_step(-1_000_001), THRESHOLD_NS), "on time")
+        self.assertEqual(verdict(with_step(-1_001_000), THRESHOLD_NS), "on time")
+        self.assertEqual(verdict(with_step(-1_001_001), THRESHOLD_NS), "off")
         self.assertEqual(verdict(MadeFrame(1, 0, flags=("StaticAfter", "UncertainStep")), THRESHOLD_NS), "static")
         self.assertEqual(verdict(MadeFrame(1, 0, flags=("UncertainStep",)), THRESHOLD_NS), "unknown")
         self.assertEqual(verdict(MadeFrame(1, 0), THRESHOLD_NS), "on time")

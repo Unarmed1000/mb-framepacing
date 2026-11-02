@@ -5,7 +5,8 @@
 //* cancels a stop against a jump: a frame that replaces a dropped one is shown two refreshes after the last shown frame and has moved two
 //* refreshes on, so the sum is 0 although the motion stood still for a refresh and then jumped. Against the frame's target it is two parts, the
 //* pacing error (display time step minus target: the frame before stayed too long or too short) and the prediction error (animation time step
-//* minus target: the animation moved too far or too short), and a frame counts when the sum or either part is beyond the threshold.
+//* minus target: the animation moved too far or too short), and a frame counts when the sum or either part is beyond the threshold. A part is
+//* measured against whole capture periods, which rounded capture times can be off: it must be past the threshold by more than that.
 //*
 //* SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 //* SPDX-License-Identifier: LicenseRef-PolyForm-Perimeter-1.0.1
@@ -17,7 +18,11 @@ namespace MB.FramePacing.Analysis
 {
   public static class AnimationErrorRule
   {
-    /// <summary>What a whole number of capture periods can be off a display's real refreshes by: less than this is no error on arrival.</summary>
+    /// <summary>
+    /// What a whole number of capture periods can be off a display's real refreshes by: less than this is no error on arrival, and no part past
+    /// the threshold. A target is whole capture periods and a display step the difference of two rounded times: a period of 16 666 667 ns against
+    /// a display step of 16 666 666 ns turns an animation step that is exactly the threshold short into one a nanosecond past it.
+    /// </summary>
     public const long RoundingNanoseconds = 1000;
 
     /// <summary>An application that presents on demand, by what its marker carries: it has no target to be off.</summary>
@@ -36,15 +41,21 @@ namespace MB.FramePacing.Analysis
       && frame.PredictionError.HasValue
       && !IsOnDemand(frame.MarkerTargetFrameTime, frame.MarkerPreferredFrameTime);
 
-    /// <summary>The frame counts as an animation error: the sum, or either part against its target, is beyond <paramref name="threshold"/>.</summary>
+    /// <summary>
+    /// The frame counts as an animation error: the sum, or either part against its target, is beyond <paramref name="threshold"/>, a part by more
+    /// than <see cref="RoundingNanoseconds"/>.
+    /// </summary>
     public static bool Counts(PresentedFrame frame, NanosecondTimeDuration threshold)
     {
       if (frame.AnimationError is not { } error)
         return false;
       if (error.Duration() > threshold)
         return true;
-      return IsJudgedInParts(frame) && (frame.PacingError!.Value.Duration() > threshold || frame.PredictionError!.Value.Duration() > threshold);
+      return IsJudgedInParts(frame) && (IsBeyond(frame.PacingError!.Value, threshold) || IsBeyond(frame.PredictionError!.Value, threshold));
     }
+
+    private static bool IsBeyond(NanosecondTimeSpan part, NanosecondTimeDuration threshold) =>
+      part.Duration().Nanoseconds - RoundingNanoseconds > threshold.Nanoseconds;
 
     /// <summary>
     /// The stop: how far the motion fell behind while the frame before stayed on screen beyond its target (negative), or null when it did not
