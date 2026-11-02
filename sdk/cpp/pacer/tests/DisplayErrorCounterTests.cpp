@@ -134,26 +134,162 @@ TEST(DisplayErrorCounter, TheAnimationTimeStepIsTheFramesOwn)
   EXPECT_EQ(counter.State().LateFrames, 1u);
 }
 
-TEST(DisplayErrorCounter, AStepNextToAFrameWithoutADisplayTimeIsNotJudged)
+TEST(DisplayErrorCounter, AStepAcrossAFrameWithoutAReportIsNotJudged)
 {
   PC::DisplayErrorCounter counter;
   Begin(counter, 1, 12);
   counter.AddDisplayReport(Shown(1, Start), g_hz100);
   counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
-  // Never shown: the frame after it is not judged, whenever it was shown
-  counter.AddDisplayReport(NotShown(3), g_hz100);
+  EXPECT_EQ(counter.State().JudgedFrames, 1u);
+  // No report for frame 3: it may have been shown, so nothing is said of frame 4
   counter.AddDisplayReport(Shown(4, Start + (7 * Period)), g_hz100);
-  EXPECT_EQ(counter.State().NotShown, 1u);
   EXPECT_EQ(counter.State().JudgedFrames, 1u);
   counter.AddDisplayReport(Shown(5, Start + (8 * Period)), g_hz100);
   EXPECT_EQ(counter.State().JudgedFrames, 2u);
-  // No report for a frame: the same
-  counter.AddDisplayReport(Shown(7, Start + (20 * Period)), g_hz100);
+  // No report for frame 6, and frame 7 never shown: the same
+  counter.AddDisplayReport(NotShown(7), g_hz100);
+  counter.AddDisplayReport(Shown(8, Start + (20 * Period)), g_hz100);
   EXPECT_EQ(counter.State().JudgedFrames, 2u);
-  counter.AddDisplayReport(Shown(8, Start + (21 * Period)), g_hz100);
+  counter.AddDisplayReport(Shown(9, Start + (21 * Period)), g_hz100);
   EXPECT_EQ(counter.State().JudgedFrames, 3u);
   EXPECT_EQ(counter.State().ErrorFrames, 0u);
-  EXPECT_EQ(counter.State().Reports, 7u);
+  EXPECT_EQ(counter.State().NotShown, 1u);
+}
+
+// On screen a, a, c: frame 3 is never shown and frame 4 replaces it, animated for its display time. It has moved two refreshes and
+// stayed away two: 0 by the sum, a stop of one refresh and a step of one more by the parts
+TEST(DisplayErrorCounter, AFrameThatReplacesOneNeverShownIsAnErrorFrameAndNotLate)
+{
+  PC::DisplayErrorCounter counter;
+  Begin(counter, 1, 5);
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
+  counter.AddDisplayReport(NotShown(3), g_hz100);
+  counter.AddDisplayReport(Shown(4, Start + (3 * Period)), g_hz100);
+
+  PC::DisplayErrorState state = counter.State();
+  EXPECT_EQ(state.NotShown, 1u);
+  EXPECT_EQ(state.JudgedFrames, 2u);
+  EXPECT_EQ(state.ErrorFrames, 1u);
+  EXPECT_EQ(state.OffTargetFrames, 0u);
+  EXPECT_EQ(state.LateFrames, 0u);
+
+  // The frame after it is on time again
+  counter.AddDisplayReport(Shown(5, Start + (4 * Period)), g_hz100);
+  state = counter.State();
+  EXPECT_EQ(state.JudgedFrames, 3u);
+  EXPECT_EQ(state.ErrorFrames, 1u);
+}
+
+// Frames 3 and 4 never shown: frame 5 has moved three refreshes and stayed away three
+TEST(DisplayErrorCounter, TheStepAcrossFramesNeverShownAddsUpTheirAnimationTimeSteps)
+{
+  PC::DisplayErrorCounter counter;
+  Begin(counter, 1, 5);
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
+  counter.AddDisplayReport(NotShown(3), g_hz100);
+  counter.AddDisplayReport(NotShown(4), g_hz100);
+  counter.AddDisplayReport(Shown(5, Start + (4 * Period)), g_hz100);
+
+  const PC::DisplayErrorState state = counter.State();
+  EXPECT_EQ(state.NotShown, 2u);
+  EXPECT_EQ(state.ErrorFrames, 1u);
+  EXPECT_EQ(state.OffTargetFrames, 0u);
+  EXPECT_EQ(state.LateFrames, 0u);
+}
+
+// The clock lost the frame: frame 3 never shown and the animation did not move for it, so frame 4 is a refresh behind where it stayed
+TEST(DisplayErrorCounter, AFrameNeverShownThatTheAnimationDidNotMoveForLeavesTheNextOneLate)
+{
+  PC::DisplayErrorCounter counter;
+  Begin(counter, 1, 2);
+  counter.AddFrame(3, FP::NanosecondTimeSpan(0), 1, FP::NanosecondTickCount(0));
+  counter.AddFrame(4, FP::NanosecondTimeSpan(Period), 1, FP::NanosecondTickCount(0));
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
+  counter.AddDisplayReport(NotShown(3), g_hz100);
+  counter.AddDisplayReport(Shown(4, Start + (3 * Period)), g_hz100);
+
+  const PC::DisplayErrorState state = counter.State();
+  EXPECT_EQ(state.ErrorFrames, 1u);
+  EXPECT_EQ(state.OffTargetFrames, 1u);
+  EXPECT_EQ(state.LateFrames, 1u);
+}
+
+// At a target of two refreshes: frame 3 never shown, frame 4 has moved four and stayed away four
+TEST(DisplayErrorCounter, AFrameThatReplacesOneNeverShownIsOffItsOwnIntendedPeriod)
+{
+  PC::DisplayErrorCounter counter;
+  for (uint64_t frameId = 1; frameId <= 4; ++frameId)
+  {
+    counter.AddFrame(frameId, FP::NanosecondTimeSpan(2 * Period), 2, FP::NanosecondTickCount(0));
+  }
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + (2 * Period)), g_hz100);
+  EXPECT_EQ(counter.State().ErrorFrames, 0u);
+  counter.AddDisplayReport(NotShown(3), g_hz100);
+  counter.AddDisplayReport(Shown(4, Start + (6 * Period)), g_hz100);
+
+  EXPECT_EQ(counter.State().ErrorFrames, 1u);
+  EXPECT_EQ(counter.State().LateFrames, 0u);
+}
+
+// On demand there is no target to be off: the same frames have no error by the sum and none is looked for by a part
+TEST(DisplayErrorCounter, AFrameWithoutAnIntendedPeriodKeepsTheSum)
+{
+  PC::DisplayErrorCounter counter;
+  for (uint64_t frameId = 1; frameId <= 4; ++frameId)
+  {
+    counter.AddFrame(frameId, FP::NanosecondTimeSpan(Period), 0, FP::NanosecondTickCount(0));
+  }
+  counter.AddDisplayReport(Shown(1, Start), g_hz100);
+  counter.AddDisplayReport(Shown(2, Start + Period), g_hz100);
+  counter.AddDisplayReport(NotShown(3), g_hz100);
+  counter.AddDisplayReport(Shown(4, Start + (3 * Period)), g_hz100);
+
+  EXPECT_EQ(counter.State().JudgedFrames, 2u);
+  EXPECT_EQ(counter.State().ErrorFrames, 0u);
+}
+
+// Shown 2 ms sooner than intended and animated for it: no error by the sum, a rush by the parts. And the display step that is off
+// alone: 1.001001 ms longer than intended, with the animation step 0.002 ms longer, so the sum stays within the threshold
+TEST(DisplayErrorCounter, EachPartCountsByItself)
+{
+  constexpr int64_t Millisecond = FP::NanosecondTimeSpan::NanosecondsPerMillisecond;
+  const auto errorFrames = [](const int64_t displayStep, const int64_t animationStep)
+  {
+    PC::DisplayErrorCounter counter;
+    Begin(counter, 1, 1);
+    counter.AddFrame(2, FP::NanosecondTimeSpan(animationStep), 1, FP::NanosecondTickCount(0));
+    counter.AddDisplayReport(Shown(1, Start), g_hz100);
+    counter.AddDisplayReport(Shown(2, Start + displayStep), g_hz100);
+    return counter.State().ErrorFrames;
+  };
+
+  EXPECT_EQ(errorFrames(Period - (2 * Millisecond), Period - (2 * Millisecond)), 1u);
+  EXPECT_EQ(errorFrames(Period + Millisecond + 1'001, Period + 2'000), 1u);
+  EXPECT_EQ(errorFrames(Period, Period), 0u);
+}
+
+// The display step is `early` short of the intended period and the animation step 1 ms shorter than that, so the sum is exactly the
+// threshold, which is not beyond it: only the step is past the threshold, by `early`
+TEST(DisplayErrorCounter, APartCountsOnlyPastTheRounding)
+{
+  const auto errorFrames = [](const int64_t early)
+  {
+    constexpr int64_t Millisecond = FP::NanosecondTimeSpan::NanosecondsPerMillisecond;
+    PC::DisplayErrorCounter counter;
+    Begin(counter, 1, 1);
+    counter.AddFrame(2, FP::NanosecondTimeSpan(Period - early - Millisecond), 1, FP::NanosecondTickCount(0));
+    counter.AddDisplayReport(Shown(1, Start), g_hz100);
+    counter.AddDisplayReport(Shown(2, Start + Period - early), g_hz100);
+    return counter.State().ErrorFrames;
+  };
+
+  EXPECT_EQ(errorFrames(1), 0u);
+  EXPECT_EQ(errorFrames(1000), 0u);
+  EXPECT_EQ(errorFrames(1001), 1u);
 }
 
 TEST(DisplayErrorCounter, AReportForAFrameItDoesNotKeepIsRefused)

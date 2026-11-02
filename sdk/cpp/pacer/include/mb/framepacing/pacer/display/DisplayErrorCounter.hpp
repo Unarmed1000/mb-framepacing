@@ -18,13 +18,15 @@ namespace MB::FramePacing::Pacer
   //! where the application runs, from the display times it reports: one of the parts a pacer is put together from, used where
   //! display times are reported (the "+" beside a tier). Statistics only: nothing here paces a frame.
   //!
-  //! The rules are the measuring tools': the animation error of a frame is its animation time step less its display time step
-  //! (the time between its display time and that of the frame before it); an error of more than ErrorThreshold is an error
-  //! frame; a display time step half a refresh or more off the animation time step is a frame at another refresh than it was made
-  //! for; such a frame is late when its display time step is the longer and is also half a refresh or more longer than the frame's
-  //! intended period (the period its marker carries: a frame on demand has none and is never late); and a step next to a frame
-  //! without a display time (never shown, no report) is not judged. What differs: the times are the platform's word, where the
-  //! tools read them off the display.
+  //! The rules are the measuring tools': the animation error of a frame is its animation time step less its display time step, both
+  //! from the last frame shown, so across a frame the platform says was never shown; an error of more than ErrorThreshold is an
+  //! error frame, and so is a frame with either part against its intended period (the period its marker carries: a frame on demand
+  //! has none) more than ErrorThreshold off, by more than PartRounding: the stop or rush (intended period less display time step)
+  //! and the step (animation time step less intended period), as the sum cancels a stop against a jump; a display time step half a
+  //! refresh or more off the animation time step is a frame at another refresh than it was made for; such a frame is late when its
+  //! display time step is the longer and is also half a refresh or more longer than the frame's intended period (a frame on demand
+  //! is never late); and a step across a frame without a report is not judged. What differs: the times are the platform's word,
+  //! where the tools read them off the display.
   //!
   //! Next to that it adds up how long a frame took from its start to its display, of every frame reported as shown.
   //!
@@ -37,6 +39,9 @@ namespace MB::FramePacing::Pacer
 
     //! An animation error of more than this is an error frame: the measuring tools' threshold, 1 ms.
     static constexpr NanosecondTimeSpan ErrorThreshold{NanosecondTimeSpan::NanosecondsPerMillisecond};
+
+    //! What a part of the error may be past ErrorThreshold by and still be no error: the measuring tools' rounding, 1 microsecond.
+    static constexpr NanosecondTimeSpan PartRounding{NanosecondTimeSpan::NanosecondsPerMicrosecond};
 
     //! The last second is counted in this many parts of an eighth of a second each.
     static constexpr uint32_t RecentBuckets = 8;
@@ -64,9 +69,12 @@ namespace MB::FramePacing::Pacer
     uint64_t m_newestId{0};
     uint64_t m_oldestId{1};
     uint64_t m_newestReportId{0};
-    // The frame shown last by the reports, and when: the frame after it is judged against it
+    // The frame shown last by the reports, and when: the next frame shown is judged against it
     uint64_t m_shownId{0};
     NanosecondTickCount m_shownTime;
+    // The newest frame that has a report with every frame back to the frame shown last, and the animation time steps of those never shown
+    uint64_t m_unbrokenId{0};
+    int64_t m_stepsNotShown{0};
     std::array<Bucket, RecentBuckets> m_buckets{};
     int64_t m_newestBucket{-1};
     // From start to display, in nanoseconds: of all the frames, and the longest

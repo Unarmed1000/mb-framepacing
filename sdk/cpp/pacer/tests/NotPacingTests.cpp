@@ -464,13 +464,16 @@ TEST(NotPacing, WaitsNoPlanAskedForAreNotTakenAndTheOtherReportsAre)
   // The GPU's time is the one that was reported while nothing was paced, then and when pacing starts again
   EXPECT_EQ(loop.Pacer.GpuTime().Nanoseconds(), 2'500'000);
   EXPECT_EQ(loop.Pacer.LastPresentBlocked().Nanoseconds(), 60'000);
-  // The display reports are counted as ever: each frame's animation step was the time since the one before, and so was
-  // the time between their display times
+  // The display reports are counted as ever: each frame's animation step was the time since the one before, and so was the time
+  // between their display times, which is no error by the sum. The frames are on screen for longer than the preferred swap interval
+  // they carry, though, so each is off by both parts, as the measuring tools read the same marker
   const PC::DisplayErrorState state = loop.Pacer.DisplayErrors();
   EXPECT_EQ(state.Reports, 10u);
   EXPECT_EQ(state.Refused, 0u);
   EXPECT_EQ(state.JudgedFrames, 9u);
-  EXPECT_EQ(state.ErrorFrames, 0u);
+  EXPECT_EQ(state.ErrorFrames, 9u);
+  EXPECT_EQ(state.OffTargetFrames, 0u);
+  EXPECT_EQ(state.LateFrames, 0u);
   EXPECT_EQ(state.StartToDisplayLongest.Nanoseconds(), 3 * Period);
 
   loop.Pacer.SetPacing(true);

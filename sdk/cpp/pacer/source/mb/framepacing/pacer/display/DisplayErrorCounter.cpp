@@ -15,6 +15,11 @@ namespace MB::FramePacing::Pacer
     //! A display time step this share of a refresh period or more off the animation time step is at another refresh: one in
     //! this many
     constexpr int64_t OffTargetDivisor = 2;
+
+    constexpr bool IsBeyond(const int64_t value, const int64_t limit) noexcept
+    {
+      return value > limit || value < -limit;
+    }
   }
 
   void DisplayErrorCounter::AddFrame(const uint64_t frameId, const NanosecondTimeSpan animationStep, const uint32_t intendedRefreshes,
@@ -49,8 +54,18 @@ namespace MB::FramePacing::Pacer
     ++m_state.Reports;
     if (!report.Shown)
     {
-      // Never shown: the frame after it has no frame before it to be judged against
       ++m_state.NotShown;
+      // Never shown: the frame after it is measured from the last frame shown, and its animation moved for this frame too. A frame
+      // without a report may have been shown: nothing is judged across that
+      if (frameId == m_unbrokenId + 1u)
+      {
+        m_unbrokenId = frameId;
+        m_stepsNotShown += m_steps[static_cast<std::size_t>(frameId % Capacity)].Nanoseconds();
+      }
+      else
+      {
+        m_shownId = 0;
+      }
       return;
     }
     // The part of the last second the frame was shown in
@@ -76,20 +91,26 @@ namespace MB::FramePacing::Pacer
       m_startToDisplayLongest = std::max(m_startToDisplayLongest, startToDisplay);
     }
 
-    // Judged against the frame before it, when that one was reported as shown: a step across a frame without a display time
-    // says nothing of either frame
-    if (m_shownId != 0 && frameId == m_shownId + 1u)
+    // Judged against the last frame shown, when every frame since has a report: a step across a frame without a report says
+    // nothing of either frame
+    if (m_shownId != 0 && frameId == m_unbrokenId + 1u)
     {
-      const NanosecondTimeSpan animationStep = m_steps[static_cast<std::size_t>(frameId % Capacity)];
+      const int64_t animationStep = m_stepsNotShown + m_steps[static_cast<std::size_t>(frameId % Capacity)].Nanoseconds();
       const int64_t displayStep = report.DisplayTime.Nanoseconds() - m_shownTime.Nanoseconds();
-      const int64_t error = animationStep.Nanoseconds() - displayStep;
+      const int64_t error = animationStep - displayStep;
       const int64_t offTarget = period.ToNanosecondTimeSpan().Nanoseconds() / OffTargetDivisor;
-      const bool isError = error > ErrorThreshold.Nanoseconds() || error < -ErrorThreshold.Nanoseconds();
+      // A frame without an intended period (on demand) has no target, and is never late
+      const uint32_t intendedRefreshes = m_intendedRefreshes[static_cast<std::size_t>(frameId % Capacity)];
+      const int64_t target = intendedRefreshes > 0 ? period.TimeFor(intendedRefreshes).Nanoseconds() : 0;
+      // The sum cancels a stop against a jump: a frame that replaces one never shown has moved as far as it stayed away. Against the
+      // target they are two parts, the stop or rush and the step
+      const int64_t partLimit = ErrorThreshold.Nanoseconds() + PartRounding.Nanoseconds();
+      const bool isError = IsBeyond(error, ErrorThreshold.Nanoseconds()) ||
+                           (intendedRefreshes > 0 && (IsBeyond(target - displayStep, partLimit) || IsBeyond(animationStep - target, partLimit)));
       const bool isOffTarget = error >= offTarget || error <= -offTarget;
       // Shown later than its animation time step put it and later than intended: the display time step is half a refresh or more
-      // longer than both. A frame without an intended period (on demand) is never late
-      const uint32_t intendedRefreshes = m_intendedRefreshes[static_cast<std::size_t>(frameId % Capacity)];
-      const bool isLate = error <= -offTarget && intendedRefreshes > 0 && displayStep >= period.TimeFor(intendedRefreshes).Nanoseconds() + offTarget;
+      // longer than both
+      const bool isLate = error <= -offTarget && intendedRefreshes > 0 && displayStep >= target + offTarget;
 
       ++bucket.Judged;
       bucket.Errors += isError ? 1u : 0u;
@@ -102,6 +123,8 @@ namespace MB::FramePacing::Pacer
       m_state.LateFrames += isLate ? 1u : 0u;
     }
     m_shownId = frameId;
+    m_unbrokenId = frameId;
+    m_stepsNotShown = 0;
     m_shownTime = report.DisplayTime;
   }
 

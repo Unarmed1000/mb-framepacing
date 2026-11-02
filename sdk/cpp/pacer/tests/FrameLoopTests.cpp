@@ -716,6 +716,62 @@ TEST(FrameLoop, WithVerticalBlankTimesAFrameThatRunsLongLeavesTheLoopWhereItWas)
   }
 }
 
+TEST(FrameLoop, AtThreeOrFourRefreshesPerFrameALateFrameMovesTheRhythmAndTheSwapIntervalStays)
+{
+  struct Case
+  {
+    uint32_t SwapInterval;
+    int64_t LongPercent;
+    bool OnVerticalBlanks;
+    //! The display steps from the long frame on that are not its swap interval
+    std::vector<int64_t> Steps;
+  };
+  const std::vector<Case> cases = {
+    // On a grid on the clock a frame has the refreshes of its swap interval to run long in, and costs nothing within them
+    {3, 240, false, {}},
+    {4, 340, false, {}},
+    // Past them it costs whole refreshes on this step and the next, and the loop goes on from where that left it
+    {3, 340, false, {4, 4}},
+    {4, 440, false, {5, 5}},
+    {4, 540, false, {6, 5}},
+    // On vertical blanks a frame is started for its own vertical blank, so one that runs long costs on this step alone
+    {3, 90, true, {4}},
+    {3, 140, true, {5}},
+    {4, 90, true, {5}},
+    {4, 140, true, {6}},
+    {4, 240, true, {7}},
+  };
+
+  for (const Case& test : cases)
+  {
+    Sim::LoopSettings settings = LightLoop(2, PC::PacerAim::LowLatency);
+    settings.PreferredSwapInterval = test.SwapInterval;
+    const int64_t period = PeriodNanoseconds(settings);
+    settings.LongFrames = {100};
+    settings.LongFrameCpuNanoseconds = (period * test.LongPercent) / 100;
+    const std::vector<Sim::LoopFrame> frames =
+      test.OnVerticalBlanks ? Sim::SimulateVBlankPeriodOnlyLoop(settings) : Sim::SimulateTimerPeriodOnlyLoop(settings);
+    const std::string name =
+      std::to_string(test.SwapInterval) + ' ' + std::to_string(test.LongPercent) + (test.OnVerticalBlanks ? " vertical blanks" : " clock");
+
+    int64_t moved = 0;
+    for (std::size_t index = 100; index < frames.size(); ++index)
+    {
+      const std::size_t after = index - 100;
+      const int64_t expected = after < test.Steps.size() ? test.Steps[after] : int64_t{test.SwapInterval};
+      const int64_t step = ((frames[index].ShownNanoseconds - frames[index - 1].ShownNanoseconds) + (period / 2)) / period;
+      ASSERT_EQ(step, expected) << name << ' ' << index;
+      // Nothing catches up: the swap interval is the frame's all the way through
+      ASSERT_EQ(frames[index].SwapInterval, test.SwapInterval) << name << ' ' << index;
+      moved += step - int64_t{test.SwapInterval};
+    }
+
+    // The frames are as far from a whole number of swap intervals after the frame before the long one as the late refreshes left them
+    const int64_t refreshes = ((frames.back().ShownNanoseconds - frames[99].ShownNanoseconds) + (period / 2)) / period;
+    EXPECT_EQ(refreshes % int64_t{test.SwapInterval}, moved % int64_t{test.SwapInterval}) << name;
+  }
+}
+
 TEST(FrameLoop, WithVerticalBlankTimesAndGpuWorkReportsAHeavyGpuLoadIsHeldAndOneThatDoesNotFitSlowsTheLoopDown)
 {
   for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})

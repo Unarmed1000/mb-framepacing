@@ -80,7 +80,7 @@ vblank-low-latency-at-time,200,37853,1586928608
 vblank-low-latency-duration-two-refreshes,200,37963,1955646621
 vblank-low-latency-swap-interval-two-refreshes,200,37963,506874430
 vblank-low-latency-gpu-wait,200,40163,2243924970
-vblank-low-latency-display-reports,200,41448,2313127925
+vblank-low-latency-display-reports,200,41448,2572038152
 vblank-low-latency-active-set-changes,200,37457,193764871
 vblank-low-latency-pacing-changes,200,35288,4062803380
 vblank-low-latency-60-hz,200,38433,3214534361

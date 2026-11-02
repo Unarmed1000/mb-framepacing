@@ -813,8 +813,11 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       `strip-failed`, named in the cell) and an older frame shown again (`strip-older`, drawn as that frame), the two bands, rows for
       stop or rush and step where the sum hides anything or with `--parts`, and `--compact` (no CPU rows, no key).
     - The pacer's `DisplayErrorCounter` counts by the same rule (the user's go, 2026-10-14): `TierPacer` gives it each frame's
-      intended period in refreshes (the swap interval while pacing, the preferred swap interval while not; 0 = on demand). While
-      pacing that changes no count (the golden runs are byte for byte the same); only a frame not paced counts differently.
+      intended period in refreshes (the swap interval while pacing, the preferred swap interval while not; 0 = on demand), and
+      since 2026-11-02 (the user: "fix all three") it judges in two parts and from the last frame shown, across frames reported as never
+      shown, never across a frame without a report (`PartRounding`, the tools' 1 µs). One golden run moved by one frame, the pause
+      after start-up. While not pacing the target is the preferred frame time, so a loop steadily slower than that has every frame
+      counted, as the tools count the same marker.
     - **Delta time jitter** (`PresentedFrameFlags.DeltaTimeJitter`, `DeltaTimeJitter` in the frames CSV, the vocabulary's term: never bare "jitter", which reads as an uneven display, the user, 2026-10-14: "jitter animation timer off by less than a intended refresh
       period"): an error frame that the cause split (`PacingAnalyzer.Split`) counts as delta time jitter, off by less than its
       intended period, and not late. Yellow (`#e3b341`) on the error bars (`bar-jitter`; a pixel column of many frames when every

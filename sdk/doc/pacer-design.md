@@ -1304,10 +1304,12 @@ Inside a major tier a sub tier is a rank, from two capabilities:
   reported, not that they are right. Pacing by them is "Pacing by display times", below.
   **Built on 2026-10-08** (`DisplayErrorCounter`, `TierPacer::AddDisplayReport` and `DisplayErrors`; the simulation and
   unit tests only): the application gives each frame's display time back by its frame id, a few frames later, or says
-  that it was never shown. The rules are the measuring tools': a frame is judged when it and the frame before it were
-  both reported as shown; its animation error is its animation time step less the time between the two display times;
-  more than 1 ms either way is an error frame; half a refresh or more is a frame at another refresh than it was made
-  for, and late when it is the later one; a step next to a frame without a display time is not judged. Counted since
+  that it was never shown. The rules are the measuring tools': a frame is judged against the last frame shown, across
+  frames reported as never shown, with its animation time step since that frame; its animation error is that step less
+  the time between the two display times; more than 1 ms either way is an error frame, and since 2026-11-02 so is a frame
+  with either part against its intended period (the stop or rush and the step, as the tools have them) that far off by more
+  than 1 µs, as the sum cancels a stop against a jump; half a refresh or more is a frame at another refresh than it was made
+  for, and late when it is the later one; a step across a frame without a report is not judged. Counted since
   the pacer was made and for about the last second (eight eighths of a second), over the last 64 frames at most, with
   nothing allocated. A pause the pacer did not ask for shows as one late frame. What it is not: the tools read the
   display, and this reads what the platform says.
@@ -2231,6 +2233,13 @@ was given without `PresentSkipsOverdue`, and this system's present takes no time
 As of 2026-10-09, in the order it is planned. What is built is built against the simulation and unit tests, and
 measured only where a section above says so.
 
+**A late frame at three or four refreshes per frame (2026-11-02, the simulation only, no capture):** 240 Hz, light work, one long
+frame, low latency. The swap interval stays and later display steps are the swap interval again; the rhythm moves against the
+display by what was lost. In display steps from the long frame on, with its CPU time in refreshes: on vertical blanks 0.9 gives
+4 at three refreshes per frame and 5 at four, 1.4 gives 5 and 6, 2.4 gives 7 at four. On a grid on the clock, 2.4 at three and 3.4
+at four cost nothing; 3.4 at three gives 4, 4; 4.4 at four gives 5, 5; 5.4 at four gives 6, 5. Pinned by
+`FrameLoop.AtThreeOrFourRefreshesPerFrameALateFrameMovesTheRhythmAndTheSwapIntervalStays`.
+
 1. **A capture session of the first integration** on the pacer as it is now: done ("The capture session of 2026-10-09").
    What it leaves open: the runs on a timer that have frames off their swap interval as a whole run, most of them at four
    refreshes per frame with a wait, low latency and the minimum duration; the 10 to 20 frames off with smoothness on
@@ -2395,7 +2404,10 @@ pacing by display times beyond the display's slip in major tier 2 (decision 20);
     step is half a refresh or more longer than both its animation time step and its intended period, the period its marker
     carries (the target frame time, the swap interval, while pacing; the preferred frame time while not). While pacing the
     animation step is never shorter than the swap interval, so the second condition changes no count: the golden runs came
-    out byte for byte the same, among them the eight that report display times, with their 10 late frames. It counts
+    out byte for byte the same, among them the eight that report display times, with their 10 late frames. Judging in two
+    parts (2026-11-02) changed one of the 200 golden runs by one frame, `vblank-low-latency-display-reports`: the pause after
+    start-up, five refreshes on screen and five animated against a swap interval of one, which is an error frame now and
+    is still not late. It counts
     differently only while not pacing, where the animation step is the time since the frame before started. The swap
     interval rule's count (`FrameWindowState::LateFrames`)
     is not that rule. It has no display times, and it counts a frame that did not make its time, which is what the rule

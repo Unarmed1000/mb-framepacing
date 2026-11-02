@@ -13,8 +13,8 @@ namespace MB::FramePacing::Pacer
   //! Counted since the pacer was made, and again for about the last second. The pacer paces by none of it, and the times are the
   //! platform's word: no measurement of the display.
   //!
-  //! A frame is judged when it and the frame before it were both reported as shown. Its animation error is its animation time
-  //! step less the time between the two display times.
+  //! A frame is judged when it was reported as shown, as was the last frame shown before it, with every frame between them reported
+  //! as never shown. Its animation error is the animation time step since that frame less the time between the two display times.
   //!
   //! The time from a frame's start to its display is of every frame that was reported as shown, judged or not: it is how far
   //! behind the frame loop the screen is, and it grows by a refresh for every frame more that waits to be shown.
@@ -29,7 +29,8 @@ namespace MB::FramePacing::Pacer
     uint64_t NotShown{0};
     //! Frames that were judged.
     uint64_t JudgedFrames{0};
-    //! Judged frames with an animation error of more than DisplayErrorCounter::ErrorThreshold, either way.
+    //! Judged frames with an animation error of more than DisplayErrorCounter::ErrorThreshold, either way, or with a part of it
+    //! against the frame's intended period that far off: a frame that replaces one never shown has no error by the sum.
     uint64_t ErrorFrames{0};
     //! Judged frames shown half a refresh or more off where their animation time step put them: at another refresh.
     uint64_t OffTargetFrames{0};
