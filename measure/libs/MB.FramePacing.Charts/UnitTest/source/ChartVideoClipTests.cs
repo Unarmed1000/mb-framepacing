@@ -559,8 +559,8 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(Cells("off"), Is.GreaterThan(0), "the section has late frames");
       Assert.That(
         Of("err-pill").Count() + Of("err-pill-jitter").Count(),
-        Is.EqualTo(frames.Count(f => f.AnimationError is { } e && e.Duration() > chart.ErrorThreshold)),
-        "an error pill per frame off by more than the threshold"
+        Is.EqualTo(frames.Count(f => AnimationErrorRule.Counts(f, chart.ErrorThreshold))),
+        "an error pill per frame that counts as an animation error"
       );
       Assert.That(() => FrameTimelineCard.Render(RunSection.Create(chart, 0, 4)), Throws.InvalidOperationException.With.Message.Contains("at most"));
     }
@@ -843,6 +843,72 @@ namespace MB.FramePacing.Charts.UnitTest
       );
     }
 
+    /// <summary>A card's shapes with those of its groups: the frame timeline holds its own in one, under the header.</summary>
+    private static IEnumerable<CardShape> Shapes(CardDrawing card) =>
+      card.FlatShapes.SelectMany(shape => shape is GroupShape group ? group.Children : new[] { shape });
+
+    /// <summary>The frame timeline of a scenario of a stress clip: from its first frame's refresh to its last frame's.</summary>
+    private (CardDrawing Card, string[] Texts, ClipManifest Manifest, int First) ScenarioCard(
+      string clip,
+      string scenario,
+      FrameTimelineOptions? options = null
+    )
+    {
+      var (manifest, _, chart) = Analyze(clip);
+      var (_, firstFrame, count) = manifest.Scenarios.Single(s => s.Name == scenario);
+      int first = Array.IndexOf(manifest.Presented, firstFrame);
+      int last = Array.FindLastIndex(manifest.Presented, p => p < firstFrame + count);
+      double Seconds(long refresh) => (refresh - manifest.FirstRefresh(0)) / (double)manifest.Fps;
+      var section = RunSection.Create(chart, Seconds(manifest.FirstRefresh(first)) - 0.002, Seconds(manifest.FirstRefresh(last)) + 0.002);
+      var card = FrameTimelineCard.Build(section, options);
+      return (card, Shapes(card).OfType<TextShape>().Select(t => t.Content).ToArray(), manifest, first);
+    }
+
+    /// <summary>
+    /// a, a, c on the frame timeline: the sum is 0, so the card shows the two parts, and the refresh the frame never shown was due in is that
+    /// frame's, named in it.
+    /// </summary>
+    [Test]
+    public void TimelineCard_OfADrop_ShowsTheStopTheJumpAndTheFrameNeverShown()
+    {
+      var (card, texts, manifest, first) = ScenarioCard("60-stress", "01-dropped");
+
+      Assert.That(texts, Does.Contain("STOP OR RUSH").And.Contain("STEP"), "the rows of the two parts");
+      Assert.That(texts, Does.Contain("−16.7 ms").And.Contain("+16.7 ms"), "the stop and the jump");
+      Assert.That(
+        Shapes(card).OfType<RectShape>().Count(r => r.Class == "strip-dropped"),
+        Is.EqualTo(2),
+        "the refresh it was due in, and the key's swatch"
+      );
+      string lost = "#" + ((manifest.FrameIndex(first) + 1) % 1000).ToString("000", CultureInfo.InvariantCulture) + " lost";
+      Assert.That(texts, Does.Contain(lost), "named in that refresh");
+    }
+
+    /// <summary>A frame shown again is drawn as that frame, not as the newest one, and its hold has the band.</summary>
+    [Test]
+    public void TimelineCard_OfAnOlderFrameShownAgain_DrawsThatFrame()
+    {
+      var (card, texts, manifest, first) = ScenarioCard("60-stress", "37-older-frame-again");
+      string older = "#" + (manifest.FrameIndex(first) % 1000).ToString("000", CultureInfo.InvariantCulture);
+
+      Assert.That(Shapes(card).OfType<RectShape>().Count(r => r.Class == "strip-older"), Is.EqualTo(2), "the refresh, and the key's swatch");
+      Assert.That(Shapes(card).OfType<RectShape>().Count(r => r.Class == "older-band"), Is.EqualTo(1));
+      Assert.That(texts.Count(t => t == older), Is.GreaterThanOrEqualTo(2), "its own cell and the one it came back in");
+    }
+
+    /// <summary>The compact card has the display and the rows alone. The parts come when asked for, where the sum hides nothing.</summary>
+    [Test]
+    public void TimelineCard_Compact_LeavesOutTheCpuRowsAndTheKey_AndThePartsAreAnOption()
+    {
+      var (card, texts, _, _) = ScenarioCard("60-stress", "04-late-step-stays", new FrameTimelineOptions { Compact = true });
+      var (_, withParts, _, _) = ScenarioCard("60-stress", "04-late-step-stays", new FrameTimelineOptions { Parts = true });
+
+      Assert.That(Shapes(card).OfType<RectShape>().Where(r => r.Class == "box"), Is.Empty, "no CPU boxes");
+      Assert.That(texts, Has.None.StartsWith("CPU"), "no CPU row and no key");
+      Assert.That(texts, Does.Not.Contain("STOP OR RUSH"), "a late frame's sum says it");
+      Assert.That(withParts, Does.Contain("STOP OR RUSH"));
+    }
+
     /// <summary>
     /// The frames dropped and out of order tiles count what the manifest says: frames never on screen, refreshes that showed an older
     /// frame; a clip with neither leaves both out.
@@ -1001,7 +1067,7 @@ namespace MB.FramePacing.Charts.UnitTest
       var expected = values.GroupBy(Bin).OrderBy(g => g.Key).Select(g => (Position: g.Key * widthMs, Height: Math.Log10(g.Count()))).ToArray();
 
       var plot = card.Plots.Single();
-      var bars = card.FlatShapes.OfType<RectShape>().Where(r => r.Class == "hist-bar").ToArray();
+      var bars = Shapes(card).OfType<RectShape>().Where(r => r.Class == "hist-bar").ToArray();
       Assert.That(
         bars.Select(b => plot.ValueX(b.X.Value + (b.Width.Value / 2))),
         Is.EqualTo(expected.Select(e => e.Position)).Within(1e-9),

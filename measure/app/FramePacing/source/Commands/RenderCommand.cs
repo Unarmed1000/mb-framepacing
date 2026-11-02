@@ -87,6 +87,15 @@ namespace MB.FramePacing.App.Commands
       {
         Description = "With --timeline: the line under the CPU row's label instead of 'start + CPU busy' (e.g. predicted display time).",
       };
+      var partsOption = new Option<bool>("--parts")
+      {
+        Description =
+          "With --timeline: always draw the rows of the animation error's two parts, stop or rush and step. By default only where the error alone hides a stop.",
+      };
+      var compactOption = new Option<bool>("--compact")
+      {
+        Description = "With --timeline: the display and the rows alone, without the CPU rows and the key: a card for a slide of several.",
+      };
       var cpuKeyOption = new Option<string?>("--cpu-key")
       {
         Description = "With --timeline: the key's line for the CPU row's boxes instead of 'CPU: from the CPU start time for CPU busy, ...'.",
@@ -153,6 +162,8 @@ namespace MB.FramePacing.App.Commands
         cpuRowSubLabelOption,
         cpuKeyOption,
         noThresholdInKeyOption,
+        partsOption,
+        compactOption,
         stripSecondsOption,
         hideEmptyOption,
         noStaticClampOption,
@@ -187,6 +198,8 @@ namespace MB.FramePacing.App.Commands
             cpuRowSubLabelOption,
             cpuKeyOption,
             noThresholdInKeyOption,
+            partsOption,
+            compactOption,
           }
         )
         {
@@ -258,6 +271,8 @@ namespace MB.FramePacing.App.Commands
                 CpuRowSubLabel = parseResult.GetValue(cpuRowSubLabelOption),
                 ThresholdInKey = !parseResult.GetValue(noThresholdInKeyOption),
                 CpuKey = parseResult.GetValue(cpuKeyOption),
+                Parts = parseResult.GetValue(partsOption),
+                Compact = parseResult.GetValue(compactOption),
               };
               foreach (var file in ReportFiles.WriteTimeline(run.Chart, run.FilePrefix, output, from, to, parseResult.GetValue(pngOption), timeline))
                 AnsiConsole.MarkupLineInterpolated($"[grey]{file}[/]");

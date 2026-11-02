@@ -807,6 +807,9 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
       tells the bands apart for every reader (explained's advice, the user's choice); the card says "not whole refreshes", never
       "invalid", as a target within the rounding's slack is legal. A key that does not fit beside its panel's title stays where it is
       and the title goes a line up (the user: the legend below the title, "two lines is fine").
+    - **The frame timeline** follows (`render --timeline`; for explained's slides): cells for a frame never shown (`strip-dropped`,
+      `strip-failed`, named in the cell) and an older frame shown again (`strip-older`, drawn as that frame), the two bands, rows for
+      stop or rush and step where the sum hides anything or with `--parts`, and `--compact` (no CPU rows, no key).
     - The pacer's `DisplayErrorCounter` counts by the same rule (the user's go, 2026-10-14): `TierPacer` gives it each frame's
       intended period in refreshes (the swap interval while pacing, the preferred swap interval while not; 0 = on demand). While
       pacing that changes no count (the golden runs are byte for byte the same); only a frame not paced counts differently.

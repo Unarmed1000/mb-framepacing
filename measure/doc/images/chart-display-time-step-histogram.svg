@@ -58,6 +58,7 @@
   .invalid-text { font-size: 11px; fill: #adbac7; letter-spacing: 0.04em; }
   .older-band { fill: #db61a2; fill-opacity: 0.22; }
   .older-text { font-size: 11px; fill: #db61a2; letter-spacing: 0.04em; }
+  .cell-note { font-size: 10px; font-weight: 600; fill: #1c1f24; }
   .static-text { font-size: 11px; fill: #a371f7; letter-spacing: 0.04em; }
   .strip-static-a { fill: #a371f7; fill-opacity: 0.55; }
   .strip-static-b { fill: #a371f7; fill-opacity: 0.85; }

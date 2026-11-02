@@ -862,7 +862,7 @@ namespace MB.FramePacing.Charts
     }
 
     /// <summary>Lines at 45 degrees across a rectangle: a colour alone does not tell the bands apart for every reader.</summary>
-    private static void AddHatch(StringBuilder path, double x, double y, double width, double height)
+    internal static void AddHatch(StringBuilder path, double x, double y, double width, double height)
     {
       for (double c = HatchSpacing; c < width + height; c += HatchSpacing)
       {

@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using MB.FramePacing.Analysis;
 using static MB.FramePacing.Charts.SvgMarkup;
 
@@ -31,6 +32,8 @@ namespace MB.FramePacing.Charts
     private const double Left = 180;
     private const double Right = 40;
     private const double MinWidth = 900;
+    private const double MinCompactWidth = 560;
+    private const double MinCellForNote = 44;
     private const double MinRefreshPixels = 64;
     private const double VsyncY = 98;
     private const double LaneTop = VsyncY + 14;
@@ -79,7 +82,7 @@ namespace MB.FramePacing.Charts
 
       // The CPU boxes, on the capture's clock, and the lanes that keep overlapping boxes apart
       var boxes = new List<(int Frame, NanosecondTickCount Start, NanosecondTickCount End, int Lane)>();
-      if (offset is { } shift)
+      if (offset is { } shift && !options.Compact)
       {
         var laneEnds = new List<NanosecondTickCount>();
         for (int i = 0; i < frames.Count; ++i)
@@ -112,16 +115,29 @@ namespace MB.FramePacing.Charts
       double refreshMs = refresh.Value.TotalMilliseconds;
       // Pixels per millisecond: a refresh 64 pixels wide or more, or as wide as the card for a document asks
       double scale = options.RefreshPixels is { } pixels ? pixels / refreshMs : Math.Max(1.2, MinRefreshPixels / refreshMs);
-      double width = Math.Max(MinWidth, Left + ((end - origin).TotalMilliseconds * scale) + Right);
+      double width = Math.Max(options.Compact ? MinCompactWidth : MinWidth, Left + ((end - origin).TotalMilliseconds * scale) + Right);
       double XOf(NanosecondTickCount time) => Left + ((time - origin).TotalMilliseconds * scale);
+
+      var data = section.Data;
+      // The two parts of the animation error get rows where they are asked for, and where the sum hides a stop: it is 0 for a frame that
+      // replaces a dropped one, the stop and the jump cancelling
+      bool partRows =
+        options.Parts
+        || frames.Any(f =>
+          AnimationErrorRule.Counts(f, chart.ErrorThreshold) && f.AnimationError is { } sum && sum.Duration() <= chart.ErrorThreshold
+        );
+      var rowLabels = partRows
+        ? new[] { "ANIMATION TIME STEP", "DISPLAY TIME STEP", "STOP OR RUSH", "STEP", "ANIMATION ERROR" }
+        : new[] { "ANIMATION TIME STEP", "DISPLAY TIME STEP", "ANIMATION ERROR" };
+      int errorRow = rowLabels.Length - 1;
 
       double laneBottom = LaneTop + (lanes * LaneH) + ((lanes - 1) * LaneGap);
       double arrowY0 = laneBottom + 8;
-      double displayY = arrowY0 + 34;
+      double displayY = options.Compact ? LaneTop : arrowY0 + 34;
       double axisY = displayY + DisplayH + 20;
       double rowsY = axisY + 36;
-      double legendY = rowsY + (RowStep * 3) + 22;
-      double height = legendY + 122;
+      double legendY = rowsY + (RowStep * rowLabels.Length) + 22;
+      double height = options.Compact ? rowsY + (RowStep * rowLabels.Length) : legendY + 122;
 
       string title =
         (options.Title ?? RunHeadline.Title(run))
@@ -134,7 +150,8 @@ namespace MB.FramePacing.Charts
       var description = new List<string>
       {
         $"{frames.Count} presented frames on a {N(1000 / refreshMs, 2)} Hz display ({Ms(refreshMs)} ms per refresh), one capture per refresh.",
-        offset == null ? "The markers carry no CPU start time and CPU busy: only the display side is drawn."
+        options.Compact ? "The display side only."
+        : offset == null ? "The markers carry no CPU start time and CPU busy: only the display side is drawn."
         : alignedBySchedule
           ? "The CPU times are on the pacer's clock, placed on the capture's with the markers' intended display times: on-time frames appear at their intended vsync."
         : "The CPU times are on the pacer's clock; without intended display times they are placed so that no frame is presented after it first appears.",
@@ -150,6 +167,8 @@ namespace MB.FramePacing.Charts
 
       // Each frame's intended period, as the late verdict measures it (IntendedPeriods: the marker's target frame time first)
       NanosecondTimeDuration? IntendedPeriod(int index) => IntendedPeriods.Of(frames[index], refresh);
+
+      var used = new HashSet<string>();
 
       // Refresh lines: bright where a frame could be aimed at its intended period (whole periods after the previous frame appeared), faint
       // where it could not; a vsync where a frame appeared is always bright (a frame shown sooner than its period appears on one the period
@@ -171,11 +190,35 @@ namespace MB.FramePacing.Charts
           parts.Add(new TextShape(x, VsyncY, $"vsync {k + 1}", target ? "vsync-target" : "vsync-n-skip"));
       }
 
+      // Bands behind the frames, as on the report: a target that is not whole refreshes, and an older frame coming back
+      var hatch = new StringBuilder();
+      for (int i = 0; i < frames.Count; ++i)
+      {
+        double x0 = XOf(RefreshAt(shownAt[i]));
+        double x1 = XOf(RefreshAt(i + 1 < frames.Count ? shownAt[i + 1] : endRefresh));
+        double bandTop = VsyncY + 6;
+        double bandHeight = displayY + DisplayH + 5 - bandTop;
+        if (data.InvalidTargets[section.Start + i])
+        {
+          parts.Add(new RectShape("invalid-band", N(x0, 1), N(bandTop, 1), N(x1 - x0, 1), N(bandHeight, 1)));
+          ReportCard.AddHatch(hatch, x0, bandTop, x1 - x0, bandHeight);
+          used.Add("invalid-band");
+        }
+        if (frames[i].OlderFrames is { Count: > 0 })
+        {
+          parts.Add(new RectShape("older-band", N(x0, 1), N(bandTop, 1), N(x1 - x0, 1), N(bandHeight, 1)));
+        }
+      }
+      if (hatch.Length > 0)
+        parts.Add(new PathShape("invalid-hatch", hatch.ToString()));
+
       // Row labels
-      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) - 3, options.CpuRowLabel ?? "CPU", "label", "start"));
-      parts.Add(new TextShape(20, LaneTop + (LaneH / 2) + 13, options.CpuRowSubLabel ?? "start + CPU busy", "vsync-n", "start"));
+      if (!options.Compact)
+      {
+        parts.Add(new TextShape(20, LaneTop + (LaneH / 2) - 3, options.CpuRowLabel ?? "CPU", "label", "start"));
+        parts.Add(new TextShape(20, LaneTop + (LaneH / 2) + 13, options.CpuRowSubLabel ?? "start + CPU busy", "vsync-n", "start"));
+      }
       parts.Add(new TextShape(20, displayY + (DisplayH / 2) + 4, "DISPLAY", "label", "start"));
-      string[] rowLabels = { "ANIMATION TIME STEP", "DISPLAY TIME STEP", "ANIMATION ERROR" };
       for (int i = 0; i < rowLabels.Length; ++i)
         parts.Add(new TextShape(20, rowsY + (i * RowStep), rowLabels[i], "label", "start"));
 
@@ -206,8 +249,13 @@ namespace MB.FramePacing.Charts
       }
 
       // Display cells: what every refresh showed; each frame's values under its first refresh
-      var used = new HashSet<string>();
       var threshold = chart.ErrorThreshold;
+      // A frame by its label where it is in the section, else its index
+      string LabelOfIndex(ulong frameIndex)
+      {
+        int at = frames.ToList().FindIndex(f => f.FrameIndex == frameIndex);
+        return at >= 0 ? LabelOf(at) : "#" + (frameIndex % 1000).ToString("000", CultureInfo.InvariantCulture);
+      }
       for (int i = 0; i < frames.Count; ++i)
       {
         var frame = frames[i];
@@ -226,11 +274,21 @@ namespace MB.FramePacing.Charts
         // the timer was not, by less than the intended period) yellow, any other frame green; its error as the report's error bars are
         bool isLate = (frame.Flags & PresentedFrameFlags.Late) != 0;
         bool isJitter = (frame.Flags & PresentedFrameFlags.DeltaTimeJitter) != 0;
+        // The refreshes at the end of its hold where frames never shown were due, as the report's strip has them: dropped, the last one failed
+        long dropped = next != null ? data.DroppedBeforeFrame[section.Start + i + 1] : 0;
+        long failed = next != null ? data.PresentFailedBeforeFrame[section.Start + i + 1] : 0;
+        int perFrame = Math.Max(1, (int)Math.Round((next?.TargetFrameTime ?? refresh).Nanoseconds / (double)refresh.Nanoseconds));
+        int repeats = Math.Min(to - from - 1, (int)(dropped + failed) * perFrame);
+        int failedRepeats = Math.Min(repeats, (int)failed * perFrame);
         for (int k = from; k < to; ++k)
         {
           bool firstRefresh = k == from;
+          OlderFrameCapture? older = frame.OlderFrames?.Where(o => RefreshOf(o.CaptureTime) == k).Cast<OlderFrameCapture?>().FirstOrDefault();
           string kind =
-            isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
+            older != null ? "strip-older"
+            : k >= to - failedRepeats ? "strip-failed"
+            : k >= to - repeats ? "strip-dropped"
+            : isStatic ? (i % 2 == 0 ? "strip-static-a" : "strip-static-b")
             : firstRefresh
               ? (
                 isLate ? "off"
@@ -246,11 +304,18 @@ namespace MB.FramePacing.Charts
           parts.Add(
             new TextShape(
               (x0 + x1) / 2,
-              displayY + (DisplayH / 2) + 5,
-              LabelOf(i),
+              displayY + (DisplayH / 2) + (kind is "strip-dropped" or "strip-failed" && x1 - x0 >= MinCellForNote ? 0 : 5),
+              older is { } back ? LabelOfIndex(back.FrameIndex) : LabelOf(i),
               kind is "again" or "off-jitter" ? "cell-text dark-text" : "cell-text"
             )
           );
+          // The frame that was due and never shown: it has no cell of its own, so it is named over the refresh it was due in
+          if (kind is "strip-dropped" or "strip-failed" && (k - (to - repeats)) % perFrame == 0 && x1 - x0 >= MinCellForNote)
+          {
+            ulong missing = frame.FrameIndex + 1 + (ulong)((k - (to - repeats)) / perFrame);
+            string note = (options.FrameLabels != null ? "frame" : LabelOfIndex(missing)) + " lost";
+            parts.Add(new TextShape((x0 + x1) / 2, displayY + DisplayH - 5, note, "cell-note"));
+          }
         }
 
         double cx = (XOf(RefreshAt(from)) + XOf(RefreshAt(from + 1))) / 2;
@@ -259,21 +324,40 @@ namespace MB.FramePacing.Charts
         {
           parts.Add(new TextShape(cx, rowsY, frame.AnimationDelta is { } a ? $"{Ms(a.TotalMilliseconds)} ms" : "–"));
           parts.Add(new TextShape(cx, rowsY + RowStep, frame.DisplayDelta is { } d ? $"{Ms(d.TotalMilliseconds)} ms" : "–"));
-          parts.Add(new TextShape(cx, rowsY + (2 * RowStep), "static", "zero"));
+          for (int row = 2; row < errorRow; ++row)
+            parts.Add(new TextShape(cx, rowsY + (row * RowStep), "–", "zero"));
+          parts.Add(new TextShape(cx, rowsY + (errorRow * RowStep), "static", "zero"));
           continue;
         }
         if (frame.DisplayDelta is not { } display || frame.AnimationDelta is not { } animation || frame.AnimationError is not { } error)
         {
-          for (int row = 0; row < 3; ++row)
-            parts.Add(new TextShape(cx, rowsY + (row * RowStep), "–", row == 2 ? "zero" : ""));
+          for (int row = 0; row < rowLabels.Length; ++row)
+            parts.Add(new TextShape(cx, rowsY + (row * RowStep), "–", row >= 2 ? "zero" : ""));
           continue;
         }
         parts.Add(new TextShape(cx, rowsY, $"{Ms(animation.TotalMilliseconds)} ms"));
         parts.Add(new TextShape(cx, rowsY + RowStep, $"{Ms(display.TotalMilliseconds)} ms"));
         // Rounded first, so an error that is only the rounding of the times reads 0, not +0
         string value = $"{Ms(Math.Round(error.TotalMilliseconds, 1), sign: true)} ms";
-        double errorY = rowsY + (2 * RowStep);
-        if (error.Duration() > threshold)
+        double errorY = rowsY + (errorRow * RowStep);
+        if (partRows)
+        {
+          // Each part by what it is: off the target or not, in a whole nanosecond's rounding of the refreshes
+          void Part(int row, NanosecondTimeSpan? part)
+          {
+            double y = rowsY + (row * RowStep);
+            if (part is not { } known)
+            {
+              parts.Add(new TextShape(cx, y, "–", "zero"));
+              return;
+            }
+            string text = $"{Ms(Math.Round(known.TotalMilliseconds, 1), sign: true)} ms";
+            parts.Add(new TextShape(cx, y, text, known.Duration() > threshold ? "err" : "zero"));
+          }
+          Part(2, frame.PacingError is { } pacingError ? new NanosecondTimeSpan(-pacingError.Nanoseconds) : null);
+          Part(3, frame.PredictionError);
+        }
+        if (AnimationErrorRule.Counts(frame, threshold))
         {
           double pill = (value.Length * 7.4) + 18;
           parts.Add(new RectShape(isJitter ? "err-pill-jitter" : "err-pill", N(cx - (pill / 2), 1), N(errorY - 15, 1), N(pill, 1), N(21, 0), "10.5"));
@@ -283,7 +367,9 @@ namespace MB.FramePacing.Charts
           parts.Add(new TextShape(cx, errorY, value, "zero"));
       }
 
-      double keyExtra = Key(parts, used, legendY, width, options.ThresholdInKey ? threshold : null, options.FrameLabels != null, options.CpuKey);
+      double keyExtra = options.Compact
+        ? 0
+        : Key(parts, used, legendY, width, options.ThresholdInKey ? threshold : null, options.FrameLabels != null, options.CpuKey);
       header.Add(new GroupShape(headerExtra, parts));
       return new CardDrawing(title, width, height + headerExtra + keyExtra, header, Array.Empty<CardPlot>());
     }
@@ -316,7 +402,11 @@ namespace MB.FramePacing.Charts
       ("off-jitter", "the frame's first refresh, off by delta time jitter: less than the intended period"),
       ("hold", "held as intended"),
       ("again", "held longer: the next frame is late"),
+      ("strip-dropped", "a frame never shown was due"),
+      ("strip-failed", "the frame whose present failed was due"),
+      ("strip-older", "an older frame came back"),
       ("strip-static-a", "static: nothing animates"),
+      ("invalid-band", "the target is not whole refreshes"),
     };
 
     /// <summary>

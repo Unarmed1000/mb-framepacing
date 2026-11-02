@@ -87,6 +87,7 @@ namespace MB.FramePacing.Charts
       + "  .invalid-text { font-size: 11px; fill: #adbac7; letter-spacing: 0.04em; }\n"
       + "  .older-band { fill: #db61a2; fill-opacity: 0.22; }\n"
       + "  .older-text { font-size: 11px; fill: #db61a2; letter-spacing: 0.04em; }\n"
+      + "  .cell-note { font-size: 10px; font-weight: 600; fill: #1c1f24; }\n"
       + "  .static-text { font-size: 11px; fill: #a371f7; letter-spacing: 0.04em; }\n"
       + "  .strip-static-a { fill: #a371f7; fill-opacity: 0.55; }\n"
       + "  .strip-static-b { fill: #a371f7; fill-opacity: 0.85; }\n"

@@ -49,6 +49,15 @@ namespace MB.FramePacing.Charts
     /// </summary>
     public double? RefreshPixels { get; init; }
 
+    /// <summary>
+    /// true: the rows of the animation error's two parts (stop or rush, step) on every card. false: only where the sum hides a stop, as a frame
+    /// that replaces a dropped one has no error by the sum.
+    /// </summary>
+    public bool Parts { get; init; }
+
+    /// <summary>true: the display and the rows alone, without the CPU rows and the key: a card for a slide of several.</summary>
+    public bool Compact { get; init; }
+
     public const double MinRefreshPixels = 16;
     public const double MaxRefreshPixels = 480;
   }
