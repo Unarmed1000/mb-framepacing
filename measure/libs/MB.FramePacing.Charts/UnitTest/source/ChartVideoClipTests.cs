@@ -631,8 +631,8 @@ namespace MB.FramePacing.Charts.UnitTest
 
     /// <summary>
     /// The frame timeline card draws by the late verdict's intended period (the marker's target frame time first), as the timing diagrams
-    /// mean it: a game at a swap interval of one that starts a frame every two refreshes by its own clock has every vsync bright, and the
-    /// frame before a late frame is held longer (amber) from its second refresh on.
+    /// mean it: at a target of two refreshes the frame before a late frame stays three, its first refresh, one held as intended and one held
+    /// longer (amber), and the vsync after its first refresh is one no frame could be aimed at.
     /// </summary>
     [Test]
     public void FrameTimeline_DrawsByTheIntendedPeriod()
@@ -641,16 +641,34 @@ namespace MB.FramePacing.Charts.UnitTest
       var chart = AnalysisOutput.Read(report.CaptureDirectory).Single().Chart;
       var section = RunSection.Create(chart, 0, 0.25);
       var frames = section.Section.Run.Frames;
-      Assert.That(frames.All(f => f.MarkerTargetFrameTime.Nanoseconds == 16_666_667), "a swap interval of one in every marker");
+      Assert.That(frames.All(f => f.MarkerTargetFrameTime.Nanoseconds == 33_333_333), "a swap interval of two in every marker");
       int late = frames.Skip(1).Count(f => (f.Flags & PresentedFrameFlags.Late) != 0);
       Assert.That(late, Is.GreaterThanOrEqualTo(3));
       var document = System.Xml.Linq.XDocument.Parse(FrameTimelineCard.Render(section));
       int Count(string cls) => document.Descendants().Count(e => (string?)e.Attribute("class") == cls);
-      // Each late frame's frame before stays three refreshes: two beyond the intended one (the key adds one swatch), none held as intended
-      Assert.That(Count("again") - 1, Is.EqualTo(2 * late));
-      Assert.That(Count("hold"), Is.Zero);
-      // Every vsync inside the frames is one a frame could be aimed at: only the lines before the first frame and after the last are faint
-      Assert.That(Count("vsync-skip"), Is.EqualTo(3), "the key's swatch, the line before the first frame and the one after the last");
+      // The key adds one swatch to each
+      Assert.That(Count("again") - 1, Is.EqualTo(late));
+      Assert.That(Count("hold") - 1, Is.EqualTo(late));
+      Assert.That(Count("vsync-skip"), Is.EqualTo(late + 3), "the key's swatch, the line before the first frame and the one after the last");
+    }
+
+    /// <summary>
+    /// At a target of one refresh, in a scenario with one late frame: the refresh it missed is held longer, none is held as intended, and every
+    /// vsync inside the frames is one a frame could be aimed at.
+    /// </summary>
+    [Test]
+    public void FrameTimeline_AtOneRefresh_EveryVsyncCanBeAimedAt()
+    {
+      var (card, _, _, _) = ScenarioCard("60-stress", "04-late-step-stays");
+      int Rects(string cls) => Shapes(card).OfType<RectShape>().Count(r => r.Class == cls);
+
+      Assert.That(Rects("again") - 1, Is.EqualTo(1), "the key adds one swatch");
+      Assert.That(Rects("hold"), Is.Zero);
+      Assert.That(
+        Shapes(card).OfType<LineShape>().Count(l => l.Class == "vsync-skip"),
+        Is.EqualTo(3),
+        "the key's swatch, the line before the first frame and the one after the last"
+      );
     }
 
     /// <summary>
