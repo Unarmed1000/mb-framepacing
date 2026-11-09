@@ -24,7 +24,7 @@ dev = [
     "clang-format==23.1.5",
     "clang-tidy==23.1.4",
     "conan==2.34.0",
-    "ruff==0.17.3",
+    "ruff==0.17.4",
 ]
 # What tools/trace_augment.py needs and nothing else does (experimental, measure/doc/perfetto.md): Perfetto's own Python package,
 # which reads a trace through Perfetto's trace processor (a native program it downloads on first use) and writes one with
