@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 // TimeSpan32: the marker's 32-bit intervals, converted to and from a TimeSpan exactly.
+#include <mb/framepacing/core/Config.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <gtest/gtest.h>
-#include <compare>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace FP = MB::FramePacing;
 
@@ -41,6 +44,8 @@ TEST(TimeSpan32, ComparesByTicks)
   EXPECT_TRUE(shorter != longer);
   EXPECT_TRUE(shorter < longer);
   EXPECT_TRUE(longer >= shorter);
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
   EXPECT_EQ(shorter <=> longer, std::strong_ordering::less);
+#endif
   static_assert(FP::TimeSpan32::FromTimeSpan(FP::TimeSpan(5)) == FP::TimeSpan32(5u));
 }

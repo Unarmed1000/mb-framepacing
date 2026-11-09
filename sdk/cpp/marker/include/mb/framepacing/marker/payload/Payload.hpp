@@ -156,7 +156,18 @@ namespace MB::FramePacing::Marker
       return m_cpuBusy;
     }
 
-    constexpr bool operator==(const Payload&) const noexcept = default;
+    constexpr bool operator==(const Payload& other) const noexcept
+    {
+      return m_kind == other.m_kind && m_runId == other.m_runId && m_frameIndex == other.m_frameIndex && m_flags == other.m_flags &&
+             m_animationTime == other.m_animationTime && m_preferredFrameTime == other.m_preferredFrameTime &&
+             m_targetFrameTime == other.m_targetFrameTime && m_refreshPeriod == other.m_refreshPeriod &&
+             m_intendedDisplayTime == other.m_intendedDisplayTime && m_cpuStartTime == other.m_cpuStartTime && m_cpuBusy == other.m_cpuBusy;
+    }
+
+    constexpr bool operator!=(const Payload& other) const noexcept
+    {
+      return !(*this == other);
+    }
 
   private:
     //! A frame time as a marker carries it: on demand as it is, any other one at most MaxFrameTime, so that only on demand reads as on

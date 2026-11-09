@@ -15,7 +15,15 @@ namespace MB::FramePacing::Marker
     //! 0 (dark) or 255 (light). Render it as the RGB color (Luma, Luma, Luma).
     uint8_t Luma{0};
 
-    constexpr bool operator==(const Vertex&) const noexcept = default;
+    constexpr bool operator==(const Vertex& other) const noexcept
+    {
+      return X == other.X && Y == other.Y && Luma == other.Luma;
+    }
+
+    constexpr bool operator!=(const Vertex& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

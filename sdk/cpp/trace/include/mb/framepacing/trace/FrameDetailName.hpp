@@ -80,6 +80,11 @@ namespace MB::FramePacing::Trace
       return View() == other.View();
     }
 
+    constexpr bool operator!=(const FrameDetailName& other) const noexcept
+    {
+      return !(*this == other);
+    }
+
   private:
     constexpr void Append(const char character) noexcept
     {

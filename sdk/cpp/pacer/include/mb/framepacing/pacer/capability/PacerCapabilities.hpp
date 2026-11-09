@@ -86,7 +86,15 @@ namespace MB::FramePacing::Pacer
                                std::max(std::min(m_maxPresentSwapInterval, other.m_maxPresentSwapInterval), 1u));
     }
 
-    constexpr bool operator==(const PacerCapabilities& other) const noexcept = default;
+    constexpr bool operator==(const PacerCapabilities& other) const noexcept
+    {
+      return m_capabilities == other.m_capabilities && m_maxPresentSwapInterval == other.m_maxPresentSwapInterval;
+    }
+
+    constexpr bool operator!=(const PacerCapabilities& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

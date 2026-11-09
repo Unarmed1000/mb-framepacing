@@ -11,6 +11,7 @@
 //                 [--background <0-255>] -o <file.pgm>
 //   marker-render --golden <directory>
 #include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -31,7 +32,6 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -119,7 +119,7 @@ namespace
     return {ParseNumber<int32_t>(text.substr(0, split), name), ParseNumber<int32_t>(text.substr(split + 1), name)};
   }
 
-  std::string ToHex(const std::span<const uint8_t> bytes)
+  std::string ToHex(const MB::FramePacing::Span<const uint8_t> bytes)
   {
     constexpr std::string_view Digits = "0123456789abcdef";
     std::string hex;
@@ -407,7 +407,7 @@ int main(int argc, char* argv[])
     FP::NanosecondTickCount cpuStartTime;
     FP::NanosecondTimeDuration cpuBusy;
 
-    const std::span<char* const> arguments(argv, static_cast<std::size_t>(argc));
+    const MB::FramePacing::Span<char* const> arguments(argv, static_cast<std::size_t>(argc));
     for (std::size_t i = 1; i < arguments.size(); ++i)
     {
       const std::string_view arg(arguments[i]);

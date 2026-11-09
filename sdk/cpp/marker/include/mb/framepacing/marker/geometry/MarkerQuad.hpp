@@ -14,7 +14,15 @@ namespace MB::FramePacing::Marker
     //! true: draw black (luma 0), false: draw white (luma 255)
     bool Dark{false};
 
-    constexpr bool operator==(const MarkerQuad&) const noexcept = default;
+    constexpr bool operator==(const MarkerQuad& other) const noexcept
+    {
+      return Rect == other.Rect && Dark == other.Dark;
+    }
+
+    constexpr bool operator!=(const MarkerQuad& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

@@ -16,12 +16,12 @@
 //   for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection
 //   with the Software or the use or other dealings in the Software.
 #include "QrEncoder.hpp"
+#include <mb/framepacing/core/Span.hpp>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <span>
+#include "BitCount.hpp"
 #include "QrMaskPatterns.hpp"
 #include "QrReedSolomon.hpp"
 #include "QrSymbol.hpp"
@@ -52,11 +52,11 @@ namespace MB::FramePacing::Marker::QrEncoder
 
     int32_t PopCount(const uint64_t value) noexcept
     {
-      return std::popcount(value);
+      return BitCount::PopCount(value);
     }
 
     //! The symbol of data before a mask: the function patterns (format bits light) and the codewords. False when data does not fit.
-    bool BuildUnmasked(const std::span<const uint8_t> data, const QrVersionTables& tables, QrSymbol& rSymbol) noexcept
+    bool BuildUnmasked(const Span<const uint8_t> data, const QrVersionTables& tables, QrSymbol& rSymbol) noexcept
     {
       const auto capacity = static_cast<std::size_t>(tables.DataCodewordCount);
       // Byte mode (4 bits), the byte count (8 bits) and the terminator (4 bits) take two codewords
@@ -90,7 +90,7 @@ namespace MB::FramePacing::Marker::QrEncoder
       const std::size_t blockLength = capacity / blockCount;
       for (std::size_t block = 0; block < blockCount; ++block)
       {
-        const std::span<const uint8_t> blockData = std::span<const uint8_t>(codewords).subspan(block * blockLength, blockLength);
+        const Span<const uint8_t> blockData = Span<const uint8_t>(codewords).subspan(block * blockLength, blockLength);
         std::array<uint8_t, EccCodewordsPerBlock> errorCorrection{};
         ComputeErrorCorrection(blockData, errorCorrection);
         for (std::size_t i = 0; i < blockLength; ++i)
@@ -105,7 +105,7 @@ namespace MB::FramePacing::Marker::QrEncoder
 
       // The codeword bits onto their modules
       rSymbol = tables.FunctionPatterns;
-      const std::span<const uint16_t> modules = tables.CodewordModules;
+      const Span<const uint16_t> modules = tables.CodewordModules;
       for (std::size_t i = 0; i < modules.size(); ++i)
       {
         const uint64_t bit = (static_cast<uint64_t>(interleaved[i >> 3u]) >> (7u - (i & 7u))) & 1u;
@@ -142,7 +142,7 @@ namespace MB::FramePacing::Marker::QrEncoder
     }
   }
 
-  bool Encode(const std::span<const uint8_t> data, const int32_t version, QrSymbol& rSymbol) noexcept
+  bool Encode(const Span<const uint8_t> data, const int32_t version, QrSymbol& rSymbol) noexcept
   {
     const QrVersionTables* const pTables = TablesFor(version);
     QrSymbol unmasked;
@@ -166,7 +166,7 @@ namespace MB::FramePacing::Marker::QrEncoder
     return true;
   }
 
-  bool EncodeWithMask(const std::span<const uint8_t> data, const int32_t version, const int32_t mask, QrSymbol& rSymbol) noexcept
+  bool EncodeWithMask(const Span<const uint8_t> data, const int32_t version, const int32_t mask, QrSymbol& rSymbol) noexcept
   {
     const QrVersionTables* const pTables = TablesFor(version);
     QrSymbol unmasked;
@@ -209,7 +209,7 @@ namespace MB::FramePacing::Marker::QrEncoder
     for (;;)
     {
       // The first run is light, and empty when the line starts dark
-      const int32_t length = std::min(dark ? std::countl_one(line) : std::countl_zero(line), remaining);
+      const int32_t length = std::min(dark ? BitCount::CountLeadingOnes(line) : BitCount::CountLeadingZeros(line), remaining);
       if (length == remaining)
       {
         if (dark)
@@ -313,7 +313,7 @@ namespace MB::FramePacing::Marker::QrEncoder
     return score;
   }
 
-  void PackModules(const QrSymbol& symbol, const std::span<uint8_t> dst) noexcept
+  void PackModules(const QrSymbol& symbol, const Span<uint8_t> dst) noexcept
   {
     const auto size = static_cast<uint32_t>(symbol.Size);
     uint64_t pending = 0;

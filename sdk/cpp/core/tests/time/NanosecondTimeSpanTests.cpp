@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // NanosecondTimeSpan: a signed interval in nanoseconds, kept as a platform that counts in nanoseconds gives it. To and from a
 // TimeSpan (ticks of 100 ns) it is exact one way and truncated the other, and out of range throws as TimeSpan does.
+#include <mb/framepacing/core/Config.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <gtest/gtest.h>
-#include <compare>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace FP = MB::FramePacing;
 
@@ -164,6 +168,8 @@ TEST(NanosecondTimeSpan, ComparesByItsCount)
   EXPECT_TRUE(shorter != longer);
   EXPECT_TRUE(shorter == FP::NanosecondTimeSpan(-100));
   EXPECT_TRUE(shorter <= FP::NanosecondTimeSpan(-100));
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
   EXPECT_EQ(shorter <=> longer, std::strong_ordering::less);
+#endif
   EXPECT_TRUE(FP::NanosecondTimeSpan::MinValue() < FP::NanosecondTimeSpan::MaxValue());
 }

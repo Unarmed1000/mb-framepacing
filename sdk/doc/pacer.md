@@ -19,9 +19,9 @@ It is **values in, values out**: the pacer calls no graphics or platform API, ha
 clock. Made once (it allocates its frame windows then), it never allocates again while it paces; only other settings that need
 a larger frame window do.
 
-| Language | Module                                                                                  |
-| -------- | --------------------------------------------------------------------------------------- |
-| C++20    | `mb_framepacing::pacer`, `<mb/framepacing/pacer/…>`, namespace `MB::FramePacing::Pacer` |
+| Language                                              | Module                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| C++20, or C++17 with `MB_FRAMEPACING_CXX_STANDARD=17` | `mb_framepacing::pacer`, `<mb/framepacing/pacer/…>`, namespace `MB::FramePacing::Pacer` |
 
 [The frame pacer: redesign proposal](pacer-design.md) has how this pacer came to be: what was wrong with the one it replaced,
 every measurement so far with its conditions, the decisions and what is still missing. This guide says how to use it.

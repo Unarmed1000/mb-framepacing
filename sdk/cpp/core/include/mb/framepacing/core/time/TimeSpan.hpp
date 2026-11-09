@@ -3,12 +3,16 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <compare>
-#include <concepts>
+#include <mb/framepacing/core/Config.hpp>
+#include <mb/framepacing/core/IntegerCompareUtil.hpp>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace MB::FramePacing
 {
@@ -73,48 +77,42 @@ namespace MB::FramePacing
     }
 
     //! A whole number of days. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr TimeSpan FromDays(const T days)
     {
       return FromUnits(days, TicksPerDay);
     }
 
     //! A whole number of hours. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr TimeSpan FromHours(const T hours)
     {
       return FromUnits(hours, TicksPerHour);
     }
 
     //! A whole number of minutes. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr TimeSpan FromMinutes(const T minutes)
     {
       return FromUnits(minutes, TicksPerMinute);
     }
 
     //! A whole number of seconds. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr TimeSpan FromSeconds(const T seconds)
     {
       return FromUnits(seconds, TicksPerSecond);
     }
 
     //! A whole number of milliseconds. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr TimeSpan FromMilliseconds(const T milliseconds)
     {
       return FromUnits(milliseconds, TicksPerMillisecond);
     }
 
     //! A whole number of microseconds. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr TimeSpan FromMicroseconds(const T microseconds)
     {
       return FromUnits(microseconds, TicksPerMicrosecond);
@@ -351,8 +349,39 @@ namespace MB::FramePacing
       return static_cast<double>(dividend.m_ticks) / static_cast<double>(divisor.m_ticks);
     }
 
-    constexpr bool operator==(const TimeSpan&) const noexcept = default;
+    constexpr bool operator==(const TimeSpan& other) const noexcept
+    {
+      return m_ticks == other.m_ticks;
+    }
+
+    constexpr bool operator!=(const TimeSpan& other) const noexcept
+    {
+      return !(*this == other);
+    }
+
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
     constexpr std::strong_ordering operator<=>(const TimeSpan&) const noexcept = default;
+#else
+    constexpr bool operator<(const TimeSpan& other) const noexcept
+    {
+      return m_ticks < other.m_ticks;
+    }
+
+    constexpr bool operator<=(const TimeSpan& other) const noexcept
+    {
+      return m_ticks <= other.m_ticks;
+    }
+
+    constexpr bool operator>(const TimeSpan& other) const noexcept
+    {
+      return m_ticks > other.m_ticks;
+    }
+
+    constexpr bool operator>=(const TimeSpan& other) const noexcept
+    {
+      return m_ticks >= other.m_ticks;
+    }
+#endif
 
   private:
     //! value is NaN (std::isnan is not constexpr in C++20)
@@ -363,10 +392,10 @@ namespace MB::FramePacing
       return value != value;
     }
 
-    template <std::integral T>
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr TimeSpan FromUnits(const T value, const int64_t ticksPerUnit)
     {
-      if (std::cmp_less(value, MinTicks / ticksPerUnit) || std::cmp_greater(value, MaxTicks / ticksPerUnit))
+      if (IntegerCompareUtil::Less(value, MinTicks / ticksPerUnit) || IntegerCompareUtil::Greater(value, MaxTicks / ticksPerUnit))
       {
         throw std::out_of_range("TimeSpan: the value is outside the range of a TimeSpan");
       }

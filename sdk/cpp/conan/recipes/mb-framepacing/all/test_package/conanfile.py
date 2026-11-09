@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Builds and runs a small program against the mb-framepacing package: find_package with its components, link, draw one marker, read a time.
 A package built with with_pacer (the experimental pacer module) also paces one frame, and one with the trace module (with_trace, the
-default) also makes the record of one frame's marker."""
+default) also makes the record of one frame's marker. One built without the data module (with_data=False, as for C++17) reads no summary,
+and the program is built for the profile's C++ standard."""
 
 import os
 
@@ -26,6 +27,7 @@ class TestPackageConan(ConanFile):
         toolchain = CMakeToolchain(self)
         toolchain.cache_variables["MB_TEST_PACKAGE_PACER"] = bool(self.dependencies["mb-framepacing"].options.with_pacer)
         toolchain.cache_variables["MB_TEST_PACKAGE_TRACE"] = bool(self.dependencies["mb-framepacing"].options.with_trace)
+        toolchain.cache_variables["MB_TEST_PACKAGE_DATA"] = bool(self.dependencies["mb-framepacing"].options.with_data)
         toolchain.generate()
 
     def build(self):

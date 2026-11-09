@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // ByteSpanUtil: little-endian values in byte spans, the byte count from the value's type.
 #include <mb/framepacing/core/ByteSpanUtil.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <gtest/gtest.h>
 #include <array>
 #include <cstdint>
 #include <limits>
-#include <span>
 
 namespace BSU = MB::FramePacing::ByteSpanUtil;
 
@@ -65,7 +65,7 @@ TEST(ByteSpanUtil, ReadsWhatItWrote)
 TEST(ByteSpanUtil, AnOffsetAtTheEndFitsAValueThatEndsThere)
 {
   std::array<uint8_t, 4> bytes{};
-  BSU::WriteLE(std::span<uint8_t>(bytes), 2, uint16_t{0xBEEFu});
+  BSU::WriteLE(MB::FramePacing::Span<uint8_t>(bytes), 2, uint16_t{0xBEEFu});
   EXPECT_EQ(BSU::ReadLE<uint16_t>(bytes, 2), 0xBEEFu);
   EXPECT_EQ(BSU::ReadLE<uint32_t>(bytes, 0), 0xBEEF0000u);
 }

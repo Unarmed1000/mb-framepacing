@@ -35,7 +35,17 @@ namespace MB::FramePacing::Pacer
     //! that the display's side took a frame where that wait would say it was shown.
     bool HoldsByFrameCallback{false};
 
-    constexpr bool operator==(const PacerRating& other) const noexcept = default;
+    constexpr bool operator==(const PacerRating& other) const noexcept
+    {
+      return Tier == other.Tier && RaisesTier == other.RaisesTier && DisplaySideHolds == other.DisplaySideHolds &&
+             ReportsDisplayTimes == other.ReportsDisplayTimes && SkipsOverdue == other.SkipsOverdue &&
+             HoldsByFrameCallback == other.HoldsByFrameCallback;
+    }
+
+    constexpr bool operator!=(const PacerRating& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

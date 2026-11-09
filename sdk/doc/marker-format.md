@@ -416,7 +416,8 @@ const std::size_t vertexCount = FM::ModulesToTriangles(matrix, options, origin, 
 
 ## Requirements
 
-- C++: CMake 4.0 or newer and a C++20 compiler (MSVC 19.5x / Visual Studio 2026, GCC 12+, Clang 16+, AppleClang 15+).
+- C++: CMake 4.0 or newer and a C++20 compiler (MSVC 19.5x / Visual Studio 2026, GCC 12+, Clang 16+, AppleClang 15+), or the
+  same compilers in C++17 with `-DMB_FRAMEPACING_CXX_STANDARD=17` (every module but data).
   The core and the marker module have no external dependencies (the data module fetches nlohmann/json unless one is installed); the
   unit tests fetch GoogleTest unless an installed one is found.
 - C#: .NET 10 SDK.

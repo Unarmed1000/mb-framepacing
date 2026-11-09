@@ -25,9 +25,9 @@
 #include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cassert>
 #include <limits>
+#include "detail/BitCount.hpp"
 #include "detail/QrEncoder.hpp"
 #include "detail/QrSymbol.hpp"
 #include "detail/WireFormat.hpp"
@@ -72,8 +72,7 @@ namespace MB::FramePacing::Marker
 
     //! The first module at or after column from of a row (whose first module is bit rowStart) that is dark (or light), or size when there
     //! is none. Reads whole bytes: a byte without such a module is skipped at once.
-    int32_t FindModule(const std::span<const uint8_t> bits, const std::size_t rowStart, const int32_t from, const int32_t size,
-                       const bool dark) noexcept
+    int32_t FindModule(const Span<const uint8_t> bits, const std::size_t rowStart, const int32_t from, const int32_t size, const bool dark) noexcept
     {
       int32_t x = from;
       while (x < size)
@@ -88,7 +87,7 @@ namespace MB::FramePacing::Marker
           continue;
         }
         // The most significant bit is the first module
-        x += static_cast<int32_t>(static_cast<uint32_t>(std::countl_zero(remaining)) - offset);
+        x += static_cast<int32_t>(static_cast<uint32_t>(BitCount::CountLeadingZeros(remaining)) - offset);
         return std::min(x, size);
       }
       return size;
@@ -99,7 +98,7 @@ namespace MB::FramePacing::Marker
     bool WalkRuns(const ModuleMatrix& matrix, const TEmit& emit) noexcept
     {
       const int32_t size = matrix.Size();
-      const std::span<const uint8_t> bits = matrix.Bits();
+      const Span<const uint8_t> bits = matrix.Bits();
       for (int32_t y = 0; y < size; ++y)
       {
         const std::size_t rowStart = static_cast<std::size_t>(y) * static_cast<std::size_t>(size);
@@ -140,7 +139,7 @@ namespace MB::FramePacing::Marker
     }
 
     //! 6 vertices: (TL, TR, BL) (BL, TR, BR), clockwise on screen (+y down).
-    void WriteTriangles(const MarkerQuad& quad, const std::span<Vertex, 6> dst) noexcept
+    void WriteTriangles(const MarkerQuad& quad, const Span<Vertex, 6> dst) noexcept
     {
       const uint8_t luma = quad.Dark ? 0u : 255u;
       const Vertex topLeft{quad.Rect.Left(), quad.Rect.Top(), luma};
@@ -156,8 +155,7 @@ namespace MB::FramePacing::Marker
     }
 
     //! 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2), clockwise on screen. first is the index of the first vertex.
-    void WriteIndexed(const MarkerQuad& quad, const std::span<Vertex, 4> dstVertices, const std::span<uint32_t, 6> dstIndices,
-                      const uint32_t first) noexcept
+    void WriteIndexed(const MarkerQuad& quad, const Span<Vertex, 4> dstVertices, const Span<uint32_t, 6> dstIndices, const uint32_t first) noexcept
     {
       const uint8_t luma = quad.Dark ? 0u : 255u;
       dstVertices[0] = Vertex{quad.Rect.Left(), quad.Rect.Top(), luma};
@@ -172,7 +170,7 @@ namespace MB::FramePacing::Marker
       dstIndices[5] = first + 2u;
     }
 
-    std::size_t BuildQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<MarkerQuad> dst) noexcept
+    std::size_t BuildQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const Span<MarkerQuad> dst) noexcept
     {
       std::size_t count = 0;
       const bool complete = WalkQuads(matrix, options, origin,
@@ -188,7 +186,7 @@ namespace MB::FramePacing::Marker
       return complete ? count : 0;
     }
 
-    std::size_t BuildTriangles(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
+    std::size_t BuildTriangles(const ModuleMatrix& matrix, const Options& options, const Point origin, const Span<Vertex> dst) noexcept
     {
       std::size_t count = 0;
       const bool complete = WalkQuads(matrix, options, origin,
@@ -205,8 +203,8 @@ namespace MB::FramePacing::Marker
       return complete ? count : 0;
     }
 
-    IndexedCount BuildIndexed(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dstVertices,
-                              const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
+    IndexedCount BuildIndexed(const ModuleMatrix& matrix, const Options& options, const Point origin, const Span<Vertex> dstVertices,
+                              const Span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
     {
       IndexedCount count;
       const bool complete =
@@ -227,7 +225,7 @@ namespace MB::FramePacing::Marker
     }
 
     //! Fill a quad, clipped to the buffer, with its luma in every colour channel (alpha 255).
-    void FillQuad(const MarkerQuad& quad, const std::span<uint8_t> dst, const int32_t width, const int32_t height, const std::size_t bytesPerPixel,
+    void FillQuad(const MarkerQuad& quad, const Span<uint8_t> dst, const int32_t width, const int32_t height, const std::size_t bytesPerPixel,
                   const std::size_t stride) noexcept
     {
       const int32_t left = std::max(quad.Rect.Left(), 0);
@@ -242,7 +240,7 @@ namespace MB::FramePacing::Marker
       const auto columns = static_cast<std::size_t>(right - left);
       for (int32_t y = top; y < bottom; ++y)
       {
-        const std::span<uint8_t> row =
+        const Span<uint8_t> row =
           dst.subspan((static_cast<std::size_t>(y) * stride) + (static_cast<std::size_t>(left) * bytesPerPixel), columns * bytesPerPixel);
         if (bytesPerPixel == 4u)
         {
@@ -262,7 +260,7 @@ namespace MB::FramePacing::Marker
     }
   }
 
-  std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, const std::span<uint8_t> dst) noexcept
+  std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, const Span<uint8_t> dst) noexcept
   {
     const bool isStart = payload.Kind() == MarkerKind::SequenceStart;
     const std::size_t byteCount = isStart                              ? WireFormat::StartPayloadByteCount
@@ -287,7 +285,7 @@ namespace MB::FramePacing::Marker
     return byteCount;
   }
 
-  bool TryDecodePayload(const std::span<const uint8_t> bytes, Payload& rPayload, StartMetadata* const pMetadata) noexcept
+  bool TryDecodePayload(const Span<const uint8_t> bytes, Payload& rPayload, StartMetadata* const pMetadata) noexcept
   {
     if (bytes.size() < WireFormat::SyncPayloadByteCount || bytes[WireFormat::OffsetMagic0] != WireFormat::PayloadMagic0 ||
         bytes[WireFormat::OffsetMagic1] != WireFormat::PayloadMagic1 || bytes[WireFormat::OffsetVersion] != WireFormat::PayloadFormatVersion ||
@@ -356,7 +354,7 @@ namespace MB::FramePacing::Marker
     const int32_t version = payload.Kind() == MarkerKind::Sync ? WireFormat::SyncQrVersion : WireFormat::QrVersion;
     // Cannot fail: every kind's bytes fit its version (WireFormat::QrCapacityBytes, WireFormat::SyncQrCapacityBytes)
     QrEncoder::QrSymbol symbol;
-    [[maybe_unused]] const bool encoded = QrEncoder::Encode(std::span<const uint8_t>(data).first(byteCount), version, symbol);
+    [[maybe_unused]] const bool encoded = QrEncoder::Encode(Span<const uint8_t>(data).first(byteCount), version, symbol);
     assert(encoded);
 
     std::array<uint8_t, ModuleMatrix::MaxPackedModuleByteCount> bits{};
@@ -364,23 +362,23 @@ namespace MB::FramePacing::Marker
     return ModuleMatrix::TryFromBits(symbol.Size, bits, rMatrix);
   }
 
-  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<MarkerQuad> dst) noexcept
+  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, const Point origin, const Span<MarkerQuad> dst) noexcept
   {
     return matrix.Size() > 0 ? BuildQuads(matrix, options, origin, dst) : 0u;
   }
 
-  std::size_t ModulesToTriangles(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
+  std::size_t ModulesToTriangles(const ModuleMatrix& matrix, const Options& options, const Point origin, const Span<Vertex> dst) noexcept
   {
     return matrix.Size() > 0 ? BuildTriangles(matrix, options, origin, dst) : 0u;
   }
 
-  IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<Vertex> dstVertices,
-                                const std::span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
+  IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, const Point origin, const Span<Vertex> dstVertices,
+                                const Span<uint32_t> dstIndices, const uint32_t baseVertex) noexcept
   {
     return matrix.Size() > 0 ? BuildIndexed(matrix, options, origin, dstVertices, dstIndices, baseVertex) : IndexedCount{};
   }
 
-  std::size_t GridVertices(const MarkerKind kind, const Options& options, const Point origin, const std::span<Vertex> dst) noexcept
+  std::size_t GridVertices(const MarkerKind kind, const Options& options, const Point origin, const Span<Vertex> dst) noexcept
   {
     const std::size_t count = GridVertexCount(kind);
     if (dst.size() < count)
@@ -407,7 +405,7 @@ namespace MB::FramePacing::Marker
     return count;
   }
 
-  std::size_t ModulesToGridIndices(const ModuleMatrix& matrix, const std::span<uint32_t> dst, const uint32_t baseVertex) noexcept
+  std::size_t ModulesToGridIndices(const ModuleMatrix& matrix, const Span<uint32_t> dst, const uint32_t baseVertex) noexcept
   {
     if (matrix.Size() == 0 || dst.size() < 6u)
     {
@@ -443,7 +441,7 @@ namespace MB::FramePacing::Marker
     return complete ? count : 0u;
   }
 
-  bool ModulesToBitmap(const ModuleMatrix& matrix, const Options& options, const Point origin, const std::span<uint8_t> dst, const int32_t width,
+  bool ModulesToBitmap(const ModuleMatrix& matrix, const Options& options, const Point origin, const Span<uint8_t> dst, const int32_t width,
                        const int32_t height, const PixelFormat format, const std::size_t stride) noexcept
   {
     if (matrix.Size() == 0 || width < 0 || height < 0)

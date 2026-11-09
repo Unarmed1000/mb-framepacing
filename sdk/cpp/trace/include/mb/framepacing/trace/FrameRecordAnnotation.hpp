@@ -17,7 +17,15 @@ namespace MB::FramePacing::Trace
     //! The marker's value, a whole number of nanoseconds.
     int64_t Value{0};
 
-    constexpr bool operator==(const FrameRecordAnnotation&) const noexcept = default;
+    constexpr bool operator==(const FrameRecordAnnotation& other) const noexcept
+    {
+      return Name == other.Name && Value == other.Value;
+    }
+
+    constexpr bool operator!=(const FrameRecordAnnotation& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

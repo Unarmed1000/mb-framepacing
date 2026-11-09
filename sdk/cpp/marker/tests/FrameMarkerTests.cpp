@@ -3,6 +3,7 @@
 #include <mb/framepacing/core/Crc32Util.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/Rectangle.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -23,7 +24,6 @@
 #include <algorithm>
 #include <array>
 #include <limits>
-#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -96,7 +96,7 @@ namespace
   void PutCrc(std::vector<uint8_t>& rBytes)
   {
     const std::size_t fieldByteCount = rBytes.size() - FM::WireFormat::CrcByteCount;
-    const uint32_t crc = FP::Crc32Util::Compute(std::span<const uint8_t>(rBytes).first(fieldByteCount));
+    const uint32_t crc = FP::Crc32Util::Compute(MB::FramePacing::Span<const uint8_t>(rBytes).first(fieldByteCount));
     for (std::size_t i = 0; i < FM::WireFormat::CrcByteCount; ++i)
     {
       rBytes[fieldByteCount + i] = static_cast<uint8_t>(crc >> (8u * i));
@@ -149,37 +149,40 @@ namespace
     return Encode(payload.WithKind(FM::MarkerKind::SequenceStart), metadata);
   }
 
-  std::size_t GenerateQuads(const FM::Payload& payload, const FM::Options& options, const FP::Point origin, const std::span<FM::MarkerQuad> dst)
+  std::size_t GenerateQuads(const FM::Payload& payload, const FM::Options& options, const FP::Point origin,
+                            const MB::FramePacing::Span<FM::MarkerQuad> dst)
   {
     return FM::ModulesToQuads(Encode(payload), options, origin, dst);
   }
 
   std::size_t GenerateStartQuads(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options, const FP::Point origin,
-                                 const std::span<FM::MarkerQuad> dst)
+                                 const MB::FramePacing::Span<FM::MarkerQuad> dst)
   {
     return FM::ModulesToQuads(EncodeStart(payload, metadata), options, origin, dst);
   }
 
-  std::size_t GenerateTriangles(const FM::Payload& payload, const FM::Options& options, const FP::Point origin, const std::span<FM::Vertex> dst)
+  std::size_t GenerateTriangles(const FM::Payload& payload, const FM::Options& options, const FP::Point origin,
+                                const MB::FramePacing::Span<FM::Vertex> dst)
   {
     return FM::ModulesToTriangles(Encode(payload), options, origin, dst);
   }
 
   std::size_t GenerateStartTriangles(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options,
-                                     const FP::Point origin, const std::span<FM::Vertex> dst)
+                                     const FP::Point origin, const MB::FramePacing::Span<FM::Vertex> dst)
   {
     return FM::ModulesToTriangles(EncodeStart(payload, metadata), options, origin, dst);
   }
 
   FM::IndexedCount GenerateIndexed(const FM::Payload& payload, const FM::Options& options, const FP::Point origin,
-                                   const std::span<FM::Vertex> dstVertices, const std::span<uint32_t> dstIndices, const uint32_t baseVertex = 0)
+                                   const MB::FramePacing::Span<FM::Vertex> dstVertices, const MB::FramePacing::Span<uint32_t> dstIndices,
+                                   const uint32_t baseVertex = 0)
   {
     return FM::ModulesToIndexed(Encode(payload), options, origin, dstVertices, dstIndices, baseVertex);
   }
 
   FM::IndexedCount GenerateStartIndexed(const FM::Payload& payload, const FM::StartMetadata& metadata, const FM::Options& options,
-                                        const FP::Point origin, const std::span<FM::Vertex> dstVertices, const std::span<uint32_t> dstIndices,
-                                        const uint32_t baseVertex = 0)
+                                        const FP::Point origin, const MB::FramePacing::Span<FM::Vertex> dstVertices,
+                                        const MB::FramePacing::Span<uint32_t> dstIndices, const uint32_t baseVertex = 0)
   {
     return FM::ModulesToIndexed(EncodeStart(payload, metadata), options, origin, dstVertices, dstIndices, baseVertex);
   }
@@ -339,7 +342,7 @@ TEST(Payload, RoundTrips)
     const std::size_t byteCount = FM::EncodePayload(payload, {}, buffer);
     ASSERT_GT(byteCount, 0u);
     FM::Payload decoded{};
-    ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+    ASSERT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount), decoded));
     EXPECT_EQ(decoded, payload);
   }
 }
@@ -479,7 +482,7 @@ TEST(Payload, AStartMarkerSaysTheApplicationLogsTheFrameRecord)
   ASSERT_GT(byteCount, 0u);
   EXPECT_EQ(buffer[16], 0x05u);
   FM::Payload decoded{};
-  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+  ASSERT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount), decoded));
   EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::FrameRecordLogged));
   EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticAfter));
   EXPECT_FALSE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticBefore));
@@ -495,7 +498,7 @@ TEST(Payload, AFrameSaysThePresentOfTheFrameBeforeFailed)
   ASSERT_GT(byteCount, 0u);
   EXPECT_EQ(buffer[16], 0x18u);
   FM::Payload decoded{};
-  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+  ASSERT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount), decoded));
   EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::PresentFailedBefore));
   EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::Paced));
   EXPECT_FALSE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticAfter));
@@ -515,7 +518,7 @@ TEST(Payload, AFrameSaysAPacerOrALimiterHeldIt)
   ASSERT_GT(byteCount, 0u);
   EXPECT_EQ(buffer[16], 0x09u);
   FM::Payload decoded{};
-  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+  ASSERT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount), decoded));
   EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::Paced));
   EXPECT_TRUE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::StaticAfter));
   EXPECT_FALSE(FM::HasFlag(decoded.Flags(), FM::MarkerFlags::FrameRecordLogged));
@@ -533,8 +536,8 @@ TEST(Payload, TryDecodeRejectsBadInput)
 {
   auto bytes = PayloadBytes({FM::MarkerKind::Frame, 0u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   FM::Payload decoded{};
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::PayloadByteCount - 1), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(bytes).first(FM::WireFormat::SyncPayloadByteCount - 1), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(bytes).first(FM::WireFormat::PayloadByteCount - 1), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(bytes).first(FM::WireFormat::SyncPayloadByteCount - 1), decoded));
   // Each with the CRC put right, so it is the magic, the format version and the kind that are refused
   bytes[0] = 'X';
   PutCrc(bytes);
@@ -623,21 +626,21 @@ TEST(Payload, TryDecodeRejectsWrongLengths)
                                  FP::NanosecondTickCount{6}, FP::NanosecondTimeDuration::FromNanoseconds(7)},
                                 {}, buffer),
               61u);
-    EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(61), decoded));
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(60), decoded));
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(62), decoded));
+    EXPECT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(61), decoded));
+    EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(60), decoded));
+    EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(62), decoded));
     // The header alone, as a payload was before it had a CRC
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(57), decoded));
+    EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(57), decoded));
   }
   ASSERT_EQ(FM::EncodePayload({FM::MarkerKind::SequenceStart, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}, UnknownFrameTime,
                                FP::NanosecondTimeDuration::FromNanoseconds(5), UnknownFrameTime, FP::NanosecondTickCount{4},
                                FP::NanosecondTickCount{6}, FP::NanosecondTimeDuration::FromNanoseconds(7)},
                               {9, {}}, buffer),
             85u);
-  EXPECT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(85), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(84), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(86), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(81), decoded));
+  EXPECT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(85), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(84), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(86), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(81), decoded));
 }
 
 TEST(Payload, StartMetadataRoundTrips)
@@ -675,14 +678,14 @@ TEST(Payload, StartMetadataRoundTrips)
 
     FM::Payload decoded{};
     FM::StartMetadata metadata{1, byteId};
-    ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded, &metadata));
+    ASSERT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount), decoded, &metadata));
     EXPECT_EQ(decoded, payload);
     EXPECT_EQ(metadata, expected);
 
     // A start payload must be exactly StartPayloadByteCount bytes
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded, &metadata));
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded, &metadata));
-    EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::WireFormat::PayloadByteCount), decoded, &metadata));
+    EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount - 1), decoded, &metadata));
+    EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount + 1), decoded, &metadata));
+    EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(FM::WireFormat::PayloadByteCount), decoded, &metadata));
   }
 
   // Frame and end payloads ignore the metadata and stay PayloadByteCount bytes, and decoding them resets the metadata
@@ -693,7 +696,7 @@ TEST(Payload, StartMetadataRoundTrips)
             FM::WireFormat::PayloadByteCount);
   FM::Payload decoded{};
   FM::StartMetadata metadata{5, textId};
-  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::WireFormat::PayloadByteCount), decoded, &metadata));
+  ASSERT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(FM::WireFormat::PayloadByteCount), decoded, &metadata));
   EXPECT_EQ(metadata, FM::StartMetadata{});
 
   // The start payload does not fit a smaller destination
@@ -832,13 +835,13 @@ TEST(Payload, SyncMarkerCarriesOnlyTheRunIdAndTheFrameIndex)
   EXPECT_TRUE(std::equal(expected.begin(), expected.end(), buffer.begin()));
 
   FM::Payload decoded{};
-  ASSERT_TRUE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount), decoded));
+  ASSERT_TRUE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount), decoded));
   EXPECT_EQ(decoded, (FM::Payload{FM::MarkerKind::Sync, payload.RunId(), payload.FrameIndex(), FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{0}}));
   EXPECT_EQ(decoded.CpuStartTime().Nanoseconds(), 0);
   EXPECT_EQ(decoded.CpuBusy().Nanoseconds(), 0);
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount + 1), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(byteCount - 1), decoded));
-  EXPECT_FALSE(FM::TryDecodePayload(std::span<const uint8_t>(buffer).first(FM::WireFormat::SyncFieldsByteCount), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount + 1), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(byteCount - 1), decoded));
+  EXPECT_FALSE(FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(buffer).first(FM::WireFormat::SyncFieldsByteCount), decoded));
 }
 
 TEST(Symbol, EveryMarkerIsVersion6)
@@ -1317,7 +1320,7 @@ TEST(ModuleMatrix, TryFromBitsTakesTheMarkerSizesAndIgnoresThePadding)
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(0, bits, copy));
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(-25, bits, copy));
   EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(45, bits, copy));
-  EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(25, std::span<const uint8_t>(bits).first(78), copy));
+  EXPECT_FALSE(FM::ModuleMatrix::TryFromBits(25, MB::FramePacing::Span<const uint8_t>(bits).first(78), copy));
   // The other QR sizes are not markers: nothing draws their grid
   for (const int32_t size : {21, 29, 33, 37})
   {
@@ -1448,8 +1451,8 @@ TEST(Bitmap, RefusesInvalidArgumentsWithoutWriting)
   const FM::ModuleMatrix matrix = Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}});
   std::vector<uint8_t> pixels(std::size_t{64} * 64u * 4u, 128u);
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, pixels, 64, 64, FM::PixelFormat::R8G8B8, 64u * 3u - 1u)) << "short stride";
-  EXPECT_FALSE(
-    FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, std::span<uint8_t>(pixels).first((64u * 64u * 4u) - 1u), 64, 64, FM::PixelFormat::R8G8B8A8))
+  EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, MB::FramePacing::Span<uint8_t>(pixels).first((64u * 64u * 4u) - 1u), 64, 64,
+                                   FM::PixelFormat::R8G8B8A8))
     << "too small";
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, pixels, -1, 64, FM::PixelFormat::R8)) << "negative width";
   EXPECT_FALSE(FM::ModulesToBitmap(matrix, FM::Options(1, 4), {}, pixels, 64, -1, FM::PixelFormat::R8)) << "negative height";
@@ -1531,13 +1534,13 @@ TEST(Grid, ResolvedIndicesEqualTheIndexedTrianglesTriangleByTriangle)
 TEST(Grid, SmallBuffersGiveNothing)
 {
   std::vector<FM::Vertex> grid(FM::MaxGridVertexCount());
-  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {}, {}, std::span<FM::Vertex>(grid).first(1767)), 0u);
-  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Sync, {}, {}, std::span<FM::Vertex>(grid).first(680)), 680u);
+  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Frame, {}, {}, MB::FramePacing::Span<FM::Vertex>(grid).first(1767)), 0u);
+  EXPECT_EQ(FM::GridVertices(FM::MarkerKind::Sync, {}, {}, MB::FramePacing::Span<FM::Vertex>(grid).first(680)), 680u);
   std::array<uint32_t, 12> indices{};
   EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Frame, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}), indices), 0u);
   EXPECT_EQ(FM::ModulesToGridIndices(FM::ModuleMatrix{}, indices), 0u);
   EXPECT_EQ(FM::ModulesToGridIndices(Encode({FM::MarkerKind::Sync, 3u, 1u, FM::MarkerFlags::NoFlags, FP::NanosecondTimeSpan{2}}),
-                                     std::span<uint32_t>(indices).first(5)),
+                                     MB::FramePacing::Span<uint32_t>(indices).first(5)),
             0u)
     << "not even the background";
 }

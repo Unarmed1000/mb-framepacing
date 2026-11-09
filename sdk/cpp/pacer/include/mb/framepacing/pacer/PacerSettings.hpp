@@ -318,7 +318,24 @@ namespace MB::FramePacing::Pacer
 
     void SetReadyPlacePercent(uint32_t percent) noexcept;
 
-    constexpr bool operator==(const PacerSettings&) const noexcept = default;
+    constexpr bool operator==(const PacerSettings& other) const noexcept
+    {
+      return m_refresh == other.m_refresh && m_preferredFrameTime == other.m_preferredFrameTime &&
+             m_preferredSwapInterval == other.m_preferredSwapInterval && m_autoSwapInterval == other.m_autoSwapInterval &&
+             m_slowDown == other.m_slowDown && m_frameWindowLength == other.m_frameWindowLength &&
+             m_slowDownLatePercent == other.m_slowDownLatePercent && m_frameMargin == other.m_frameMargin &&
+             m_frameMarginSet == other.m_frameMarginSet && m_slowestFrameTime == other.m_slowestFrameTime && m_aim == other.m_aim &&
+             m_waitingPresents == other.m_waitingPresents && m_presentWaitSwapIntervals == other.m_presentWaitSwapIntervals &&
+             m_minWaitTimeout == other.m_minWaitTimeout && m_maxFramesInFlight == other.m_maxFramesInFlight &&
+             m_startupPauseRefreshes == other.m_startupPauseRefreshes && m_startupPauseDelay == other.m_startupPauseDelay &&
+             m_readyPlacePercent == other.m_readyPlacePercent && m_swapChainImages == other.m_swapChainImages &&
+             m_systemHoldsLoop == other.m_systemHoldsLoop;
+    }
+
+    constexpr bool operator!=(const PacerSettings& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

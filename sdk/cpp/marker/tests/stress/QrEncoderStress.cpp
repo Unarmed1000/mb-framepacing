@@ -8,6 +8,7 @@
 //   mb_framepacing_marker_qr_stress [--payloads N] [--lines N] [--symbols N] [--threads N] [--seed N] [--no-exhaustive]
 //
 // The run is deterministic for a seed and a thread count. It stops at the first difference, prints what differed and exits with 1.
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -28,7 +29,6 @@
 #include <exception>
 #include <functional>
 #include <mutex>
-#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -84,7 +84,7 @@ namespace
   std::atomic<bool> g_failed{false};
   std::mutex g_reportMutex;
 
-  std::string Hex(const std::span<const uint8_t> bytes)
+  std::string Hex(const MB::FramePacing::Span<const uint8_t> bytes)
   {
     std::string text;
     for (const uint8_t value : bytes)
@@ -111,7 +111,7 @@ namespace
     return version == 2 ? 26u : 106u;
   }
 
-  bool ReferenceEncode(const std::span<const uint8_t> data, const int32_t version, const qrcodegen_Mask mask, ReferenceSymbol& rSymbol)
+  bool ReferenceEncode(const MB::FramePacing::Span<const uint8_t> data, const int32_t version, const qrcodegen_Mask mask, ReferenceSymbol& rSymbol)
   {
     ReferenceSymbol dataAndTemp{};
     std::copy(data.begin(), data.end(), dataAndTemp.begin());
@@ -206,7 +206,7 @@ namespace
   }
 
   //! Encode with both encoders and compare; every eighth payload with each of the eight masks and its penalty score too.
-  bool ComparePayload(const std::span<const uint8_t> payload, const int32_t version, const bool everyMask)
+  bool ComparePayload(const MB::FramePacing::Span<const uint8_t> payload, const int32_t version, const bool everyMask)
   {
     ReferenceSymbol reference{};
     QR::QrSymbol symbol;
@@ -272,9 +272,9 @@ namespace
     ReferenceSymbol reference{};
     const int32_t version = kind == FM::MarkerKind::Sync ? 2 : 6;
     if (byteCount == 0 || !FM::GenerateModules(payload, matrix, metadata) ||
-        !ReferenceEncode(std::span<const uint8_t>(bytes).first(byteCount), version, qrcodegen_Mask_AUTO, reference))
+        !ReferenceEncode(MB::FramePacing::Span<const uint8_t>(bytes).first(byteCount), version, qrcodegen_Mask_AUTO, reference))
     {
-      Fail("a marker was not encoded: payload bytes " + Hex(std::span<const uint8_t>(bytes).first(byteCount)));
+      Fail("a marker was not encoded: payload bytes " + Hex(MB::FramePacing::Span<const uint8_t>(bytes).first(byteCount)));
       return false;
     }
     const int32_t size = qrcodegen_getSize(reference.data());
@@ -287,11 +287,11 @@ namespace
       }
     }
     // The bytes past the last module are zero
-    const std::span<const uint8_t> bits = matrix.Bits();
-    same = same && (bits.back() & 0x7Fu) == 0u;
+    const MB::FramePacing::Span<const uint8_t> bits = matrix.Bits();
+    same = same && (bits[bits.size() - 1u] & 0x7Fu) == 0u;
     if (!same)
     {
-      Fail("GenerateModules differs from the reference: payload bytes " + Hex(std::span<const uint8_t>(bytes).first(byteCount)));
+      Fail("GenerateModules differs from the reference: payload bytes " + Hex(MB::FramePacing::Span<const uint8_t>(bytes).first(byteCount)));
     }
     return same;
   }

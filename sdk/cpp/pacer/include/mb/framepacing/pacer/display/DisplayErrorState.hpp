@@ -55,7 +55,21 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeDuration RecentStartToDisplayTotal;
     NanosecondTimeDuration RecentStartToDisplayLongest;
 
-    constexpr bool operator==(const DisplayErrorState&) const noexcept = default;
+    constexpr bool operator==(const DisplayErrorState& other) const noexcept
+    {
+      return Reports == other.Reports && Refused == other.Refused && NotShown == other.NotShown && JudgedFrames == other.JudgedFrames &&
+             ErrorFrames == other.ErrorFrames && OffTargetFrames == other.OffTargetFrames && LateFrames == other.LateFrames &&
+             StartToDisplayFrames == other.StartToDisplayFrames && StartToDisplayTotal == other.StartToDisplayTotal &&
+             StartToDisplayLongest == other.StartToDisplayLongest && RecentJudgedFrames == other.RecentJudgedFrames &&
+             RecentErrorFrames == other.RecentErrorFrames && RecentOffTargetFrames == other.RecentOffTargetFrames &&
+             RecentLateFrames == other.RecentLateFrames && RecentStartToDisplayFrames == other.RecentStartToDisplayFrames &&
+             RecentStartToDisplayTotal == other.RecentStartToDisplayTotal && RecentStartToDisplayLongest == other.RecentStartToDisplayLongest;
+    }
+
+    constexpr bool operator!=(const DisplayErrorState& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

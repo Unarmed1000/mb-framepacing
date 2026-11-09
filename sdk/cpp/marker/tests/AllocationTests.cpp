@@ -5,6 +5,7 @@
 // new/delete (mb_framepacing_test_support) and checks that every generate / encode / convert call stays at zero allocations.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -25,7 +26,6 @@
 #include <array>
 #include <cstdint>
 #include <new>
-#include <span>
 
 namespace FP = MB::FramePacing;
 namespace FT = MB::FramePacing::Testing;
@@ -125,9 +125,10 @@ TEST(Allocations, GeneratingMarkersDoesNotAllocate)
       FM::Payload decoded;
       FM::StartMetadata decodedMetadata;
       const std::size_t byteCount = FM::EncodePayload(framePayload, metadata, g_payloadBytes);
-      written += FM::TryDecodePayload(std::span<const uint8_t>(g_payloadBytes.data(), byteCount), decoded, &decodedMetadata) ? 1u : 0u;
+      written += FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(g_payloadBytes.data(), byteCount), decoded, &decodedMetadata) ? 1u : 0u;
       const std::size_t startByteCount = FM::EncodePayload(startPayload, metadata, g_payloadBytes);
-      written += FM::TryDecodePayload(std::span<const uint8_t>(g_payloadBytes.data(), startByteCount), decoded, &decodedMetadata) ? 1u : 0u;
+      written +=
+        FM::TryDecodePayload(MB::FramePacing::Span<const uint8_t>(g_payloadBytes.data(), startByteCount), decoded, &decodedMetadata) ? 1u : 0u;
     }
     EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
   }

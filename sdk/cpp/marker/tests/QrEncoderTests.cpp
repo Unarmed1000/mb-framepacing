@@ -3,13 +3,13 @@
 //
 // The marker's own QR encoder against the reference it must agree with: the vendored QR Code generator library (qrcodegen). Every
 // symbol module by module, every mask's penalty score, and the pieces the encoder is made of.
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/marker/geometry/ModuleMatrix.hpp>
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include <string>
 #include <vector>
 #include "QrcodegenReference.h"
@@ -65,7 +65,7 @@ namespace
   };
 
   //! The reference's symbol of data, with its automatic mask or a given one.
-  bool ReferenceEncode(const std::span<const uint8_t> data, const int32_t version, const qrcodegen_Mask mask, ReferenceSymbol& rSymbol)
+  bool ReferenceEncode(const MB::FramePacing::Span<const uint8_t> data, const int32_t version, const qrcodegen_Mask mask, ReferenceSymbol& rSymbol)
   {
     // qrcodegen takes the data in a buffer it overwrites
     ReferenceSymbol dataAndTemp{};
@@ -368,7 +368,8 @@ TEST(QrReedSolomon, TablesMadeAtRunTimeEqualTheCompileTimeOnes)
 
 TEST(QrReedSolomon, TheLogarithmsMultiply)
 {
-  EXPECT_TRUE(std::ranges::none_of(QR::Divisor, [](const uint8_t value) { return value == 0; })) << "every coefficient has a logarithm";
+  EXPECT_TRUE(std::none_of(QR::Divisor.begin(), QR::Divisor.end(), [](const uint8_t value) { return value == 0; }))
+    << "every coefficient has a logarithm";
   for (uint32_t x = 1; x < 256; ++x)
   {
     for (uint32_t y = 1; y < 256; ++y)
@@ -486,8 +487,8 @@ TEST(QrEncoder, TheFirstOfEqualMasksWins)
       ASSERT_TRUE(QR::EncodeWithMask(payload, 2, mask, masked));
       scores[static_cast<std::size_t>(mask)] = QR::PenaltyScore(masked);
     }
-    const auto best = static_cast<int32_t>(std::ranges::min_element(scores) - scores.begin());
-    if (std::ranges::count(scores, scores[static_cast<std::size_t>(best)]) < 2)
+    const auto best = static_cast<int32_t>(std::min_element(scores.begin(), scores.end()) - scores.begin());
+    if (std::count(scores.begin(), scores.end(), scores[static_cast<std::size_t>(best)]) < 2)
     {
       continue;
     }
@@ -514,15 +515,15 @@ TEST(QrEncoder, RefusesOtherVersionsAndDataThatDoesNotFit)
 
   for (const int32_t version : {0, 1, 3, 5, 7, 40})
   {
-    EXPECT_FALSE(QR::Encode(std::span<const uint8_t>(payload).first(4), version, symbol)) << version;
-    EXPECT_FALSE(QR::EncodeWithMask(std::span<const uint8_t>(payload).first(4), version, 0, symbol)) << version;
+    EXPECT_FALSE(QR::Encode(MB::FramePacing::Span<const uint8_t>(payload).first(4), version, symbol)) << version;
+    EXPECT_FALSE(QR::EncodeWithMask(MB::FramePacing::Span<const uint8_t>(payload).first(4), version, 0, symbol)) << version;
   }
   EXPECT_FALSE(QR::Encode(payload, 2, symbol)) << "27 bytes in version 2";
   EXPECT_FALSE(QR::EncodeWithMask(payload, 2, 0, symbol));
   EXPECT_FALSE(QR::Encode(std::vector<uint8_t>(107, 0x11), 6, symbol)) << "107 bytes in version 6";
   EXPECT_EQ(symbol.Size, -1) << "a refused symbol is left as it was";
 
-  EXPECT_TRUE(QR::Encode(std::span<const uint8_t>(payload).first(26), 2, symbol));
+  EXPECT_TRUE(QR::Encode(MB::FramePacing::Span<const uint8_t>(payload).first(26), 2, symbol));
   EXPECT_EQ(symbol.Size, 25);
 }
 

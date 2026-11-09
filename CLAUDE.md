@@ -41,7 +41,7 @@ See `README.md` for the overview and `sdk/doc/marker-format.md` for the marker s
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `sdk/`                                            | **BSD 3-Clause**: everything below it; `sdk/README.md` is its entry point (where to start, parts, versions)          |
 | `sdk/VERSION`, `sdk/LICENSE`                      | The SDK's one version (every module and language, released with `sdk-v*` tags) and its BSD text                      |
-| `sdk/cpp/`                                        | The C++20 library: one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`             |
+| `sdk/cpp/`                                        | The C++ library (C++20/17): one CMake project (`mb_framepacing`), presets, `package_release.py`, `tests/consumer`    |
 | `sdk/cpp/core/`                                   | Core module `mb_framepacing::core`: library version, time types, `Point`, `Rectangle` + tests                        |
 | `sdk/cpp/marker/`                                 | Marker module `mb_framepacing::marker` with its own QR encoder, `reference/` (qrcodegen), `marker-render`, tests     |
 | `sdk/cpp/data/`                                   | Data module `mb_framepacing::data` (reads; nlohmann/json via FetchContent, inside only) + GoogleTest tests           |
@@ -122,6 +122,29 @@ COMPONENTS ...)`). `MB_FRAMEPACING_BUILD_MARKER` / `_DATA` / `_PACER` / `_TRACE`
     Each module's tests are their own executable. What they share is in `sdk/cpp/testing` (`mb_framepacing_test_support`, an OBJECT
     library built with the tests only, never installed): `Testing::AllocationCounter` and the counting global `operator new`/`delete`
     the allocation tests link.
+  - **C++17 is an option** (the user, 2026-11-09: for applications pinned to `-std=c++17` on current compilers, not old toolchains):
+    `MB_FRAMEPACING_CXX_STANDARD` 20 (default) or 17. 17 builds the core, marker, trace and pacer modules (`cxx_std_17`, through
+    `MB_FRAMEPACING_CXX_FEATURE`) and their tests, tools, benchmarks, stress and fuzz targets; the data module and its tests stay
+    C++20 in every build (the user's choice), and so do the size probes. Conan follows `compiler.cppstd` (below 20: 17, and
+    `with_data=False` is required).
+    - **The generated `<mb/framepacing/core/Config.hpp>` holds `MB_FRAMEPACING_CXX_STANDARD`, and every `#if` on the standard reads it,
+      never `__cplusplus`** (the user's choice of design): every file of one build, the application's too, sees the same types, so
+      the ABI never depends on the consumer's standard. The header stops a file compiled below the library's standard with an
+      `#error` naming the option.
+    - **`MB::FramePacing::Span`** (`core/Span.hpp`) is every buffer of the API: `std::span` in a C++20 build (the C++20 API
+      unchanged), the SDK's own class in a C++17 one, holding only what the SDK uses of `std::span` under the same names. Write
+      `Span`, never `std::span`, in the four modules, their tests and tools; the data module's own headers keep `std::span`.
+    - **One code path wherever C++17 code is also valid C++20:** hand-written `operator==` and `operator!=` comparing every field
+      (no defaulted comparisons: add a new field to its `operator==`), `std::enable_if_t` in place of concepts,
+      `IntegerCompareUtil::Less`/`Greater` in place of `std::cmp_*`, loops in place of constexpr algorithms.
+      `#if MB_FRAMEPACING_CXX_STANDARD >= 20` only where C++20 keeps its own: `std::span`, the time types' ordering (a defaulted
+      `<=>` in C++20, which applications' own defaulted `<=>` needs; hand-written `<`, `<=`, `>`, `>=` in C++17 only, never both:
+      C++20 would take the hand-written ones and leave `<=>` to `a <=> b` alone), `std::bit_cast` (`ByteSpanUtil::BitCast`,
+      `__builtin_bit_cast` in C++17) and the marker's `<bit>` counts (`detail/BitCount.hpp`, plain code in C++17).
+    - **Build and test both:** the `windows-cxx17` and `linux-sanitize-cxx17` presets (`CMAKE_CXX_STANDARD=17` too, so a compiler
+      whose default is newer still checks C++17); CI runs the C++17 tree on Windows, Ubuntu and macOS, the sanitizers and clang-tidy
+      on it, the consumer check's `subdirectory-cxx17` and `package-cxx17`, and a Conan run with `compiler.cppstd=17`. Coverage is
+      measured in both (the C++17 `Span` and `BitCount` halves only exist there).
   - **Executable size:** `sdk/cpp/tests/size` holds size probes (a baseline program, then one using the core, the marker, the marker
     and data modules), linked so unused code is dropped (the modules are built with `-ffunction-sections -fdata-sections`).
     `tools/measure_sdk_size.py --toolchain <id>` builds them in Release and MinSizeRel (in `sdk/cpp/build/size`) and reports what each
@@ -335,7 +358,7 @@ glcore|vulkan|d3d12` forces another graphics API); it takes the newest editor Un
     the core, the marker module or the helpers. It also checks that `FrameMarkerTexture` keeps a quiet zone in its range and that
     `FrameMarkerOverlay` keeps drawing after a frame's draw threw (it reports the first failure and tries the next frame).
   - The core and the marker module must stay C# 9 / .NET Standard 2.1 without UnityEngine (Unity 2021.2+ has .NET Standard 2.1 in both API levels). Buffer
-    APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `std::span`.
+    APIs take `ReadOnlySpan<T>` for input and `Span<T>` for output, as the C++ library takes `MB::FramePacing::Span` (`std::span` in C++20).
 - **Standalone release archive:** `sdk/cpp/CMakeLists.txt` finds `VERSION`, `LICENSE`, `licenses/` and `shaders/` next to itself in a
   release archive, and falls back to `sdk/VERSION`, `sdk/LICENSE`, `sdk/shaders` and the repository root's `licenses/` otherwise. The
   archive (`sdk/cpp/package_release.py`) holds every module, the docs, `test-data/data` and `test-data/pacer`, not `conan/`.
@@ -1096,7 +1119,7 @@ tools/check_shaders.py` compiles them all (glslang, and DXC when found; CI runs 
   - C# style: a boxed file header, 2-space indent, block namespaces, `m_`/`g_` field prefixes, CSharpier (`.csharpierrc`, width 150).
   - SDK value types are `readonly struct`s with `public readonly` fields (derived values are expression-bodied properties) and
     `GetHashCode` through `HashCode.Combine` (a `HashCode` builder past 8 fields, `Payload`).
-- **C++:** CMake 4.0+, C++20, warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored as the QR encoder's reference (tests and benchmarks only), GoogleTest
+- **C++:** CMake 4.0+, C++20 (C++17 for every module but data with `MB_FRAMEPACING_CXX_STANDARD=17`), warnings as errors, no allocations in the per-frame path, qrcodegen (C variant) vendored as the QR encoder's reference (tests and benchmarks only), GoogleTest
   through FetchContent (`FIND_PACKAGE_ARGS` lets an installed or Conan GTest win).
 - **Our license is split by path** (root `LICENSE` lists it, and every commit in the history carries it):
   - BSD 3-Clause: everything under `sdk/`: the SDK's libraries in every language (`sdk/LICENSE` holds the text alone and is what the

@@ -11,7 +11,9 @@ archive        FetchContent of a release archive (a local path as URL, with its 
 The pacer is experimental and off by default: the runs above must not get it. Two more runs ask for the pacer and pace a frame
 (MB_CONSUMER_PACER): subdirectory-pacer, and package-pacer against an install built with -DMB_FRAMEPACING_BUILD_PACER=ON. The trace
 module is on by default: two more runs ask for it and make a frame's record (MB_CONSUMER_TRACE), subdirectory-trace and package-trace
-against the default install.
+against the default install. Two more build a C++17 application (CMAKE_CXX_STANDARD=17) with the marker, trace and pacer modules and
+without the data module, which needs C++20: subdirectory-cxx17, and package-cxx17 against an install built with
+-DMB_FRAMEPACING_CXX_STANDARD=17.
 
 --package-only runs the package way alone, with the default modules: the library built and installed once, the check that the
 install holds the trace module and nothing of the pacer, and a consumer that finds it. It is what a system runs when another one runs all
@@ -177,6 +179,17 @@ def main() -> int:
         build_and_run(work, "subdirectory-trace", {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix(), **trace})
         build_and_run(work, "package-trace", {**default_package, **trace})
 
+        # A C++17 application: the library built for C++17 (MB_FRAMEPACING_CXX_STANDARD=17), without the data module
+        cxx17 = {"CMAKE_CXX_STANDARD": "17", "CMAKE_CXX_STANDARD_REQUIRED": "ON", "CMAKE_CXX_EXTENSIONS": "OFF", "MB_CONSUMER_DATA": "OFF"}
+        cxx17 |= {**pacer, **trace}
+        subdirectory = {"MB_CONSUMER_MODE": "subdirectory", "MB_FRAMEPACING_SOURCE_DIR": source.as_posix(), "MB_FRAMEPACING_CXX_STANDARD": "17"}
+        build_and_run(work, "subdirectory-cxx17", {**subdirectory, **cxx17})
+        cxx17_options = ["-DMB_FRAMEPACING_CXX_STANDARD=17", "-DMB_FRAMEPACING_BUILD_DATA=OFF", "-DMB_FRAMEPACING_BUILD_PACER=ON"]
+        prefix = install_library(work, source, "library-cxx17", cxx17_options)
+        check_has_module(prefix, "pacer")
+        package = {"MB_CONSUMER_MODE": "package", "CMAKE_PREFIX_PATH": prefix.as_posix(), "MB_CONSUMER_VERSION": major_minor}
+        build_and_run(work, "package-cxx17", {**package, **cxx17})
+
         if args.archive:
             archive = Path(args.archive).resolve()
             sha256 = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -196,6 +209,7 @@ def main() -> int:
     finally:
         shutil.rmtree(work, ignore_errors=True)
     names = ["fetchcontent", "subdirectory", "package", "subdirectory-pacer", "package-pacer", "subdirectory-trace", "package-trace"]
+    names += ["subdirectory-cxx17", "package-cxx17"]
     names += ["archive"] if args.archive else []
     print("\nConsumer check: OK (" + ", ".join(names) + ")")
     return 0

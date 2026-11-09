@@ -7,10 +7,10 @@
 // correction codewords. The arithmetic is the QR Code generator library's (reference/third_party/qrcodegen, the tests' reference); the
 // multiplications go through logarithm tables made at compile time instead of eight shift and add steps each.
 
+#include <mb/framepacing/core/Span.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include "QrVersionTables.hpp"
 
 namespace MB::FramePacing::Marker::QrEncoder
@@ -93,7 +93,7 @@ namespace MB::FramePacing::Marker::QrEncoder
   inline constexpr std::array<uint8_t, EccCodewordsPerBlock> DivisorLog = MakeDivisorLog();
 
   //! The 16 error correction codewords of a block: the remainder of data divided by the generator polynomial.
-  constexpr void ComputeErrorCorrection(const std::span<const uint8_t> data, const std::span<uint8_t, EccCodewordsPerBlock> rRemainder) noexcept
+  constexpr void ComputeErrorCorrection(const Span<const uint8_t> data, const Span<uint8_t, EccCodewordsPerBlock> rRemainder) noexcept
   {
     std::array<uint8_t, EccCodewordsPerBlock> remainder{};
     for (const uint8_t value : data)

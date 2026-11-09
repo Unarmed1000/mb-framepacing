@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The smallest program using mb_framepacing's modules: encode the frame marker of one frame at 60 fps and draw it as a triangle
-// list (marker), read a summary's capture period (data), and print what came out with the library version (core). With
+// list (marker), read a summary's capture period (data, MB_CONSUMER_DATA), and print what came out with the library version (core). With
 // MB_CONSUMER_PACER it also paces a frame with the experimental pacer module and fills the frame's marker from it, and with
-// MB_CONSUMER_TRACE it makes the record of a frame's marker with the trace module and prints the record's name.
+// MB_CONSUMER_TRACE it makes the record of a frame's marker with the trace module and prints the record's name. It is C++17 as much as
+// C++20: built for C++17 (check_consumers.py's cxx17 runs) it goes without the data module, which needs C++20.
 #include <mb/framepacing/core/GetLibraryVersion.hpp>
 #include <mb/framepacing/core/Point.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
@@ -14,7 +15,9 @@
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
+#ifdef MB_CONSUMER_DATA
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
+#endif
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -130,7 +133,11 @@ int main()
   const FM::Payload payload{FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::NoFlags, animationTime, frameTime, frameTime};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
+#ifdef MB_CONSUMER_DATA
   const int64_t capturePeriod = FP::Data::ParseSummary(R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000 })").CapturePeriod.Nanoseconds();
+#else
+  const int64_t capturePeriod = 16'666'667;
+#endif
   const std::string_view version = FP::GetLibraryVersion().Text;
   std::printf("mb_framepacing %.*s: %zu vertices, a capture period of %lld ns, a %lld ns frame\n", static_cast<int>(version.size()), version.data(),
               count, static_cast<long long>(capturePeriod), static_cast<long long>(payload.TargetFrameTime().Nanoseconds()));

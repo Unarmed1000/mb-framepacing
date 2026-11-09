@@ -93,7 +93,15 @@ namespace MB::FramePacing::Marker
       return {inset, inset};
     }
 
-    constexpr bool operator==(const Options&) const noexcept = default;
+    constexpr bool operator==(const Options& other) const noexcept
+    {
+      return m_moduleSizePx == other.m_moduleSizePx && m_quietZoneModules == other.m_quietZoneModules;
+    }
+
+    constexpr bool operator!=(const Options& other) const noexcept
+    {
+      return !(*this == other);
+    }
 
   private:
     static constexpr int32_t CeilDiv(const int64_t numerator, const int64_t denominator) noexcept

@@ -87,7 +87,7 @@ namespace MB::FramePacing::Pacer::Simulation
     std::vector<ScenarioFrame> frames;
     std::string line;
     std::getline(file, line);
-    if (line.starts_with("\xEF\xBB\xBF"))
+    if (line.compare(0, 3, "\xEF\xBB\xBF") == 0)
     {
       line.erase(0, 3);
     }

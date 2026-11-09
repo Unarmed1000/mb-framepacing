@@ -35,7 +35,7 @@ target_sources(mb_framepacing_marker
       include/mb/framepacing/marker/payload/SequenceId.hpp
       include/mb/framepacing/marker/payload/StartMetadata.hpp
       include/mb/framepacing/marker/geometry/Vertex.hpp)
-target_compile_features(mb_framepacing_marker PUBLIC cxx_std_20)
+target_compile_features(mb_framepacing_marker PUBLIC ${MB_FRAMEPACING_CXX_FEATURE})
 target_link_libraries(mb_framepacing_marker PUBLIC mb_framepacing::core)
 target_compile_options(mb_framepacing_marker PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MB_FRAMEPACING_CXX_WARNINGS}> ${MB_FRAMEPACING_SECTION_FLAGS})
 
@@ -64,7 +64,8 @@ if(MB_FRAMEPACING_BUILD_TESTS OR MB_FRAMEPACING_BUILD_BENCHMARKS)
 endif()
 
 if(MB_FRAMEPACING_BUILD_TESTS)
-  add_executable(mb_framepacing_marker_tests tests/FrameMarkerTests.cpp tests/AllocationTests.cpp tests/QrEncoderTests.cpp)
+  add_executable(mb_framepacing_marker_tests tests/FrameMarkerTests.cpp tests/AllocationTests.cpp tests/BitCountTests.cpp tests/ComparisonTests.cpp
+                                             tests/QrEncoderTests.cpp)
   target_link_libraries(mb_framepacing_marker_tests
     PRIVATE mb_framepacing::marker mb_framepacing_qrcodegen_reference mb_framepacing_test_support GTest::gtest_main)
   # The tests check the private wire format and the QR encoder too (source/mb/framepacing/marker/detail)
@@ -105,7 +106,7 @@ if(MB_FRAMEPACING_BUILD_FUZZERS)
     source/mb/framepacing/marker/detail/QrEncoder.cpp
     reference/QrcodegenReference.c)
   set_target_properties(mb_framepacing_marker_qr_fuzz PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
-  target_compile_features(mb_framepacing_marker_qr_fuzz PRIVATE cxx_std_20)
+  target_compile_features(mb_framepacing_marker_qr_fuzz PRIVATE ${MB_FRAMEPACING_CXX_FEATURE})
   target_link_libraries(mb_framepacing_marker_qr_fuzz PRIVATE mb_framepacing::core)
   target_include_directories(mb_framepacing_marker_qr_fuzz PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include

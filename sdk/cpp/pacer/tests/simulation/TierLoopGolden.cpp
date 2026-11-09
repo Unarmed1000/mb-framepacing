@@ -4,13 +4,13 @@
 // Test code: the runs of the tier pacer's simulated loop that are golden data, and their text.
 #include "TierLoopGolden.hpp"
 #include <mb/framepacing/core/Crc32Util.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
 #include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -284,7 +284,7 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
       text += ',';
       Append(text, int64_t{run.Settings.Frames}, ',');
       Append(text, static_cast<uint64_t>(csv.size()), ',');
-      Append(text, uint64_t{Crc32Util::ComputeFast(std::span<const uint8_t>(bytes))}, '\n');
+      Append(text, uint64_t{Crc32Util::ComputeFast(MB::FramePacing::Span<const uint8_t>(bytes))}, '\n');
     }
     return text;
   }

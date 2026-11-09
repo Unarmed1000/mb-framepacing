@@ -3,11 +3,14 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/Config.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <cassert>
-#include <compare>
 #include <cstdint>
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace MB::FramePacing
 {
@@ -152,8 +155,39 @@ namespace MB::FramePacing
       return lhs.m_value >= rhs.m_value ? lhs : rhs;
     }
 
-    constexpr bool operator==(const TimeDuration&) const noexcept = default;
+    constexpr bool operator==(const TimeDuration& other) const noexcept
+    {
+      return m_value == other.m_value;
+    }
+
+    constexpr bool operator!=(const TimeDuration& other) const noexcept
+    {
+      return !(*this == other);
+    }
+
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
     constexpr std::strong_ordering operator<=>(const TimeDuration&) const noexcept = default;
+#else
+    constexpr bool operator<(const TimeDuration& other) const noexcept
+    {
+      return m_value < other.m_value;
+    }
+
+    constexpr bool operator<=(const TimeDuration& other) const noexcept
+    {
+      return m_value <= other.m_value;
+    }
+
+    constexpr bool operator>(const TimeDuration& other) const noexcept
+    {
+      return m_value > other.m_value;
+    }
+
+    constexpr bool operator>=(const TimeDuration& other) const noexcept
+    {
+      return m_value >= other.m_value;
+    }
+#endif
   };
 }
 

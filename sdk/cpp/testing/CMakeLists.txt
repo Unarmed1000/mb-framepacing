@@ -11,8 +11,9 @@ target_sources(mb_framepacing_test_support
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
-      include/mb/framepacing/testing/AllocationCounter.hpp)
-target_compile_features(mb_framepacing_test_support PUBLIC cxx_std_20)
+      include/mb/framepacing/testing/AllocationCounter.hpp
+      include/mb/framepacing/testing/EqualityCheck.hpp)
+target_compile_features(mb_framepacing_test_support PUBLIC ${MB_FRAMEPACING_CXX_FEATURE})
 target_compile_options(mb_framepacing_test_support PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
 
 # Every public header of a module, compiled as an application has them that included X11's headers first: Xlib.h and X.h define plain

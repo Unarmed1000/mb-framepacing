@@ -93,7 +93,15 @@ namespace MB::FramePacing
       return x >= Left() && x < Right() && y >= Top() && y < Bottom();
     }
 
-    constexpr bool operator==(const Rectangle&) const noexcept = default;
+    constexpr bool operator==(const Rectangle& other) const noexcept
+    {
+      return m_x == other.m_x && m_y == other.m_y && m_width == other.m_width && m_height == other.m_height;
+    }
+
+    constexpr bool operator!=(const Rectangle& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

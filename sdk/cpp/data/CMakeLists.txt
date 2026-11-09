@@ -57,6 +57,7 @@ target_sources(mb_framepacing_data
       include/mb/framepacing/data/analysis/SummaryRun.hpp
       include/mb/framepacing/data/analysis/SummaryStatistics.hpp
       include/mb/framepacing/data/analysis/ValueStatistics.hpp)
+# C++20 in every build, also when MB_FRAMEPACING_CXX_STANDARD is 17: the module (a reader, for the tools' data) has never been C++17
 target_compile_features(mb_framepacing_data PUBLIC cxx_std_20)
 target_link_libraries(mb_framepacing_data PUBLIC mb_framepacing::marker PRIVATE $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>)
 target_compile_options(mb_framepacing_data PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})

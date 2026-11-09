@@ -228,4 +228,3 @@ system's frames is which frame of the capture, and where a display's vertical bl
 - **Synced playback in the GUI:** click a spike in the Timeline to see the captured frame it came from, inside the GUI. Today
   [the playback page](../measure/doc/usage.md#the-playback-page) does it in a browser: a run's report next to its recording, with a
   playhead on every panel.
-- **A C++17 fallback** for the C++ marker library, for toolchains without C++20.

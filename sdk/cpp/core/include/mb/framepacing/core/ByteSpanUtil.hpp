@@ -3,28 +3,45 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
-#include <bit>
+#include <mb/framepacing/core/Config.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include <type_traits>
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <bit>
+#endif
 
 namespace MB::FramePacing::ByteSpanUtil
 {
   //! A value ReadLE and WriteLE take: an integer (not bool) or a double.
   template <typename T>
-  concept LittleEndianValue = (std::is_integral_v<T> && !std::is_same_v<T, bool>) || std::is_same_v<T, double>;
+  inline constexpr bool IsLittleEndianValue = (std::is_integral_v<T> && !std::is_same_v<T, bool>) || std::is_same_v<T, double>;
+
+  //! The bits of value as a To of the same size: std::bit_cast, which C++17 has not; every compiler the library supports has the
+  //! builtin it is made of, also in C++17.
+  template <typename To, typename From>
+  [[nodiscard]] constexpr To BitCast(const From& value) noexcept
+  {
+    static_assert(sizeof(To) == sizeof(From), "BitCast keeps the size");
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+    return std::bit_cast<To>(value);
+#else
+    return __builtin_bit_cast(To, value);
+#endif
+  }
 
   //! Write value as sizeof(T) little-endian bytes at offset (a signed value as its two's complement, a double as its IEEE 754 bits, as
   //! C#'s BinaryPrimitives does). The byte count follows from the value's type. dst must hold them: asserted, not checked.
-  template <LittleEndianValue T>
-  constexpr void WriteLE(const std::span<uint8_t> dst, const std::size_t offset, const T value) noexcept
+  template <typename T>
+  constexpr void WriteLE(const Span<uint8_t> dst, const std::size_t offset, const T value) noexcept
   {
+    static_assert(IsLittleEndianValue<T>, "WriteLE writes an integer (not bool) or a double");
     assert(offset <= dst.size() && dst.size() - offset >= sizeof(T));
     if constexpr (std::is_same_v<T, double>)
     {
-      WriteLE(dst, offset, std::bit_cast<uint64_t>(value));
+      WriteLE(dst, offset, BitCast<uint64_t>(value));
     }
     else
     {
@@ -37,13 +54,14 @@ namespace MB::FramePacing::ByteSpanUtil
   }
 
   //! Read a T from sizeof(T) little-endian bytes at offset: the counterpart of WriteLE. src must hold them: asserted, not checked.
-  template <LittleEndianValue T>
-  [[nodiscard]] constexpr T ReadLE(const std::span<const uint8_t> src, const std::size_t offset) noexcept
+  template <typename T>
+  [[nodiscard]] constexpr T ReadLE(const Span<const uint8_t> src, const std::size_t offset) noexcept
   {
+    static_assert(IsLittleEndianValue<T>, "ReadLE reads an integer (not bool) or a double");
     assert(offset <= src.size() && src.size() - offset >= sizeof(T));
     if constexpr (std::is_same_v<T, double>)
     {
-      return std::bit_cast<double>(ReadLE<uint64_t>(src, offset));
+      return BitCast<double>(ReadLE<uint64_t>(src, offset));
     }
     else
     {

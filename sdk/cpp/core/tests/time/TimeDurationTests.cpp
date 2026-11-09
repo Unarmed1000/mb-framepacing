@@ -2,15 +2,19 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // TimeDuration: a length of time that is never negative. It holds a TimeSpan that is zero or more, and what its arithmetic gives is
 // a duration where the result can not be negative and a TimeSpan where it can.
+#include <mb/framepacing/core/Config.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
 #include <gtest/gtest.h>
-#include <compare>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace FP = MB::FramePacing;
 
@@ -169,7 +173,9 @@ TEST(TimeDuration, ComparesByTicks)
   EXPECT_TRUE(shorter != longer);
   EXPECT_TRUE(shorter < longer);
   EXPECT_TRUE(longer >= shorter);
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
   EXPECT_EQ(shorter <=> longer, std::strong_ordering::less);
   EXPECT_EQ(longer <=> shorter, std::strong_ordering::greater);
   EXPECT_EQ(longer <=> longer, std::strong_ordering::equal);
+#endif
 }

@@ -7,10 +7,10 @@
 // the mask with the lowest penalty). It gives exactly the symbols of the QR Code generator library (reference/third_party/qrcodegen, which the
 // tests compare it with), and scores the masks on whole rows and columns instead of module by module (doc/encoding-performance.md).
 
+#include <mb/framepacing/core/Span.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <span>
 #include "QrSymbol.hpp"
 
 namespace MB::FramePacing::Marker::QrEncoder
@@ -20,10 +20,10 @@ namespace MB::FramePacing::Marker::QrEncoder
 
   //! The symbol of data in byte mode at error correction level M, with the mask that scores the lowest penalty (the lowest numbered one
   //! of equals). Returns false, leaving rSymbol unchanged, when version is not 2 or 6 or data does not fit it (26 and 106 bytes).
-  [[nodiscard]] bool Encode(std::span<const uint8_t> data, int32_t version, QrSymbol& rSymbol) noexcept;
+  [[nodiscard]] bool Encode(Span<const uint8_t> data, int32_t version, QrSymbol& rSymbol) noexcept;
 
   //! As Encode, with a given mask (0 to 7) instead of the best one. Also false for a mask outside 0 to 7.
-  [[nodiscard]] bool EncodeWithMask(std::span<const uint8_t> data, int32_t version, int32_t mask, QrSymbol& rSymbol) noexcept;
+  [[nodiscard]] bool EncodeWithMask(Span<const uint8_t> data, int32_t version, int32_t mask, QrSymbol& rSymbol) noexcept;
 
   //! The QR standard's penalty score of a symbol: runs of five or more modules of one colour and finder-like patterns in every row and
   //! column, 2x2 blocks of one colour, and the balance of dark and light. The scoring stops once the score reaches limit: the result is
@@ -39,7 +39,7 @@ namespace MB::FramePacing::Marker::QrEncoder
 
   //! The symbol's modules packed as ModuleMatrix holds them: row-major, most significant bit first, continuous across rows, the last
   //! byte zero padded. dst holds at least ModuleMatrix::PackedModuleByteCount(symbol.Size) bytes.
-  void PackModules(const QrSymbol& symbol, std::span<uint8_t> dst) noexcept;
+  void PackModules(const QrSymbol& symbol, Span<uint8_t> dst) noexcept;
 }
 
 #endif

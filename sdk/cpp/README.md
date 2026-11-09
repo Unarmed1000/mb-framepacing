@@ -1,7 +1,7 @@
 # MB Frame Pacing for C++
 
 The C++20 library of the [mb-framepacing](https://github.com/Unarmed1000/mb-framepacing) SDK: one CMake project of modules, each its
-own static library target, like Boost's and Poco's.
+own static library target, like Boost's and Poco's. Every module but `data` also builds for C++17 ([C++17](#c17)).
 
 | Module   | Target                   | Headers                     | What it does                                                                                                           |
 | -------- | ------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -62,6 +62,7 @@ Or git (`GIT_TAG sdk-v0.1.0-alpha.9`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirector
 | `MB_FRAMEPACING_BUILD_DATA`         | on; off leaves the data module out, and nlohmann/json is never fetched                                                    |
 | `MB_FRAMEPACING_BUILD_PACER`        | off: the pacer is experimental; on builds `mb_framepacing::pacer`                                                         |
 | `MB_FRAMEPACING_BUILD_TRACE`        | on (needs the marker module); off leaves the trace module out                                                             |
+| `MB_FRAMEPACING_CXX_STANDARD`       | `20`; `17` builds the core, marker, trace and pacer modules for C++17 ([C++17](#c17))                                     |
 | `MB_FRAMEPACING_BUILD_TESTS`        | on only when the library is the top-level project                                                                         |
 | `MB_FRAMEPACING_BUILD_TOOLS`        | on only when top-level (`marker-render`)                                                                                  |
 | `MB_FRAMEPACING_INSTALL`            | on only when top-level: the install rules and the CMake package. Off, your own `cmake --install` installs your files only |
@@ -71,6 +72,27 @@ Or git (`GIT_TAG sdk-v0.1.0-alpha.9`, `SOURCE_SUBDIR sdk/cpp`), `add_subdirector
 
 nlohmann/json is found with `find_package(nlohmann_json 3.12)` when installed, and downloaded (a pinned release) otherwise; GoogleTest
 likewise, only for the tests.
+
+### C++17
+
+The library is C++20. An application that compiles as C++17 builds it with `-DMB_FRAMEPACING_CXX_STANDARD=17` (Conan: a profile with
+`compiler.cppstd=17` and `-o "mb-framepacing/*:with_data=False"`). That gives the core, marker, trace and pacer modules for C++17 with
+the same API. The data module needs C++20 in either build: leave it out (`-DMB_FRAMEPACING_BUILD_DATA=OFF`) or link it only into
+C++20 code.
+
+The one difference is the span. The API's buffers are `MB::FramePacing::Span` (`core/Span.hpp`):
+
+- In a C++20 build it is `std::span`.
+- In a C++17 build it is the SDK's own type: the part of `std::span` the SDK uses, with the same names. It takes a `std::array`, a C
+  array, a pointer and a count, or a contiguous container such as a `std::vector` (or a C++20 `std::span`), as `std::span` does.
+
+The standard the library was built for is recorded in the generated `<mb/framepacing/core/Config.hpp>`
+(`MB_FRAMEPACING_CXX_STANDARD`), and the headers read that, never the standard of the file that includes them. So an application
+always sees the types the library was built with: C++20 code using a library built for C++17 gets the SDK's span, and a file
+compiled as C++17 that includes a library built for C++20 stops with an error naming the option.
+
+The same compilers are supported in either standard (MSVC 19.5x, GCC 12+, Clang 16+, AppleClang 15+). CI builds and tests every
+module both ways.
 
 ## The marker
 
@@ -323,6 +345,8 @@ In `MB::FramePacing`, each in its own header (`<mb/framepacing/core/…>`, the t
 | `core/time/ChronoConversion.hpp` (optional): `TickDuration`, `NanosecondDuration`, `ToDateTimeTicks`, … | `std::chrono` conversions for the tick and the nanosecond types, and the wall clock as C# `DateTime` ticks                                                                                                             |
 | `Point`, `Rectangle`                                                                                    | A pixel position; an integer pixel rectangle, always valid (a negative size is 0)                                                                                                                                      |
 | `ByteSpanUtil`: `WriteLE`, `ReadLE<T>`                                                                  | Little-endian values in byte spans, the byte count from the type                                                                                                                                                       |
+| `Span`, `DynamicExtent`; `core/Config.hpp`                                                              | The API's buffers: `std::span` in a C++20 build, the SDK's own in a C++17 one ([C++17](#c17)); the standard the library was built for                                                                                  |
+| `IntegerCompareUtil`: `Less`, `Greater`                                                                 | Integers compared by value whatever their signs: C++20's `std::cmp_less` and `std::cmp_greater`, in a C++17 build too                                                                                                  |
 
 ## What it adds to your executable
 
@@ -340,8 +364,8 @@ on Linux, 16 KiB on macOS arm64, 512 bytes on Windows.
 
 | Toolchain               | Compiler                   | Build      |    Core | Core + marker | Core + marker + data |
 | ----------------------- | -------------------------- | ---------- | ------: | ------------: | -------------------: |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      21.0 KiB |            221.8 KiB |
-| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.5 KiB |            192.7 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | Release    | 4.1 KiB |      21.2 KiB |            222.3 KiB |
+| MSVC, Windows x64       | MSVC 19.51.36260.0         | MinSizeRel | 4.3 KiB |      18.4 KiB |            192.8 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | Release    | 1.9 KiB |      17.4 KiB |            215.7 KiB |
 | GCC, Linux x64          | GNU 13.3.0                 | MinSizeRel | 2.0 KiB |      16.2 KiB |            139.0 KiB |
 | Clang, Linux x64        | Clang 18.1.3               | Release    | 1.7 KiB |      20.0 KiB |            189.6 KiB |
@@ -362,7 +386,9 @@ cmake --preset windows && cmake --build --preset windows && ctest --preset windo
 ```
 
 The `windows` and `linux-sanitize` presets also build and test the experimental pacer (`MB_FRAMEPACING_BUILD_PACER`, off by
-default).
+default). `windows-cxx17` and `linux-sanitize-cxx17` are the same builds for C++17: `MB_FRAMEPACING_CXX_STANDARD=17`, with every
+file of the core, marker, trace and pacer modules and their tests compiled as C++17 (`CMAKE_CXX_STANDARD=17`), and the data module
+as C++20.
 
 Every module has its tests (`<module>/tests`); they fetch GoogleTest (an installed or Conan GTest wins). What they share, such as the
 allocation counter of the zero-allocation tests, is in `testing` (test code, never installed). `marker-render`

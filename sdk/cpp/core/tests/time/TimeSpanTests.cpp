@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 // TimeSpan is C#'s System.TimeSpan: every expected value and error here is what .NET 10 gives for the same call.
+#include <mb/framepacing/core/Config.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <gtest/gtest.h>
 #include <cmath>
-#include <compare>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace FP = MB::FramePacing;
 
@@ -273,8 +276,10 @@ TEST(TimeSpan, ComparesByTicks)
   EXPECT_TRUE(shorter <= longer);
   EXPECT_TRUE(longer > shorter);
   EXPECT_TRUE(longer >= shorter);
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
   EXPECT_EQ(shorter <=> longer, std::strong_ordering::less);
   EXPECT_EQ(longer <=> longer, std::strong_ordering::equal);
+#endif
 }
 
 TEST(TimeSpan, WorksInConstantExpressions)

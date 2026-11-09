@@ -2,16 +2,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // NanosecondTimeDuration: a length of time in nanoseconds that is never negative. It holds a NanosecondTimeSpan that is zero or more,
 // and what its arithmetic gives is a duration where the result can not be negative and a NanosecondTimeSpan where it can.
+#include <mb/framepacing/core/Config.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <gtest/gtest.h>
-#include <compare>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace FP = MB::FramePacing;
 
@@ -143,9 +147,11 @@ TEST(NanosecondTimeDuration, ComparesByNanoseconds)
   EXPECT_TRUE(shorter != longer);
   EXPECT_TRUE(shorter < longer);
   EXPECT_TRUE(longer >= shorter);
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
   EXPECT_EQ(shorter <=> longer, std::strong_ordering::less);
   EXPECT_EQ(longer <=> shorter, std::strong_ordering::greater);
   EXPECT_EQ(longer <=> longer, std::strong_ordering::equal);
+#endif
 }
 
 TEST(NanosecondTimeDuration, IsExactFromTicksAndTruncatedToThem)

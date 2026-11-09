@@ -255,7 +255,15 @@ namespace MB::FramePacing
       return TimeSpan(static_cast<int64_t>(lhs.m_ticks - rhs.m_ticks));
     }
 
-    constexpr bool operator==(const TickCount64&) const noexcept = default;
+    constexpr bool operator==(const TickCount64& other) const noexcept
+    {
+      return m_ticks == other.m_ticks;
+    }
+
+    constexpr bool operator!=(const TickCount64& other) const noexcept
+    {
+      return !(*this == other);
+    }
 
     //! lhs is before rhs: the wrap-safe order of TickCount32, for counts less than 2^63 ticks apart.
     friend constexpr bool operator<(const TickCount64 lhs, const TickCount64 rhs) noexcept

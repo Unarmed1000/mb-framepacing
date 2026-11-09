@@ -16,7 +16,15 @@ namespace MB::FramePacing::Marker
     //! Identifies the capture sequence: 16 opaque bytes, any content as long as it is unique to it.
     SequenceId Id{};
 
-    constexpr bool operator==(const StartMetadata&) const noexcept = default;
+    constexpr bool operator==(const StartMetadata& other) const noexcept
+    {
+      return UtcTicks == other.UtcTicks && Id == other.Id;
+    }
+
+    constexpr bool operator!=(const StartMetadata& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

@@ -238,7 +238,15 @@ namespace MB::FramePacing
       return TimeSpan(Distance(lhs, rhs));
     }
 
-    constexpr bool operator==(const TickCount32&) const noexcept = default;
+    constexpr bool operator==(const TickCount32& other) const noexcept
+    {
+      return m_ticks == other.m_ticks;
+    }
+
+    constexpr bool operator!=(const TickCount32& other) const noexcept
+    {
+      return !(*this == other);
+    }
 
     //! lhs is before rhs (see the class: less than 2^31 ticks apart).
     friend constexpr bool operator<(const TickCount32 lhs, const TickCount32 rhs) noexcept

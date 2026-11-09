@@ -23,6 +23,12 @@ namespace Text = MB::FramePacing::Trace::FrameRecordText;
 
 namespace
 {
+  // std::string_view::starts_with, which C++17 has not
+  bool StartsWith(const std::string_view text, const std::string_view prefix)
+  {
+    return text.substr(0, prefix.size()) == prefix;
+  }
+
   // The names are there at compile time, and none allocates
   static_assert(TR::FrameDetailName(TR::FrameDetail::Present, 1, 388).View() == "mbfp present 1 388");
   static_assert(TR::FrameDetailName().View().empty());
@@ -107,7 +113,7 @@ TEST(FrameDetailName, EveryDetailIsNamedAsTheGoldenDataHasIt)
     EXPECT_EQ(name.View(), columns[3]) << line;
     EXPECT_EQ(std::strlen(name.CStr()), name.View().size()) << line;
     EXPECT_LE(name.View().size(), TR::FrameDetailName::MaxLength) << line;
-    EXPECT_TRUE(name.View().starts_with(TR::FrameDetailName::PrefixOf(*detail))) << line;
+    EXPECT_TRUE(StartsWith(name.View(), TR::FrameDetailName::PrefixOf(*detail))) << line;
     ++rows;
   }
   // A row per detail
@@ -132,12 +138,12 @@ TEST(FrameRecordText, ThePartTwoNamesAreTheirOwnAndNoneIsTheRecords)
        {Text::WaitNamePrefix, Text::PresentNamePrefix, Text::GpuNamePrefix, Text::DisplayNamePrefix, Text::NotPresentedNamePrefix,
         Text::EnvironmentName, Text::SwapChainRecreatedName, Text::SwapIntervalChangeName})
   {
-    EXPECT_FALSE(prefix.starts_with(Text::NamePrefix)) << prefix;
-    EXPECT_TRUE(prefix.starts_with("mbfp ")) << prefix;
+    EXPECT_FALSE(StartsWith(prefix, Text::NamePrefix)) << prefix;
+    EXPECT_TRUE(StartsWith(prefix, "mbfp ")) << prefix;
   }
   for (const std::string_view track : {Text::WaitTrackName, Text::PresentTrackName, Text::GpuTrackName, Text::DisplayTrackName, Text::RunTrackName})
   {
     EXPECT_NE(track, Text::TrackName);
-    EXPECT_TRUE(track.starts_with("mbfp ")) << track;
+    EXPECT_TRUE(StartsWith(track, "mbfp ")) << track;
   }
 }

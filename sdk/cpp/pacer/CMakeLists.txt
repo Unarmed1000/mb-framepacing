@@ -70,7 +70,7 @@ target_sources(mb_framepacing_pacer
       include/mb/framepacing/pacer/tier/TierPacer.hpp
       include/mb/framepacing/pacer/tier/VBlankLoopPacer.hpp
       include/mb/framepacing/pacer/timeline/VBlankTimeline.hpp)
-target_compile_features(mb_framepacing_pacer PUBLIC cxx_std_20)
+target_compile_features(mb_framepacing_pacer PUBLIC ${MB_FRAMEPACING_CXX_FEATURE})
 target_link_libraries(mb_framepacing_pacer PUBLIC mb_framepacing::core)
 target_compile_options(mb_framepacing_pacer PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
@@ -97,7 +97,7 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   target_link_libraries(pacer-sim PRIVATE mb_framepacing_pacer_simulation)
   target_compile_options(pacer-sim PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS})
 
-  add_executable(mb_framepacing_pacer_tests tests/PacerTests.cpp tests/AllocationTests.cpp tests/GoldenTests.cpp 
+  add_executable(mb_framepacing_pacer_tests tests/PacerTests.cpp tests/AllocationTests.cpp tests/ComparisonTests.cpp tests/GoldenTests.cpp
                                             
                                             tests/DisplayModelTests.cpp tests/FrameLoopTests.cpp
                                             tests/PacerCapabilityTests.cpp tests/PacerPlanTests.cpp tests/FrameWorkRuleTests.cpp

@@ -7,6 +7,8 @@
 #   MB_CONSUMER_MODE=package       find_package with the components it uses, after cmake --install (CMAKE_PREFIX_PATH)
 #   MB_CONSUMER_PACER=ON           also uses the experimental pacer module, which is off unless the application asks for it
 #   MB_CONSUMER_TRACE=ON           also uses the trace module
+#   MB_CONSUMER_DATA=OFF           leaves the data module out (it needs C++20): with CMAKE_CXX_STANDARD=17 and, for a library built
+#                                  here or installed, MB_FRAMEPACING_CXX_STANDARD=17, a C++17 application
 cmake_minimum_required(VERSION 4.0)
 project(mb_framepacing_consumer LANGUAGES CXX)
 
@@ -17,8 +19,15 @@ set(MB_FRAMEPACING_SHA256 "00000000000000000000000000000000000000000000000000000
 set(MB_FRAMEPACING_SOURCE_DIR "" CACHE PATH "Source tree for the subdirectory mode")
 option(MB_CONSUMER_PACER "Also use the experimental pacer module (mb_framepacing::pacer)" OFF)
 option(MB_CONSUMER_TRACE "Also use the trace module (mb_framepacing::trace)" OFF)
+option(MB_CONSUMER_DATA "Use the data module (mb_framepacing::data), which needs C++20" ON)
 
-set(MB_CONSUMER_COMPONENTS marker data)
+set(MB_CONSUMER_COMPONENTS marker)
+if(MB_CONSUMER_DATA)
+  list(APPEND MB_CONSUMER_COMPONENTS data)
+else()
+  # An application that builds the library inside its own project and does not use the data module leaves it out
+  set(MB_FRAMEPACING_BUILD_DATA OFF)
+endif()
 if(MB_CONSUMER_PACER)
   list(APPEND MB_CONSUMER_COMPONENTS pacer)
   # An application that builds the library inside its own project switches the pacer on before it adds the library
@@ -44,7 +53,11 @@ else()
 endif()
 
 add_executable(consumer main.cpp)
-target_link_libraries(consumer PRIVATE mb_framepacing::marker mb_framepacing::data)
+target_link_libraries(consumer PRIVATE mb_framepacing::marker)
+if(MB_CONSUMER_DATA)
+  target_link_libraries(consumer PRIVATE mb_framepacing::data)
+  target_compile_definitions(consumer PRIVATE MB_CONSUMER_DATA)
+endif()
 if(MB_CONSUMER_PACER)
   target_link_libraries(consumer PRIVATE mb_framepacing::pacer)
   target_compile_definitions(consumer PRIVATE MB_CONSUMER_PACER)

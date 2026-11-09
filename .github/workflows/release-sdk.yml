@@ -78,6 +78,12 @@ jobs:
           cmake -S sdk/cpp -B sdk/cpp/build/release -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON -DMB_FRAMEPACING_BUILD_TRACE=ON
           cmake --build sdk/cpp/build/release --config Release --parallel
           ctest --test-dir sdk/cpp/build/release -C Release --output-on-failure
+      - name: C++ library built for C++17 (core, marker, trace and the experimental pacer; the data module stays C++20)
+        shell: bash
+        run: |
+          cmake -S sdk/cpp -B sdk/cpp/build/release-cxx17 -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON -DMB_FRAMEPACING_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF
+          cmake --build sdk/cpp/build/release-cxx17 --config Release --parallel
+          ctest --test-dir sdk/cpp/build/release-cxx17 -C Release --output-on-failure
       - name: C# modules
         shell: bash
         run: |
@@ -137,11 +143,12 @@ jobs:
           prerelease=()
           if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
           cat > notes.md <<EOF
-          ## C++ (CMake 4.0+, C++20)
+          ## C++ (CMake 4.0+, C++20; C++17 for every module but data)
 
           One library of modules: \`mb_framepacing::core\`, \`mb_framepacing::marker\`, \`mb_framepacing::data\` and \`mb_framepacing::trace\`
           (\`mb_framepacing::pacer\` is experimental and off by default: \`-DMB_FRAMEPACING_BUILD_PACER=ON\`).
           Link the ones you use; \`-DMB_FRAMEPACING_BUILD_DATA=OFF\` leaves the data module (and nlohmann/json) out.
+          \`-DMB_FRAMEPACING_CXX_STANDARD=17\` builds the core, marker, trace and pacer modules for a C++17 application (the data module needs C++20).
 
           \`\`\`cmake
           include(FetchContent)

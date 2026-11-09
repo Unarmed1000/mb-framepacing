@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // The Conan package's test: encode the frame marker of one frame at 60 fps and draw it as a triangle list (marker), read a
-// summary's capture period (data), and print what came out with the library version (core). A package built with with_pacer
+// summary's capture period (data, MB_TEST_PACKAGE_DATA), and print what came out with the library version (core). A package built with with_pacer
 // (MB_TEST_PACKAGE_PACER) also paces a frame with the experimental pacer module and fills the frame's marker from it, and one built
 // with with_trace (MB_TEST_PACKAGE_TRACE) makes the record of a frame's marker with the experimental trace module and prints the
 // record's name.
@@ -15,7 +15,9 @@
 #include <mb/framepacing/core/time/TimeDuration.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
 #include <mb/framepacing/core/time/TimeSpan32.hpp>
+#ifdef MB_TEST_PACKAGE_DATA
 #include <mb/framepacing/data/analysis/AnalysisSummary.hpp>
+#endif
 #include <mb/framepacing/marker/FrameMarker.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
@@ -131,7 +133,12 @@ int main()
   const FM::Payload payload{FM::MarkerKind::Frame, 1u, frameIndex, FM::MarkerFlags::NoFlags, animationTime, frameTime, frameTime};
   const bool encoded = FM::GenerateModules(payload, matrix);
   const std::size_t count = encoded ? FM::ModulesToTriangles(matrix, options, origin, vertices) : 0u;
+#ifdef MB_TEST_PACKAGE_DATA
   const int64_t capturePeriod = FP::Data::ParseSummary(R"({ "capturePeriodNs": 16666667, "errorThresholdNs": 1000000 })").CapturePeriod.Nanoseconds();
+#else
+  // A package without the data module (one for C++17) reads no summary
+  const int64_t capturePeriod = 16'666'667;
+#endif
   const std::string_view version = FP::GetLibraryVersion().Text;
   std::printf("mb_framepacing %.*s: %zu vertices, a capture period of %lld ns, a %lld ns frame\n", static_cast<int>(version.size()), version.data(),
               count, static_cast<long long>(capturePeriod), static_cast<long long>(payload.TargetFrameTime().Nanoseconds()));

@@ -13,7 +13,15 @@ namespace MB::FramePacing
     int32_t X{0};
     int32_t Y{0};
 
-    constexpr bool operator==(const Point&) const noexcept = default;
+    constexpr bool operator==(const Point& other) const noexcept
+    {
+      return X == other.X && Y == other.Y;
+    }
+
+    constexpr bool operator!=(const Point& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

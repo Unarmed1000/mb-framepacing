@@ -29,7 +29,16 @@ namespace MB::FramePacing::Pacer
     //! wakes late every frame adds up).
     NanosecondTimeSpan StartsAhead;
 
-    constexpr bool operator==(const FrameWindowState& other) const noexcept = default;
+    constexpr bool operator==(const FrameWindowState& other) const noexcept
+    {
+      return Frames == other.Frames && LateFrames == other.LateFrames && AverageWork == other.AverageWork && Span == other.Span &&
+             Full == other.Full && StartsAhead == other.StartsAhead;
+    }
+
+    constexpr bool operator!=(const FrameWindowState& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

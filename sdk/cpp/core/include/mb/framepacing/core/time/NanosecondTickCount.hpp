@@ -189,7 +189,15 @@ namespace MB::FramePacing
       return NanosecondTimeSpan(Distance(lhs, rhs));
     }
 
-    constexpr bool operator==(const NanosecondTickCount&) const noexcept = default;
+    constexpr bool operator==(const NanosecondTickCount& other) const noexcept
+    {
+      return m_nanoseconds == other.m_nanoseconds;
+    }
+
+    constexpr bool operator!=(const NanosecondTickCount& other) const noexcept
+    {
+      return !(*this == other);
+    }
 
     //! lhs is before rhs: the wrap-safe order of TickCount64, for counts less than 2^63 nanoseconds apart.
     friend constexpr bool operator<(const NanosecondTickCount lhs, const NanosecondTickCount rhs) noexcept

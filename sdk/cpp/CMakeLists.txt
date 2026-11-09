@@ -54,6 +54,14 @@ option(MB_FRAMEPACING_INSTALL "Add the install rules and the CMake package (find
 option(MB_FRAMEPACING_BUILD_BENCHMARKS "Build the benchmarks (the marker module's; fetches Google Benchmark unless one is installed)" OFF)
 option(MB_FRAMEPACING_BUILD_FUZZERS "Build the libFuzzer targets (needs Clang): the marker's QR encoder against its reference" OFF)
 option(MB_FRAMEPACING_WARNINGS_AS_ERRORS "Treat warnings as errors" ${PROJECT_IS_TOP_LEVEL})
+# The C++ standard the library is built for. 17 builds the core, marker, trace and pacer modules for C++17 (the SDK's own Span in
+# place of std::span); the data module needs C++20 either way. The generated <mb/framepacing/core/Config.hpp> records it, so an
+# application compiled with another standard still sees the types the library was built with.
+set(MB_FRAMEPACING_CXX_STANDARD 20 CACHE STRING "The C++ standard the library is built for: 20, or 17 (core, marker, trace, pacer)")
+set_property(CACHE MB_FRAMEPACING_CXX_STANDARD PROPERTY STRINGS 17 20)
+if(NOT MB_FRAMEPACING_CXX_STANDARD MATCHES "^(17|20)$")
+  message(FATAL_ERROR "MB_FRAMEPACING_CXX_STANDARD is '${MB_FRAMEPACING_CXX_STANDARD}': it must be 17 or 20")
+endif()
 
 if(MB_FRAMEPACING_BUILD_DATA AND NOT MB_FRAMEPACING_BUILD_MARKER)
   message(FATAL_ERROR "The data module needs the marker module: MB_FRAMEPACING_BUILD_DATA=ON needs MB_FRAMEPACING_BUILD_MARKER=ON")
@@ -74,9 +82,12 @@ set(MB_FRAMEPACING_CXX_WARNINGS
 # -dead_strip); MSVC's /O2 has /Gy
 set(MB_FRAMEPACING_SECTION_FLAGS "$<$<NOT:$<STREQUAL:$<CXX_COMPILER_FRONTEND_VARIANT>,MSVC>>:-ffunction-sections;-fdata-sections>")
 
-# The generated headers (core's Version.hpp) go here; the core target adds it to its header file set.
+# The generated headers (core's Version.hpp and Config.hpp) go here; the core target adds them to its header file set.
 set(MB_FRAMEPACING_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 configure_file(cmake/Version.hpp.in ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Version.hpp @ONLY)
+configure_file(cmake/Config.hpp.in ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Config.hpp @ONLY)
+# What the core, marker, trace and pacer modules and their tests, tools and benchmarks need (cxx_std_17 or cxx_std_20)
+set(MB_FRAMEPACING_CXX_FEATURE cxx_std_${MB_FRAMEPACING_CXX_STANDARD})
 
 if(MB_FRAMEPACING_BUILD_TESTS)
   enable_testing()

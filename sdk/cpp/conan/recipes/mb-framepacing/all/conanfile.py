@@ -3,14 +3,15 @@
 """Conan recipe for mb_framepacing, the C++20 library of the mb-framepacing SDK: it builds the C++ release archive of the sdk-v<version>
 tag (conandata.yml has its URL and SHA-256). Every module is a component (mb_framepacing::core, ::marker, ::data, ::pacer, ::trace);
 with_marker, with_data and with_trace leave a module out; with_pacer (off by default: the pacer is experimental, sdk/doc/pacer.md) adds
-one. Laid out as conan-center-index recipes are, so
-the same folder can go there."""
+one. A compiler.cppstd below 20 builds the library for C++17 (MB_FRAMEPACING_CXX_STANDARD=17): the core, marker, trace and pacer
+modules, without the data module, which needs C++20 (with_data=False). Laid out as conan-center-index recipes are, so the same folder
+can go there."""
 
 import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.build import check_min_cppstd
+from conan.tools.build import check_min_cppstd, valid_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import copy, get, rmdir
 
@@ -50,7 +51,8 @@ class MbFramePacingConan(ConanFile):
             self.requires("nlohmann_json/3.12.0", visible=False)
 
     def validate(self):
-        check_min_cppstd(self, 20)
+        # The data module needs C++20; the core, marker, trace and pacer modules build for C++17 too
+        check_min_cppstd(self, 20 if self.options.with_data else 17)
         if self.options.with_data and not self.options.with_marker:
             raise ConanInvalidConfiguration("the data module needs the marker module: with_data=True needs with_marker=True")
         if self.options.with_trace and not self.options.with_marker:
@@ -72,6 +74,8 @@ class MbFramePacingConan(ConanFile):
         toolchain.cache_variables["MB_FRAMEPACING_BUILD_DATA"] = bool(self.options.with_data)
         toolchain.cache_variables["MB_FRAMEPACING_BUILD_PACER"] = bool(self.options.with_pacer)
         toolchain.cache_variables["MB_FRAMEPACING_BUILD_TRACE"] = bool(self.options.with_trace)
+        # The standard the library is built for follows the profile's: C++17 below 20 (the generated Config.hpp records it)
+        toolchain.cache_variables["MB_FRAMEPACING_CXX_STANDARD"] = "20" if valid_min_cppstd(self, 20) else "17"
         # nlohmann/json comes from Conan: FetchContent must find it, never download it
         if self.options.with_data:
             toolchain.cache_variables["CMAKE_REQUIRE_FIND_PACKAGE_nlohmann_json"] = True

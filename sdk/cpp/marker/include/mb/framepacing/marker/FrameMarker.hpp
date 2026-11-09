@@ -11,6 +11,7 @@
 // Every quad edge lies on an integer pixel edge and a quad covers exactly the pixels [Left(),Right()) x [Top(),Bottom()).
 
 #include <mb/framepacing/core/Point.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
 #include <mb/framepacing/marker/Options.hpp>
 #include <mb/framepacing/marker/geometry/IndexedCount.hpp>
@@ -22,7 +23,6 @@
 #include <mb/framepacing/marker/payload/StartMetadata.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 
 namespace MB::FramePacing::Marker
 {
@@ -64,11 +64,11 @@ namespace MB::FramePacing::Marker
   //! kinds ignore it. A frame or end marker is 61 bytes, a start marker 85, a sync marker 20, each ending with the CRC-32 of the bytes
   //! before it (doc/marker-format.md). Returns the number of bytes written, or 0 if dst is too small or the payload's kind is not a
   //! MarkerKind.
-  std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, std::span<uint8_t> dst) noexcept;
+  std::size_t EncodePayload(const Payload& payload, const StartMetadata& metadata, Span<uint8_t> dst) noexcept;
 
   //! Parse the wire format. Returns false on a wrong length, magic, format version, an unknown kind or a CRC that does not match.
   //! For a start marker pMetadata (optional) receives the metadata; other kinds reset it.
-  bool TryDecodePayload(std::span<const uint8_t> bytes, Payload& rPayload, StartMetadata* pMetadata = nullptr) noexcept;
+  bool TryDecodePayload(Span<const uint8_t> bytes, Payload& rPayload, StartMetadata* pMetadata = nullptr) noexcept;
 
   //! Encode a marker: the payload's QR symbol as a module matrix, the one step every drawing output starts from (metadata is only used by
   //! start markers). Draw it with ModulesToQuads, ModulesToTriangles, ModulesToIndexed, ModulesToGridIndices or ModulesToBitmap; one
@@ -79,38 +79,38 @@ namespace MB::FramePacing::Marker
   //! The marker as quads: the light background (symbol + quiet zone) first, then one dark quad per horizontal run of dark modules. Draw
   //! them in order. Every marker produces at most MaxQuadCount() quads. Does not allocate.
   //! Returns the number of quads written, or 0 if the matrix is empty or dst is too small.
-  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<MarkerQuad> dst) noexcept;
+  std::size_t ModulesToQuads(const ModuleMatrix& matrix, const Options& options, Point origin, Span<MarkerQuad> dst) noexcept;
 
   //! The marker as a triangle list, written straight into dst: 6 vertices per quad (see ModulesToQuads for the quad order), (TL, TR, BL)
   //! (BL, TR, BR), clockwise on screen. Every vertex lies on a pixel corner. Every marker needs at most MaxTriangleVertexCount() vertices.
   //! Returns the number of vertices written, or 0 if the matrix is empty or dst is too small.
-  std::size_t ModulesToTriangles(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<Vertex> dst) noexcept;
+  std::size_t ModulesToTriangles(const ModuleMatrix& matrix, const Options& options, Point origin, Span<Vertex> dst) noexcept;
 
   //! The marker as an indexed triangle list: 4 vertices (TL, TR, BR, BL) and 6 indices (0,1,3)(3,1,2) per quad, clockwise on screen.
   //! baseVertex is added to every index. Every marker needs at most MaxIndexedVertexCount() vertices and MaxIndexCount() indices.
   //! Returns {0,0} if the matrix is empty or a destination is too small.
-  IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<Vertex> dstVertices,
-                                std::span<uint32_t> dstIndices, uint32_t baseVertex = 0) noexcept;
+  IndexedCount ModulesToIndexed(const ModuleMatrix& matrix, const Options& options, Point origin, Span<Vertex> dstVertices, Span<uint32_t> dstIndices,
+                                uint32_t baseVertex = 0) noexcept;
 
   //! The marker's static grid, for drawing it with per-frame indices only (ModulesToGridIndices): the vertices stay the same while the kind's
   //! symbol size, the options and the origin do. Vertices 0..3 are the light background (TL, TR, BR, BL, luma 255); then the corners of
   //! the modules, dark (luma 0), row-major: corner (column, row) is vertex 4 + row x (N + 1) + column, N the kind's modules per side. Every
   //! vertex lies on a pixel corner. Does not allocate.
   //! Returns the number of vertices written (GridVertexCount(kind)), or 0 if dst is too small.
-  std::size_t GridVertices(MarkerKind kind, const Options& options, Point origin, std::span<Vertex> dst) noexcept;
+  std::size_t GridVertices(MarkerKind kind, const Options& options, Point origin, Span<Vertex> dst) noexcept;
 
   //! The per-frame part of the grid drawing: the indices of the background, (0,1,3)(3,1,2), then 6 per horizontal run of dark modules,
   //! (TL, TR, BL) (BL, TR, BR) of the run's grid corners, clockwise on screen. Use the grid of the matrix's kind (a Sync matrix with the
   //! Sync grid). baseVertex is added to every index. Every marker needs at most MaxIndexCount() indices. Does not allocate.
   //! Returns the number of indices written, or 0 if the matrix is empty or dst is too small.
-  std::size_t ModulesToGridIndices(const ModuleMatrix& matrix, std::span<uint32_t> dst, uint32_t baseVertex = 0) noexcept;
+  std::size_t ModulesToGridIndices(const ModuleMatrix& matrix, Span<uint32_t> dst, uint32_t baseVertex = 0) noexcept;
 
   //! Draw the marker into a width x height pixel buffer, rows stride bytes apart (0 = width x PixelFormatUtil::BytesPerPixel(format)): the light
   //! background (symbol + quiet zone), then the dark modules, 0 (dark) or 255 (light) in every colour channel and alpha 255. The marker is clipped to
   //! the buffer; other pixels are left as they are. With a module size of 1 and origin (0,0) this is a module-resolution image (a texture to
   //! scale up with point filtering). Does not allocate.
   //! Returns false, writing nothing, if the matrix is empty, the stride is shorter than a row or dst is too small.
-  bool ModulesToBitmap(const ModuleMatrix& matrix, const Options& options, Point origin, std::span<uint8_t> dst, int32_t width, int32_t height,
+  bool ModulesToBitmap(const ModuleMatrix& matrix, const Options& options, Point origin, Span<uint8_t> dst, int32_t width, int32_t height,
                        PixelFormat format, std::size_t stride = 0) noexcept;
 }
 

@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/trace/FrameRecordAnnotation.hpp>
@@ -11,7 +12,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 
 namespace MB::FramePacing::Trace
 {
@@ -39,7 +39,7 @@ namespace MB::FramePacing::Trace
     uint32_t Lane{0};
 
     //! The record's annotations, in the order of the marker's fields.
-    [[nodiscard]] constexpr std::span<const FrameRecordAnnotation> Annotations() const noexcept
+    [[nodiscard]] constexpr Span<const FrameRecordAnnotation> Annotations() const noexcept
     {
       assert(AnnotationCount <= MaxAnnotationCount);
       return {AnnotationBuffer.data(), AnnotationCount};

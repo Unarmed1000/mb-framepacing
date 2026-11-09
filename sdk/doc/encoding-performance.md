@@ -37,6 +37,19 @@ original's two encodes and the drawing), as the original encoder is no longer bu
 whole. C# has no bit counting instructions in .NET Standard 2.1 (which Unity needs), so
 its encoder counts bits with plain arithmetic.
 
+The C++ rows are a library built for C++20. Built for C++17 (`MB_FRAMEPACING_CXX_STANDARD=17`), which has no `<bit>`, the encoder
+counts bits with plain arithmetic too (`detail/BitCount.hpp`), and is slower by that. Measured on 2026-11-09, the median of five runs
+each:
+
+| What                          | Compiler | C++20 build | C++17 build |
+| ----------------------------- | -------- | ----------: | ----------: |
+| Main marker (frame, 61 bytes) | MSVC     |      9.3 µs |     11.6 µs |
+| Sync marker (20 bytes)        | MSVC     |      4.0 µs |      4.9 µs |
+| A whole frame, as triangles   | MSVC     |       20 µs |       28 µs |
+| Main marker (frame, 61 bytes) | Clang    |      8.6 µs |      9.9 µs |
+| Sync marker (20 bytes)        | Clang    |      3.8 µs |      3.9 µs |
+| A whole frame, as triangles   | Clang    |       19 µs |       21 µs |
+
 ## Where the time went
 
 A QR symbol's data area is filled straight from the payload's bytes. Raw bytes can give large areas of one colour, or shapes that

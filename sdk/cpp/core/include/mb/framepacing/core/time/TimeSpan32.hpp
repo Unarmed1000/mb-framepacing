@@ -3,11 +3,14 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/Config.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <compare>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace MB::FramePacing
 {
@@ -61,8 +64,39 @@ namespace MB::FramePacing
       return TimeSpan(m_ticks);
     }
 
-    constexpr bool operator==(const TimeSpan32&) const noexcept = default;
+    constexpr bool operator==(const TimeSpan32& other) const noexcept
+    {
+      return m_ticks == other.m_ticks;
+    }
+
+    constexpr bool operator!=(const TimeSpan32& other) const noexcept
+    {
+      return !(*this == other);
+    }
+
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
     constexpr std::strong_ordering operator<=>(const TimeSpan32&) const noexcept = default;
+#else
+    constexpr bool operator<(const TimeSpan32& other) const noexcept
+    {
+      return m_ticks < other.m_ticks;
+    }
+
+    constexpr bool operator<=(const TimeSpan32& other) const noexcept
+    {
+      return m_ticks <= other.m_ticks;
+    }
+
+    constexpr bool operator>(const TimeSpan32& other) const noexcept
+    {
+      return m_ticks > other.m_ticks;
+    }
+
+    constexpr bool operator>=(const TimeSpan32& other) const noexcept
+    {
+      return m_ticks >= other.m_ticks;
+    }
+#endif
   };
 }
 

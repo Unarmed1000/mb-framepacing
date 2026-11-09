@@ -11,13 +11,13 @@
 //                the penalty scores are compared.
 //
 // Built with -DMB_FRAMEPACING_BUILD_FUZZERS=ON (Clang): mb_framepacing_marker_qr_fuzz [corpus dir] -max_len=256 -max_total_time=60
+#include <mb/framepacing/core/Span.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <span>
 #include "QrcodegenReference.h"
 #include "mb/framepacing/marker/detail/QrEncoder.hpp"
 #include "mb/framepacing/marker/detail/QrSymbol.hpp"
@@ -34,7 +34,7 @@ namespace
     std::abort();
   }
 
-  bool ReferenceEncode(const std::span<const uint8_t> data, const int32_t version, const qrcodegen_Mask mask, ReferenceSymbol& rSymbol)
+  bool ReferenceEncode(const MB::FramePacing::Span<const uint8_t> data, const int32_t version, const qrcodegen_Mask mask, ReferenceSymbol& rSymbol)
   {
     ReferenceSymbol dataAndTemp{};
     std::copy(data.begin(), data.end(), dataAndTemp.begin());
@@ -62,7 +62,7 @@ namespace
     }
   }
 
-  void FuzzPayload(const int32_t version, std::span<const uint8_t> payload)
+  void FuzzPayload(const int32_t version, MB::FramePacing::Span<const uint8_t> payload)
   {
     // Up to a few bytes more than fit: both must refuse those
     payload = payload.first(std::min<std::size_t>(payload.size(), 110));
@@ -92,7 +92,7 @@ namespace
     }
   }
 
-  void FuzzDrawnSymbol(const int32_t size, const std::span<const uint8_t> rows)
+  void FuzzDrawnSymbol(const int32_t size, const MB::FramePacing::Span<const uint8_t> rows)
   {
     QR::QrSymbol symbol;
     symbol.Size = size;
@@ -123,7 +123,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* const pData, const std::siz
   {
     return 0;
   }
-  const std::span<const uint8_t> input(pData, size);
+  const MB::FramePacing::Span<const uint8_t> input(pData, size);
   const uint8_t mode = input[0];
   if ((mode & 0x80u) == 0u)
   {

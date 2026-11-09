@@ -7,11 +7,11 @@
 // error correction level M): which modules carry data, the function patterns, where the format bits go and the order the codeword bits
 // are placed in. The layout is the QR standard's, as the QR Code generator library draws it (reference/third_party/qrcodegen, the tests' reference).
 
+#include <mb/framepacing/core/Span.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include "QrSymbol.hpp"
 
 namespace MB::FramePacing::Marker::QrEncoder
@@ -39,7 +39,7 @@ namespace MB::FramePacing::Marker::QrEncoder
     //! The modules of the format bits, both copies: ModuleOf(x, y) with the format bit's index above (FormatBitOf).
     std::array<uint16_t, 2 * FormatBitCount> FormatModules{};
     //! Codeword bit i (the first codeword's highest bit first) goes to module CodewordModules[i]: ModuleOf(x, y).
-    std::span<const uint16_t> CodewordModules;
+    Span<const uint16_t> CodewordModules;
   };
 
   //! A module's position in one value.
@@ -179,7 +179,7 @@ namespace MB::FramePacing::Marker::QrEncoder
   }
 
   [[nodiscard]] constexpr QrVersionTables MakeVersionTables(const int32_t version, const int32_t dataCodewordCount, const int32_t blockCount,
-                                                            const std::span<const uint16_t> codewordModules) noexcept
+                                                            const Span<const uint16_t> codewordModules) noexcept
   {
     QrVersionTables tables;
     const int32_t size = (4 * version) + 17;

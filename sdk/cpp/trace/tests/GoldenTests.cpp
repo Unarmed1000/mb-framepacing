@@ -4,6 +4,7 @@
 // The golden data (test-data/trace/frame-records.csv; every language's trace module reads the same file): each row is what a
 // payload's constructor is given, before any cap, and then the record that payload gives: the slice's name, start and length and
 // its annotations in order (name=value, joined by ';'). A row whose name is empty is a payload that gets no record.
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -20,7 +21,6 @@
 #include <fstream>
 #include <limits>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -176,7 +176,7 @@ TEST(Golden, EveryPayloadGivesTheRecordOfItsRow)
     EXPECT_EQ(record.StartTime.Nanoseconds(), std::stoll(cells[11]));
     EXPECT_EQ(record.Duration.Nanoseconds(), std::stoll(cells[12]));
     const std::vector<std::string> expected = cells[13].empty() ? std::vector<std::string>() : Split(cells[13], ';');
-    const std::span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
+    const MB::FramePacing::Span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
     ASSERT_EQ(annotations.size(), expected.size());
     for (std::size_t index = 0; index < expected.size(); ++index)
     {

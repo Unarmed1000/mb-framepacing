@@ -36,7 +36,15 @@ namespace MB::FramePacing::Pacer
     //! The time rounded to the nearest nanosecond (half up).
     [[nodiscard]] NanosecondTimeSpan ToNanosecondTimeSpan() const noexcept;
 
-    constexpr bool operator==(const RefreshTime&) const noexcept = default;
+    constexpr bool operator==(const RefreshTime& other) const noexcept
+    {
+      return m_whole == other.m_whole && m_fraction == other.m_fraction;
+    }
+
+    constexpr bool operator!=(const RefreshTime& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

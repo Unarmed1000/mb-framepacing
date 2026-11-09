@@ -3,13 +3,12 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/marker/MarkerKind.hpp>
-#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 
 namespace MB::FramePacing::Marker
 {
@@ -60,15 +59,15 @@ namespace MB::FramePacing::Marker
     }
 
     //! The packed bits: PackedModuleByteCount(Size()) bytes.
-    [[nodiscard]] constexpr std::span<const uint8_t> Bits() const noexcept
+    [[nodiscard]] constexpr Span<const uint8_t> Bits() const noexcept
     {
-      return std::span<const uint8_t>(m_bits).first(PackedModuleByteCount(m_size));
+      return Span<const uint8_t>(m_bits).first(PackedModuleByteCount(m_size));
     }
 
     //! A matrix of Size x Size modules from packed bits (at least PackedModuleByteCount(size) bytes; bits past the last module are
     //! ignored). Returns false, leaving rMatrix unchanged, for a size that is not a marker's (MainSize or SyncSize: the sizes the drawing
     //! functions and the grid know) or too few bytes.
-    static constexpr bool TryFromBits(const int32_t size, const std::span<const uint8_t> bits, ModuleMatrix& rMatrix) noexcept
+    static constexpr bool TryFromBits(const int32_t size, const Span<const uint8_t> bits, ModuleMatrix& rMatrix) noexcept
     {
       const std::size_t byteCount = PackedModuleByteCount(size);
       if ((size != MainSize && size != SyncSize) || bits.size() < byteCount)
@@ -77,7 +76,10 @@ namespace MB::FramePacing::Marker
       }
       ModuleMatrix matrix;
       matrix.m_size = size;
-      std::copy_n(bits.begin(), byteCount, matrix.m_bits.begin());
+      for (std::size_t i = 0; i < byteCount; ++i)
+      {
+        matrix.m_bits[i] = bits[i];
+      }
       // Zero the padding, so equal symbols compare equal. Both sizes are odd and an odd square is 1 more than a multiple of 8, so the
       // last byte always holds 1 module and 7 bits of padding.
       matrix.m_bits[byteCount - 1u] = static_cast<uint8_t>(matrix.m_bits[byteCount - 1u] & 0x80u);
@@ -87,7 +89,25 @@ namespace MB::FramePacing::Marker
 
     constexpr bool operator==(const ModuleMatrix& other) const noexcept
     {
-      return m_size == other.m_size && std::ranges::equal(Bits(), other.Bits());
+      if (m_size != other.m_size)
+      {
+        return false;
+      }
+      const Span<const uint8_t> bits = Bits();
+      const Span<const uint8_t> otherBits = other.Bits();
+      for (std::size_t i = 0; i < bits.size(); ++i)
+      {
+        if (bits[i] != otherBits[i])
+        {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    constexpr bool operator!=(const ModuleMatrix& other) const noexcept
+    {
+      return !(*this == other);
     }
   };
 }

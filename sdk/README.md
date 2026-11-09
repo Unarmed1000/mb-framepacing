@@ -42,14 +42,14 @@ Everything here is under the BSD 3-Clause License. The measuring tools themselve
 
 ## Pick a library
 
-| Your application                 | Library                                                                                                                         | How to get it                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| C++ (any engine or graphics API) | [C++20](cpp/README.md): `mb_framepacing::core`, `::marker`, `::data`, `::trace` (`::pacer` experimental, off by default)        | Release archive via CMake `FetchContent`, git, `add_subdirectory`, an install or Conan |
-| Unity 2021.3+                    | [Unity package](unity/README.md) (`com.manabattery.framepacing`)                                                                | Package Manager, git URL (`#upm/v<version>`)                                           |
-| Other C# / .NET                  | [`MB.FramePacing.Marker`](csharp/marker/README.md) (.NET Standard 2.1, with the core [`MB.FramePacing`](csharp/core/README.md)) | The source at an `sdk-v*` tag, as a project reference or a copy                        |
-|                                  | [`MB.FramePacing.Data`](csharp/data/README.md) (.NET 10, reads and writes)                                                      |                                                                                        |
-|                                  | [`MB.FramePacing.Trace`](csharp/trace/README.md) (.NET Standard 2.1)                                                            |                                                                                        |
-| Python 3.12+                     | [`mb_framepacing`](python/README.md): `mb_framepacing.marker`, `mb_framepacing.data`                                            | One package, standard library only                                                     |
+| Your application                 | Library                                                                                                                                             | How to get it                                                                          |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| C++ (any engine or graphics API) | [C++20, or C++17 without `::data`](cpp/README.md): `mb_framepacing::core`, `::marker`, `::data`, `::trace` (`::pacer` experimental, off by default) | Release archive via CMake `FetchContent`, git, `add_subdirectory`, an install or Conan |
+| Unity 2021.3+                    | [Unity package](unity/README.md) (`com.manabattery.framepacing`)                                                                                    | Package Manager, git URL (`#upm/v<version>`)                                           |
+| Other C# / .NET                  | [`MB.FramePacing.Marker`](csharp/marker/README.md) (.NET Standard 2.1, with the core [`MB.FramePacing`](csharp/core/README.md))                     | The source at an `sdk-v*` tag, as a project reference or a copy                        |
+|                                  | [`MB.FramePacing.Data`](csharp/data/README.md) (.NET 10, reads and writes)                                                                          |                                                                                        |
+|                                  | [`MB.FramePacing.Trace`](csharp/trace/README.md) (.NET Standard 2.1)                                                                                |                                                                                        |
+| Python 3.12+                     | [`mb_framepacing`](python/README.md): `mb_framepacing.marker`, `mb_framepacing.data`                                                                | One package, standard library only                                                     |
 
 The Unity package contains the C# core and marker modules plus Unity helpers (an overlay component that does everything for you).
 What the C++ modules add to an executable, per compiler, is in [the C++ README](cpp/README.md#what-it-adds-to-your-executable).
@@ -69,15 +69,15 @@ CI checks it):
 
 ## What is here
 
-| Path                            | Contents                                                                                                                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`cpp/`](cpp/README.md)         | The C++20 library: one CMake project, a folder per module (`core/`, `marker/`, `data/`, `trace/`, and `pacer/`, experimental and off by default), and its Conan recipe (`cpp/conan/`) |
-| [`csharp/`](csharp)             | The C# modules: [`core/`](csharp/core/README.md), [`marker/`](csharp/marker/README.md), [`data/`](csharp/data/README.md) and [`trace/`](csharp/trace/README.md)                       |
-| [`python/`](python/README.md)   | The Python package `mb_framepacing`, with the `marker` and `data` subpackages                                                                                                         |
-| [`unity/`](unity/README.md)     | The Unity package's sources: helpers, samples, and the scripts that assemble and check it                                                                                             |
-| [`shaders/`](shaders/README.md) | The reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3 / ES 3.0, OpenGL ES 2.0 and Vulkan                                                                  |
-| [`doc/`](doc)                   | The formats, the integration guides and the [vocabulary](doc/vocabulary.md)                                                                                                           |
-| [`test-data/`](test-data)       | The golden data every language's tests check against: marker images (`markers/`), an analysed test clip (`data/`), the pacer's scenarios (`pacer/`) and frame records (`trace/`)      |
+| Path                            | Contents                                                                                                                                                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`cpp/`](cpp/README.md)         | The C++20 library (C++17 for every module but data): one CMake project, a folder per module (`core/`, `marker/`, `data/`, `trace/`, and `pacer/`, experimental and off by default), and its Conan recipe (`cpp/conan/`) |
+| [`csharp/`](csharp)             | The C# modules: [`core/`](csharp/core/README.md), [`marker/`](csharp/marker/README.md), [`data/`](csharp/data/README.md) and [`trace/`](csharp/trace/README.md)                                                         |
+| [`python/`](python/README.md)   | The Python package `mb_framepacing`, with the `marker` and `data` subpackages                                                                                                                                           |
+| [`unity/`](unity/README.md)     | The Unity package's sources: helpers, samples, and the scripts that assemble and check it                                                                                                                               |
+| [`shaders/`](shaders/README.md) | The reference shaders that draw the marker as one quad: HLSL, GLSL for OpenGL 3.3 / ES 3.0, OpenGL ES 2.0 and Vulkan                                                                                                    |
+| [`doc/`](doc)                   | The formats, the integration guides and the [vocabulary](doc/vocabulary.md)                                                                                                                                             |
+| [`test-data/`](test-data)       | The golden data every language's tests check against: marker images (`markers/`), an analysed test clip (`data/`), the pacer's scenarios (`pacer/`) and frame records (`trace/`)                                        |
 
 ## The marker module
 

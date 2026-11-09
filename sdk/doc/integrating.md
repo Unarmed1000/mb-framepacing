@@ -20,7 +20,8 @@ whatever you already use (Direct3D, Vulkan, Metal, OpenGL, a 2D API). The precis
 
 ## 1. Add the C++ library
 
-CMake 4.0+ and a C++20 compiler. The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`; `::pacer` is experimental and off by default); the marker
+CMake 4.0+ and a C++20 compiler, or a C++17 one with `-DMB_FRAMEPACING_CXX_STANDARD=17`: that builds every module but the data
+module, which needs C++20, for C++17 ([C++17](../cpp/README.md#c17)). The library is one CMake project of modules (`mb_framepacing::core`, `::marker`, `::data`; `::pacer` is experimental and off by default); the marker
 module needs only the core and has no dependencies ([what each module adds to your executable](../cpp/README.md#what-it-adds-to-your-executable)).
 Pick one of five ways:
 
@@ -78,7 +79,8 @@ find_package(mb_framepacing CONFIG REQUIRED COMPONENTS marker)   # from Conan's 
 target_link_libraries(my_game PRIVATE mb_framepacing::marker)
 ```
 
-The remote holds recipes only, no prebuilt binaries, and the library needs C++20: the profile's `compiler.cppstd` must be 20 or newer.
+The remote holds recipes only, no prebuilt binaries. The profile's `compiler.cppstd` decides the standard the library is built for:
+20 or newer for every module; 17 for every module but data, so add `-o "mb-framepacing/*:with_data=False"`.
 
 What your project gets:
 

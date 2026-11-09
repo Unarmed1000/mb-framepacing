@@ -53,7 +53,22 @@ namespace MB::FramePacing::Marker
       return true;
     }
 
-    constexpr bool operator==(const SequenceId&) const noexcept = default;
+    constexpr bool operator==(const SequenceId& other) const noexcept
+    {
+      for (std::size_t i = 0; i < ByteCount; ++i)
+      {
+        if (Bytes[i] != other.Bytes[i])
+        {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    constexpr bool operator!=(const SequenceId& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

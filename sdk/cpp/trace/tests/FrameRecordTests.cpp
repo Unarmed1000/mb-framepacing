@@ -4,6 +4,7 @@
 // The frame record (sdk/doc/trace-frame-record.md, which is the reference): its strings, the name of a frame's slice, and the
 // record a marker's payload gives, rule by rule: which markers get one, where the slice starts and how long it is, and which of
 // the marker's times are annotations.
+#include <mb/framepacing/core/Span.hpp>
 #include <mb/framepacing/core/time/NanosecondTickCount.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeDuration.hpp>
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
@@ -20,7 +21,6 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <span>
 #include <string_view>
 
 namespace FP = MB::FramePacing;
@@ -210,7 +210,7 @@ TEST(FrameRecord, AnnotationsAreTheFirstOfTheBuffer)
   record.AnnotationBuffer[1] = {TR::FrameRecordText::MarkerTargetNs, 2};
   record.AnnotationBuffer[2] = {TR::FrameRecordText::IntendedDisplayNs, 3};
   record.AnnotationCount = 2;
-  const std::span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
+  const MB::FramePacing::Span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
   ASSERT_EQ(annotations.size(), 2u);
   EXPECT_EQ(annotations.data(), record.AnnotationBuffer.data());
   EXPECT_EQ(annotations[0], (TR::FrameRecordAnnotation{TR::FrameRecordText::AnimationNs, 1}));
@@ -248,7 +248,7 @@ TEST(FrameRecordUtil, AFrameMarkerGivesItsRecord)
   EXPECT_EQ(record.Duration, FP::NanosecondTimeDuration::FromNanoseconds(77'600));
   EXPECT_EQ(record.EndTime(), FP::NanosecondTickCount(5'000'685'950'000));
   // Every annotation, in the order of the marker's fields
-  const std::span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
+  const MB::FramePacing::Span<const TR::FrameRecordAnnotation> annotations = record.Annotations();
   ASSERT_EQ(annotations.size(), 5u);
   EXPECT_EQ(annotations[0], (TR::FrameRecordAnnotation{"animationNs", 833'277'800}));
   EXPECT_EQ(annotations[1], (TR::FrameRecordAnnotation{"markerPreferredNs", 16'666'667}));

@@ -16,9 +16,11 @@ target_sources(mb_framepacing_core
       include/mb/framepacing/core/ByteSpanUtil.hpp
       include/mb/framepacing/core/Crc32Util.hpp
       include/mb/framepacing/core/GetLibraryVersion.hpp
+      include/mb/framepacing/core/IntegerCompareUtil.hpp
       include/mb/framepacing/core/LibraryVersion.hpp
       include/mb/framepacing/core/Point.hpp
       include/mb/framepacing/core/Rectangle.hpp
+      include/mb/framepacing/core/Span.hpp
       include/mb/framepacing/core/time/ChronoConversion.hpp
       include/mb/framepacing/core/time/NanosecondTickCount.hpp
       include/mb/framepacing/core/time/NanosecondTimeDuration.hpp
@@ -28,8 +30,9 @@ target_sources(mb_framepacing_core
       include/mb/framepacing/core/time/TimeDuration.hpp
       include/mb/framepacing/core/time/TimeSpan.hpp
       include/mb/framepacing/core/time/TimeSpan32.hpp
+      ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Config.hpp
       ${MB_FRAMEPACING_GENERATED_INCLUDE_DIR}/mb/framepacing/core/Version.hpp)
-target_compile_features(mb_framepacing_core PUBLIC cxx_std_20)
+target_compile_features(mb_framepacing_core PUBLIC ${MB_FRAMEPACING_CXX_FEATURE})
 target_compile_options(mb_framepacing_core PRIVATE ${MB_FRAMEPACING_CXX_WARNINGS} ${MB_FRAMEPACING_SECTION_FLAGS})
 
 if(MB_FRAMEPACING_INSTALL)
@@ -42,8 +45,11 @@ if(MB_FRAMEPACING_BUILD_TESTS)
   add_executable(mb_framepacing_core_tests
     tests/AllocationTests.cpp
     tests/ByteSpanUtilTests.cpp
+    tests/ComparisonTests.cpp
     tests/CoreTests.cpp
     tests/Crc32UtilTests.cpp
+    tests/IntegerCompareUtilTests.cpp
+    tests/SpanTests.cpp
     tests/time/ChronoConversionTests.cpp
     tests/time/NanosecondTickCountTests.cpp
     tests/time/NanosecondTimeDurationTests.cpp

@@ -3,11 +3,11 @@
 // Crc32Util: the CRC-32 of zlib, PNG and Ethernet, which the marker's payloads and a frame log's headers and records end with. The
 // expected values come from Python's binascii.crc32, never from our own code.
 #include <mb/framepacing/core/Crc32Util.hpp>
+#include <mb/framepacing/core/Span.hpp>
 #include <gtest/gtest.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include <string_view>
 #include <vector>
 
@@ -34,7 +34,7 @@ TEST(Crc32Util, ContinuesOverSeveralSpans)
 {
   const std::string_view digits = "123456789";
   const std::vector<uint8_t> bytes(digits.begin(), digits.end());
-  const std::span<const uint8_t> all(bytes);
+  const MB::FramePacing::Span<const uint8_t> all(bytes);
   // Cut anywhere, the two parts give the CRC of the whole; no bytes change nothing
   for (std::size_t cut = 0; cut <= all.size(); ++cut)
   {
@@ -63,7 +63,7 @@ TEST(Crc32Util, TheFastFormGivesTheSameValues)
   EXPECT_EQ(CRC::ComputeFast({}), 0u);
   EXPECT_EQ(CRC::ComputeFast(std::vector<uint8_t>(32, 0x00u)), 0x190A55ADu);
   EXPECT_EQ(CRC::ComputeFast(std::vector<uint8_t>(32, 0xFFu)), 0xFF6CAB0Bu);
-  EXPECT_EQ(CRC::ComputeFast(std::span<const uint8_t>(bytes).first(4)), 0x9BE3E0A3u);
+  EXPECT_EQ(CRC::ComputeFast(MB::FramePacing::Span<const uint8_t>(bytes).first(4)), 0x9BE3E0A3u);
 
   // Its table made at run time is the compile time one; its first entries are the ones every listing of it starts with, and every
   // sixteenth entry is the small table's
@@ -86,10 +86,10 @@ TEST(Crc32Util, TheFastFormGivesTheSameValues)
     state = (state * 1664525u) + 1013904223u;
     rByte = static_cast<uint8_t>(state >> 24u);
   }
-  const std::span<const uint8_t> all(pattern);
+  const MB::FramePacing::Span<const uint8_t> all(pattern);
   for (std::size_t length = 0; length <= all.size(); ++length)
   {
-    const std::span<const uint8_t> data = all.first(length);
+    const MB::FramePacing::Span<const uint8_t> data = all.first(length);
     ASSERT_EQ(CRC::ComputeFast(data), CRC::Compute(data)) << "length " << length;
     for (std::size_t cut = 0; cut <= length; cut += 3u)
     {

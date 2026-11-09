@@ -20,7 +20,15 @@ namespace MB::FramePacing::Pacer
     //! The frame rate in millihertz, the nearest: 59'940 is 59.94 frames a second. A number to show, in a menu for one.
     uint32_t RateMillihertz{0};
 
-    constexpr bool operator==(const FrameRateStep&) const noexcept = default;
+    constexpr bool operator==(const FrameRateStep& other) const noexcept
+    {
+      return SwapInterval == other.SwapInterval && FrameTime == other.FrameTime && RateMillihertz == other.RateMillihertz;
+    }
+
+    constexpr bool operator!=(const FrameRateStep& other) const noexcept
+    {
+      return !(*this == other);
+    }
   };
 }
 

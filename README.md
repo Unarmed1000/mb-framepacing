@@ -118,7 +118,7 @@ allocate nothing per frame:
 
 | Your application                 | Marker module                                                                                                                          | Guide                                            |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| C++ (any engine or graphics API) | [`sdk/cpp`](sdk/cpp/README.md): `mb_framepacing::marker`, C++20, CMake, no dependencies                                                | [Integrating the marker](sdk/doc/integrating.md) |
+| C++ (any engine or graphics API) | [`sdk/cpp`](sdk/cpp/README.md): `mb_framepacing::marker`, C++20 or C++17, CMake, no dependencies                                       | [Integrating the marker](sdk/doc/integrating.md) |
 | C# / .NET                        | [`sdk/csharp/marker`](sdk/csharp/marker/README.md): `MB.FramePacing.Marker`, .NET Standard 2.1, no dependencies besides the SDK's core | [Integrating the marker](sdk/doc/integrating.md) |
 | Unity 2021.3+                    | Unity package `com.manabattery.framepacing`: the C# module plus a drop-in overlay component                                            | [Unity](sdk/doc/unity.md)                        |
 | Python 3.12+                     | [`sdk/python`](sdk/python/README.md): `mb_framepacing.marker`, standard library only                                                   | [Python library](sdk/python/README.md)           |
@@ -494,7 +494,7 @@ then the usual install folders (winget, Chocolatey, Scoop, Homebrew, apt, snap).
 
 Step-by-step instructions per platform, including putting the tools on your PATH, are in the [platform guides](#getting-started).
 This is the developer summary. Requirements: the .NET 10 SDK, CMake 4.0+ with a C++20 compiler (MSVC 19.5x / Visual Studio 2026, GCC 12+, Clang 16+ or
-AppleClang 15+), Python 3, and Node.js for formatting the docs.
+AppleClang 15+; an application can build the SDK for C++17), Python 3, and Node.js for formatting the docs.
 
 ```sh
 # .NET: libraries, command line tool, GUI and tests

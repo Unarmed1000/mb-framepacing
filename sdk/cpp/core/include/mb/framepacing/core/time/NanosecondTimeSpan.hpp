@@ -3,13 +3,17 @@
 // SPDX-FileCopyrightText: Copyright (C) 2026 Mana Battery ApS
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <mb/framepacing/core/Config.hpp>
+#include <mb/framepacing/core/IntegerCompareUtil.hpp>
 #include <mb/framepacing/core/time/TimeSpan.hpp>
-#include <compare>
-#include <concepts>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
+#include <compare>
+#endif
 
 namespace MB::FramePacing
 {
@@ -62,10 +66,11 @@ namespace MB::FramePacing
 
   private:
     // Defined before the factories that call it: a constant expression needs the template's definition at the call
-    template <std::integral T>
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr NanosecondTimeSpan FromUnits(const T value, const int64_t nanosecondsPerUnit)
     {
-      if (std::cmp_less(value, MinNanoseconds / nanosecondsPerUnit) || std::cmp_greater(value, MaxNanoseconds / nanosecondsPerUnit))
+      if (IntegerCompareUtil::Less(value, MinNanoseconds / nanosecondsPerUnit) ||
+          IntegerCompareUtil::Greater(value, MaxNanoseconds / nanosecondsPerUnit))
       {
         throw std::out_of_range("NanosecondTimeSpan: the value is outside the range of a NanosecondTimeSpan");
       }
@@ -74,24 +79,21 @@ namespace MB::FramePacing
 
   public:
     //! A whole number of microseconds. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr NanosecondTimeSpan FromMicroseconds(const T microseconds)
     {
       return FromUnits(microseconds, NanosecondsPerMicrosecond);
     }
 
     //! A whole number of milliseconds. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr NanosecondTimeSpan FromMilliseconds(const T milliseconds)
     {
       return FromUnits(milliseconds, NanosecondsPerMillisecond);
     }
 
     //! A whole number of seconds. Throws std::out_of_range if it is outside the range.
-    template <std::integral T>
-      requires(!std::same_as<T, bool>)
+    template <typename T, std::enable_if_t<IntegerCompareUtil::IsComparableInteger<T>, int> = 0>
     static constexpr NanosecondTimeSpan FromSeconds(const T seconds)
     {
       return FromUnits(seconds, NanosecondsPerSecond);
@@ -211,8 +213,39 @@ namespace MB::FramePacing
       return lhs -= rhs;
     }
 
-    constexpr bool operator==(const NanosecondTimeSpan&) const noexcept = default;
+    constexpr bool operator==(const NanosecondTimeSpan& other) const noexcept
+    {
+      return m_nanoseconds == other.m_nanoseconds;
+    }
+
+    constexpr bool operator!=(const NanosecondTimeSpan& other) const noexcept
+    {
+      return !(*this == other);
+    }
+
+#if MB_FRAMEPACING_CXX_STANDARD >= 20
     constexpr std::strong_ordering operator<=>(const NanosecondTimeSpan&) const noexcept = default;
+#else
+    constexpr bool operator<(const NanosecondTimeSpan& other) const noexcept
+    {
+      return m_nanoseconds < other.m_nanoseconds;
+    }
+
+    constexpr bool operator<=(const NanosecondTimeSpan& other) const noexcept
+    {
+      return m_nanoseconds <= other.m_nanoseconds;
+    }
+
+    constexpr bool operator>(const NanosecondTimeSpan& other) const noexcept
+    {
+      return m_nanoseconds > other.m_nanoseconds;
+    }
+
+    constexpr bool operator>=(const NanosecondTimeSpan& other) const noexcept
+    {
+      return m_nanoseconds >= other.m_nanoseconds;
+    }
+#endif
   };
 }
 

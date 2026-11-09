@@ -11,10 +11,10 @@
 // - ComputeFast and ContinueFast take a byte per step with a table of 256 entries (1 KiB): the fast one, for the frame log's
 //   records. An application that never calls them does not get the table.
 
+#include <mb/framepacing/core/Span.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 
 namespace MB::FramePacing::Crc32Util
 {
@@ -41,7 +41,7 @@ namespace MB::FramePacing::Crc32Util
 
   //! The CRC-32 of the bytes crc is the CRC-32 of, followed by data: a CRC over several spans is continued from one to the next,
   //! starting from 0 (the CRC-32 of no bytes), as zlib's crc32 does.
-  [[nodiscard]] constexpr uint32_t Continue(const uint32_t crc, const std::span<const uint8_t> data) noexcept
+  [[nodiscard]] constexpr uint32_t Continue(const uint32_t crc, const Span<const uint8_t> data) noexcept
   {
     uint32_t value = crc ^ 0xFFFFFFFFu;
     for (const uint8_t byte : data)
@@ -54,7 +54,7 @@ namespace MB::FramePacing::Crc32Util
   }
 
   //! The CRC-32 of data.
-  [[nodiscard]] constexpr uint32_t Compute(const std::span<const uint8_t> data) noexcept
+  [[nodiscard]] constexpr uint32_t Compute(const Span<const uint8_t> data) noexcept
   {
     return Continue(0u, data);
   }
@@ -78,7 +78,7 @@ namespace MB::FramePacing::Crc32Util
   inline constexpr std::array<uint32_t, 256> ByteTable = MakeByteTable();
 
   //! Continue with the table of 256 entries: the same result, a byte per step.
-  [[nodiscard]] constexpr uint32_t ContinueFast(const uint32_t crc, const std::span<const uint8_t> data) noexcept
+  [[nodiscard]] constexpr uint32_t ContinueFast(const uint32_t crc, const Span<const uint8_t> data) noexcept
   {
     uint32_t value = crc ^ 0xFFFFFFFFu;
     for (const uint8_t byte : data)
@@ -89,7 +89,7 @@ namespace MB::FramePacing::Crc32Util
   }
 
   //! Compute with the table of 256 entries: the same result, a byte per step.
-  [[nodiscard]] constexpr uint32_t ComputeFast(const std::span<const uint8_t> data) noexcept
+  [[nodiscard]] constexpr uint32_t ComputeFast(const Span<const uint8_t> data) noexcept
   {
     return ContinueFast(0u, data);
   }
@@ -97,10 +97,10 @@ namespace MB::FramePacing::Crc32Util
   //! The check value every description of this CRC gives: the ASCII digits 1 to 9.
   inline constexpr std::array<uint8_t, 9> CheckInput{'1', '2', '3', '4', '5', '6', '7', '8', '9'};
   static_assert(Compute(CheckInput) == 0xCBF43926u);
-  static_assert(Compute(std::span<const uint8_t>()) == 0u);
-  static_assert(Continue(Compute(std::span<const uint8_t>(CheckInput).first(4)), std::span<const uint8_t>(CheckInput).subspan(4)) == 0xCBF43926u);
+  static_assert(Compute(Span<const uint8_t>()) == 0u);
+  static_assert(Continue(Compute(Span<const uint8_t>(CheckInput).first(4)), Span<const uint8_t>(CheckInput).subspan(4)) == 0xCBF43926u);
   static_assert(ComputeFast(CheckInput) == 0xCBF43926u);
-  static_assert(ComputeFast(std::span<const uint8_t>()) == 0u);
+  static_assert(ComputeFast(Span<const uint8_t>()) == 0u);
 }
 
 #endif

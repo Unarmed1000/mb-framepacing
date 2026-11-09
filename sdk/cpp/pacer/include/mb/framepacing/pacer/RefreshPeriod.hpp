@@ -58,7 +58,15 @@ namespace MB::FramePacing::Pacer
     //! The fewest refreshes that take at least span: the smallest n with TimeFor(n) >= span (0 for a span of 0 or less).
     [[nodiscard]] int64_t RefreshesToFit(NanosecondTimeSpan span) const noexcept;
 
-    constexpr bool operator==(const RefreshPeriod&) const noexcept = default;
+    constexpr bool operator==(const RefreshPeriod& other) const noexcept
+    {
+      return m_nanosecondsQ32 == other.m_nanosecondsQ32;
+    }
+
+    constexpr bool operator!=(const RefreshPeriod& other) const noexcept
+    {
+      return !(*this == other);
+    }
 
   private:
     explicit RefreshPeriod(int64_t nanosecondsQ32) noexcept;

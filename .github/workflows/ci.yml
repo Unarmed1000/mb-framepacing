@@ -56,6 +56,13 @@ jobs:
           cmake --build sdk/cpp/build/ci --config Release --parallel
           ctest --test-dir sdk/cpp/build/ci -C Release --output-on-failure
 
+      - name: C++ library built for C++17 (core, marker, trace and the experimental pacer; the data module stays C++20)
+        shell: bash
+        run: |
+          cmake -S sdk/cpp -B sdk/cpp/build/ci-cxx17 -DCMAKE_BUILD_TYPE=Release -DMB_FRAMEPACING_BUILD_PACER=ON -DMB_FRAMEPACING_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_CXX_EXTENSIONS=OFF
+          cmake --build sdk/cpp/build/ci-cxx17 --config Release --parallel
+          ctest --test-dir sdk/cpp/build/ci-cxx17 -C Release --output-on-failure
+
       - name: C++ library with the core and marker modules only (no nlohmann/json)
         shell: bash
         run: |
@@ -192,7 +199,7 @@ jobs:
   cpp-analysis:
     name: C++ sanitizers and clang-tidy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - name: CMake 4
@@ -212,6 +219,13 @@ jobs:
         run: build/linux-sanitize/marker/mb_framepacing_marker_qr_fuzz -max_len=256 -max_total_time=60
       - name: clang-format and clang-tidy
         run: python3 tools/check_cpp.py --preset linux-sanitize
+      # The library built for C++17 (MB_FRAMEPACING_CXX_STANDARD=17): its tests with the sanitizers, and clang-tidy on what only that
+      # build compiles (the SDK's own Span, the C++17 halves of the #if MB_FRAMEPACING_CXX_STANDARD blocks)
+      - name: Tests with the sanitizers, the library built for C++17
+        working-directory: sdk/cpp
+        run: cmake --preset linux-sanitize-cxx17 && cmake --build --preset linux-sanitize-cxx17 --parallel && ctest --preset linux-sanitize-cxx17
+      - name: clang-tidy, the library built for C++17
+        run: python3 tools/check_cpp.py --preset linux-sanitize-cxx17
 
   # What the C++ SDK adds to an executable, per toolchain: fails when sdk/cpp/README.md's table is off by more than the tolerance;
   # the measurement is in the job summary and an artifact (tools/measure_sdk_size.py --update-doc <files> refreshes the table)
