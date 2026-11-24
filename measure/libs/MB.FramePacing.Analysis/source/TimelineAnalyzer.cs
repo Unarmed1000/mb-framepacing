@@ -97,6 +97,9 @@ namespace MB.FramePacing.Analysis
       // The start marker says the application logs the run's frame record to a trace
       public bool FrameRecordLogged;
 
+      // The run's first captured end marker, a frame too: its StaticBefore speaks for the frame index before it
+      public EndMarker? End;
+
       // The run's rows, as stretches of the capture's rows: not a copy of them
       public readonly RowRanges Rows;
       public readonly List<string> Warnings = new List<string>();
@@ -106,6 +109,12 @@ namespace MB.FramePacing.Analysis
         Rows = new RowRanges(captureRows);
       }
     }
+
+    /// <summary>
+    /// A run's end marker as the frame after the run's last frame: its frame index, its StaticBefore flag, and whether the capture had a
+    /// gap right before it (the source dropped captures or refreshes were missed before its first capture).
+    /// </summary>
+    private readonly record struct EndMarker(ulong FrameIndex, bool StaticBefore, bool GapBefore);
 
     private static List<RunRows> SplitIntoRuns(IReadOnlyList<CaptureRow> rows, List<string> warnings)
     {
@@ -175,6 +184,7 @@ namespace MB.FramePacing.Analysis
               if (current != null && current.RunId == payload.RunId)
               {
                 current.HasEnd = true;
+                current.End = new EndMarker(payload.FrameIndex, payload.IsStaticBefore, row.SourceDrops > 0 || row.MissedBefore > 0);
                 if (measuring)
                   runs.Add(current);
                 else
@@ -376,7 +386,9 @@ namespace MB.FramePacing.Analysis
       var cameraStatistics = camera ? AnalyzeCamera(builders, firstSecondary, period, warnings) : null;
       if (cameraStatistics != null)
         TimeBySyncMarker(builders, cameraStatistics);
-      var frames = BuildFrames(builders, period, threshold, camera, options.AssumeStatic);
+      // Rows after the last decoded frame are a capture gap before the end marker
+      var end = run.End is { } endMarker ? endMarker with { GapBefore = endMarker.GapBefore || lastDecoded + 1 < rows.Count } : (EndMarker?)null;
+      var frames = BuildFrames(builders, end, period, threshold, camera, options.AssumeStatic);
       var pacing = AnalyzePacing(frames, period, threshold, camera, options, warnings);
       var statistics = RunStatistics.From(frames, threshold, period);
       var counts = new RunCounts(
@@ -693,25 +705,33 @@ namespace MB.FramePacing.Analysis
     ///    animation step is no more than one frame time per frame rendered in between, and two frame times or more short of the display
     ///    step, as a frame that is only late is a frame time short). The frame time is B's target or preferred frame time, else the animation
     ///    step into A. A stall with a running clock, or an ordinary dropped frame, is neither.
+    /// The run's end marker is a frame too and may be B for the run's last frame, by the first rule only: the hold before the end marker
+    /// is outside the measured window, so it gives no grounds to guess a lost flag from.
     /// </summary>
-    private static void AssumeStatic(List<FrameBuilder> builders, NanosecondTimeDuration refresh, NanosecondTimeDuration threshold)
+    private static void AssumeStatic(List<FrameBuilder> builders, EndMarker? end, NanosecondTimeDuration refresh, NanosecondTimeDuration threshold)
     {
       var onDemandTime = MarkerPayload.OnDemandFrameTime;
       // Half a refresh, cut to the nanosecond
       var halfRefresh = NanosecondTimeDuration.FromNanoseconds(refresh.Nanoseconds / 2);
-      bool usesStaticFlags = builders.Any(b => b.StaticAfter || b.StaticBefore);
+      bool usesStaticFlags = builders.Any(b => b.StaticAfter || b.StaticBefore) || end is { StaticBefore: true };
       // The frame indices each segment showed out of order: skipped, but not dropped
       var older = builders
         .Where(b => b.OlderFrames != null)
         .GroupBy(b => b.Segment)
         .ToDictionary(g => g.Key, g => g.SelectMany(b => b.OlderFrames!).Select(o => o.FrameIndex).ToHashSet());
+      // A, not static by its flags, then the frame index next with frames the target dropped in between: no capture gap on either side,
+      // and none of those frames shown out of order
+      bool HeldUntilAfterDroppedFrames(FrameBuilder a, ulong nextFrameIndex, bool nextUncertainStart) =>
+        nextFrameIndex > a.FrameIndex + 1
+        && !a.StaticAfter
+        && !a.UncertainStart
+        && !nextUncertainStart
+        && !(older.TryGetValue(a.Segment, out var shown) && shown.Any(index => index > a.FrameIndex && index < nextFrameIndex));
       for (int i = 1; i < builders.Count; ++i)
       {
         var a = builders[i - 1];
         var b = builders[i];
-        if (a.Segment != b.Segment || b.SkippedBefore == 0 || a.StaticAfter || a.UncertainStart || b.UncertainStart)
-          continue;
-        if (older.TryGetValue(b.Segment, out var shown) && shown.Any(index => index > a.FrameIndex && index < b.FrameIndex))
+        if (a.Segment != b.Segment || !HeldUntilAfterDroppedFrames(a, b.FrameIndex, b.UncertainStart))
           continue;
         if (!b.StaticBefore)
         {
@@ -740,10 +760,20 @@ namespace MB.FramePacing.Analysis
         a.StaticAfter = true;
         a.StaticAssumed = true;
       }
+      if (
+        builders.Count > 0
+        && end is { StaticBefore: true } endMarker
+        && HeldUntilAfterDroppedFrames(builders[^1], endMarker.FrameIndex, endMarker.GapBefore)
+      )
+      {
+        builders[^1].StaticAfter = true;
+        builders[^1].StaticAssumed = true;
+      }
     }
 
     private static List<PresentedFrame> BuildFrames(
       List<FrameBuilder> builders,
+      EndMarker? end,
       NanosecondTimeDuration period,
       NanosecondTimeDuration threshold,
       bool camera,
@@ -752,15 +782,18 @@ namespace MB.FramePacing.Analysis
     {
       var frames = new List<PresentedFrame>(builders.Count);
       // Static is a frame's time on screen, said by the frame itself (StaticAfter) or, when the application only knew it one frame later,
-      // by the next frame (StaticBefore). The next frame speaks only for the frame index before it: a frame never shown has no time on screen
+      // by the next frame (StaticBefore). The next frame speaks only for the frame index before it: a frame never shown has no time on screen.
+      // The run's end marker is a frame too, the next after the run's last frame
       for (int i = 1; i < builders.Count; ++i)
       {
         if (builders[i].StaticBefore && builders[i - 1].Segment == builders[i].Segment && builders[i - 1].FrameIndex + 1 == builders[i].FrameIndex)
           builders[i - 1].StaticAfter = true;
       }
+      if (builders.Count > 0 && end is { StaticBefore: true } endMarker && builders[^1].FrameIndex + 1 == endMarker.FrameIndex)
+        builders[^1].StaticAfter = true;
       // A capture card's captures only: a camera's steps have gaps in every scanout
       if (assumeStatic && !camera)
-        AssumeStatic(builders, period, threshold);
+        AssumeStatic(builders, end, period, threshold);
       int segmentStart = 0;
       var drift = NanosecondTimeSpan.Zero;
       for (int i = 0; i < builders.Count; ++i)

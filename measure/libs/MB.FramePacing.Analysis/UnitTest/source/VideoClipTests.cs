@@ -333,8 +333,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
     /// <summary>
     /// The same rests said two ways: StaticAfter on the rest's frame (known in advance) or StaticBefore on the frame that wakes (known in
-    /// hindsight) analyse to the same frames. Only the last frame differs: its StaticAfter is in the clip, while the StaticBefore that would say
-    /// the same comes with the frame after the capture.
+    /// hindsight) analyse to the same frames. The last frame's rest is said by the end marker's StaticBefore: the end marker is a frame too.
     /// </summary>
     [Test]
     public void StaticInHindsight_AnalysesAsStaticInAdvance()
@@ -349,8 +348,8 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       Assert.That(inHindsight, Has.Count.EqualTo(inAdvance.Count));
       Assert.That(inAdvance.Count(f => (f.Flags & PresentedFrameFlags.StaticBefore) != 0), Is.GreaterThan(0), "the clips have static steps");
-      Assert.That(inHindsight.Take(inAdvance.Count - 1), Is.EqualTo(inAdvance.Take(inAdvance.Count - 1)), "every frame but the last");
-      Assert.That(inHindsight[^1] with { Flags = inHindsight[^1].Flags | PresentedFrameFlags.StaticAfter }, Is.EqualTo(inAdvance[^1]));
+      Assert.That(inAdvance[^1].Flags.HasFlag(PresentedFrameFlags.StaticAfter), "the last frame rests");
+      Assert.That(inHindsight, Is.EqualTo(inAdvance), "every frame, the last one too");
     }
 
     /// <summary>How long after its intended display time the frame is first shown (the pacer's and the video's clocks differ by a constant).</summary>

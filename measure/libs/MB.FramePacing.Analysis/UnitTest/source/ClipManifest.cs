@@ -209,12 +209,24 @@ namespace MB.FramePacing.Analysis.UnitTest
     public long AnimationStepNanoseconds(int frame) => AnimationNanoseconds(Presented[frame]) - AnimationNanoseconds(Presented[frame - 1]);
 
     /// <summary>
+    /// The rendered frame the end marker shows: the frame on screen in the next loop's first refresh (<see cref="MarkerOfVideoFrame"/>).
+    /// </summary>
+    private int EndMarkerRendered => Screen[0];
+
+    /// <summary>The end marker's frame index, counted on across the loop.</summary>
+    private ulong EndMarkerFrameIndex => (2 * FirstFrameIndex) + (ulong)EndMarkerRendered;
+
+    /// <summary>
     /// Nothing animates while presented frame <paramref name="frame"/> is on screen, by the flags alone: its own StaticAfter, or StaticBefore on
-    /// the next presented frame when that is the next rendered frame. The last one's next frame is after the capture.
+    /// the next presented frame when that is the next rendered frame. The last one's next frame is the end marker, a frame too.
     /// </summary>
     public bool IsStaticByFlags(int frame) =>
       RenderedStaticAfter[Presented[frame]]
-      || (frame + 1 < FrameCount && Presented[frame + 1] == Presented[frame] + 1 && RenderedStaticBefore[Presented[frame + 1]]);
+      || (
+        frame + 1 < FrameCount
+          ? Presented[frame + 1] == Presented[frame] + 1 && RenderedStaticBefore[Presented[frame + 1]]
+          : EndMarkerFrameIndex == FrameIndex(frame) + 1 && RenderedStaticBefore[EndMarkerRendered]
+      );
 
     /// <summary>
     /// The analysis's guess (TimelineOptions.AssumeStatic): presented frame <paramref name="frame"/> held a rest whose flag a dropped frame
@@ -222,13 +234,17 @@ namespace MB.FramePacing.Analysis.UnitTest
     /// StaticBefore, or the clip uses the static flags on frames it shows, the next frame is on demand or the hold is half a refresh beyond
     /// what the frames in between were due, and the animation clock stood still: the animation step is at most one frame time per frame
     /// rendered in between and two frame times or more short of the display step (the frame time: the next frame's target, else the animation
-    /// step into the held frame).
+    /// step into the held frame). The last presented frame's next frame is the end marker, by its StaticBefore only.
     /// </summary>
     public bool IsAssumedStatic(int frame)
     {
-      if (frame + 1 >= FrameCount || IsStaticByFlags(frame))
+      if (IsStaticByFlags(frame))
         return false;
       int held = Presented[frame];
+      if (frame + 1 >= FrameCount)
+        return EndMarkerFrameIndex > FrameIndex(frame) + 1
+          && RenderedStaticBefore[EndMarkerRendered]
+          && !Enumerable.Range(held + 1, RenderedRefresh.Length - held - 1).Any(Screen.Contains);
       int next = Presented[frame + 1];
       int dropped = next - held - 1;
       if (dropped <= 0 || Enumerable.Range(held + 1, dropped).Any(Screen.Contains))

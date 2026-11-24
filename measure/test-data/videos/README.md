@@ -43,8 +43,8 @@ The start marker also carries a sequence id: the mode's name, or a UUID made fro
 - `60-on-demand-paused-clock`: as `60-on-demand`, but the animation clock pauses while idle, so only the StaticAfter flag keeps the step
   after a rest from being judged.
 - `60-on-demand-paused-clock-hindsight`: the same frames and clock, but the rest is said in hindsight: no flag on the rest's frame,
-  StaticBefore on the frame that wakes. It analyses as `60-on-demand-paused-clock` (only the last frame differs: its StaticBefore would
-  come with the frame after the capture).
+  StaticBefore on the frame that wakes. It analyses as `60-on-demand-paused-clock`, the last frame too: the end marker carries its
+  StaticBefore.
 - `60-on-demand-paused-clock-hindsight-dropped-before-wake`: as the hindsight clip, but the first rest's frame is rendered and never
   shown, so the wake frame's StaticBefore speaks for a frame that was never on screen. The analysis assumes the frame shown instead
   held the rest (`StaticAssumed`); without the guess that step is judged (−100 ms).

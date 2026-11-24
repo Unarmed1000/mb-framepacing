@@ -84,7 +84,7 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   often the one that reaches the rest pose). Two bits say it, for the two moments an application can know it:
   - bit 0, **static after**, on the frame itself: the application knows while rendering it that it has no pending work after it;
   - bit 1, **static before**, on the next frame: the application only knows once it renders that frame (it woke up on input after
-    waiting).
+    waiting). The end marker is a frame too: its static before says the run's last measured frame rests.
 - **Value:** set whichever bit the application knows, or both; they are independent flags. Inside a static stretch that is rendered
   every refresh, a frame carries both. Bit 2 is the start marker's frame record flag, bit 3 the paced flag and bit 4 present failed before (the next sections). Bits 5 to 7 are reserved:
   write `0`.
@@ -99,7 +99,7 @@ An animation clock in seconds converts with `NanosecondTimeSpan.FromSeconds` (C#
   - Static before speaks for the frame index before it only. When the target dropped a frame next to a rest, the flag can be lost
     (the dropped frame carried it) or orphaned (it speaks for the dropped frame). The analysis then **assumes** the rest is static and
     flags the frame that held it `StaticAssumed`, so the report says it apart from a rest the markers stated:
-    - a `StaticBefore` whose frame was dropped: the frame shown before it held the rest;
+    - a `StaticBefore` whose frame was dropped: the frame shown before it held the rest (the end marker's too);
     - a flag lost with its frame: only in a run that uses the static flags, when the frame after the dropped one is on demand or came
       later than the frames in between were due, and the animation clock stood still over the hold (a stall with a running clock is a
       stall).

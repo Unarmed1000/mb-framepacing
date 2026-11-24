@@ -39,7 +39,8 @@ Part of the notes for Claude; `CLAUDE.md` holds the rules every task needs.
     `StaticAfter` says it on the frame (known upfront: no pending work), bit 1 `StaticBefore` on the next frame (known in hindsight,
     only for frame index − 1). `TimelineAnalyzer.BuildFrames` turns both into `PresentedFrameFlags.StaticAfter` on the frame and
     `StaticBefore` on the next: that static step gets no animation or prediction error (the drift sums only judged errors), the step
-    into the static frame is judged. Independent flags, not an enum; bits 4 to 7 are reserved (write 0, decoders keep them).
+    into the static frame is judged. The run's end marker counts as the frame after the last one (`RunRows.End`): its `StaticBefore`
+    marks the last frame, and `AssumeStatic` gives it the flag rule only (the hold before it is outside the run). Independent flags, not an enum; bits 4 to 7 are reserved (write 0, decoders keep them).
     - **Bit 2, `FrameRecordLogged`** (the user, 2026-10-13: "just so we know it exists"): on a **start marker**, the
       application's word that it logs the run's frame record to a trace. **The application sets it; the SDK never does** (the trace
       module writes no trace, so it can not know) and it is off unless set. Read from the start marker only

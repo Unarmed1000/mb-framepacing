@@ -72,7 +72,12 @@ namespace MB.FramePacing.Analysis.UnitTest
           flags: flags
         );
 
-      public RowBuilder End(uint runId, int captures = 3) => Show(999_999, 0, captures, runId, MarkerKind.SequenceEnd);
+      public RowBuilder End(
+        uint runId,
+        int captures = 3,
+        ulong frameIndex = 999_999,
+        MB.FramePacing.Marker.MarkerFlags flags = MB.FramePacing.Marker.MarkerFlags.NoFlags
+      ) => Show(frameIndex, 0, captures, runId, MarkerKind.SequenceEnd, flags: flags);
 
       public RowBuilder Status(CaptureStatus status, int captures = 1)
       {
@@ -395,8 +400,76 @@ namespace MB.FramePacing.Analysis.UnitTest
     }
 
     /// <summary>
+    /// The end marker is a frame too: its StaticBefore speaks for the frame index before it, the run's last frame, which then rests. No step
+    /// leaves the last frame inside the run, so nothing judged changes. An end marker without the flag, or one that is not the frame after
+    /// the last frame, says nothing of it.
+    /// </summary>
+    [TestCase(5UL, MB.FramePacing.Marker.MarkerFlags.StaticBefore, true)]
+    [TestCase(5UL, MB.FramePacing.Marker.MarkerFlags.NoFlags, false)]
+    [TestCase(2UL, MB.FramePacing.Marker.MarkerFlags.StaticBefore, false)]
+    public void EndMarker_StaticBefore_MakesTheLastFrameStatic(ulong endFrameIndex, MB.FramePacing.Marker.MarkerFlags endFlags, bool rests)
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4).Show(4, 48, 4);
+      rows.End(1, frameIndex: endFrameIndex, flags: endFlags);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows).Runs.Single();
+      var frames = run.Frames;
+
+      Assert.That(
+        frames.Select(f => f.Flags & (PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed)),
+        Is.EqualTo(
+          new[]
+          {
+            PresentedFrameFlags.None,
+            PresentedFrameFlags.None,
+            PresentedFrameFlags.None,
+            rests ? PresentedFrameFlags.StaticAfter : PresentedFrameFlags.None,
+          }
+        )
+      );
+      Assert.That(frames.Any(f => f.Flags.HasFlag(PresentedFrameFlags.StaticBefore)), Is.False, "no step from the last frame inside the run");
+      Assert.That(frames.Skip(1).Select(f => f.AnimationError?.Nanoseconds), Is.All.EqualTo(0L));
+      Assert.That(run.Statistics.ExcludedStaticFrames, Is.Zero);
+      Assert.That(run.Statistics.DisplayDeltaMs.Count, Is.EqualTo(3));
+    }
+
+    /// <summary>
+    /// The end marker's StaticBefore after a frame the target dropped (frame 5, the rest's): the run's last frame held the rest, assumed
+    /// static as between two frames of the run. Without the guess, or after a capture gap before the end marker, it is not. With no frame
+    /// in between the frame index alone says the end marker is the next frame, gap or not.
+    /// </summary>
+    [TestCase(6UL, true, false, true)]
+    [TestCase(6UL, false, false, false)]
+    [TestCase(6UL, true, true, false)]
+    [TestCase(5UL, true, true, true)]
+    public void EndMarker_StaticBefore_AfterADroppedFrame_IsAssumedStatic_UnlessTheGuessIsOff(
+      ulong endFrameIndex,
+      bool assume,
+      bool gapBeforeEnd,
+      bool rests
+    )
+    {
+      var rows = new RowBuilder().Start(1);
+      rows.Show(1, 0, 4).Show(2, 16, 4).Show(3, 32, 4).Show(4, 48, 30);
+      if (gapBeforeEnd)
+        rows.Status(CaptureStatus.Undecodable);
+      rows.End(1, frameIndex: endFrameIndex, flags: MB.FramePacing.Marker.MarkerFlags.StaticBefore);
+
+      var run = TimelineAnalyzer.Analyze(rows.Rows, new TimelineOptions { AssumeStatic = assume }).Runs.Single();
+      var last = run.Frames[^1];
+
+      bool assumed = rests && endFrameIndex == 6;
+      Assert.That(last.FrameIndex, Is.EqualTo(4UL));
+      Assert.That(last.Flags.HasFlag(PresentedFrameFlags.StaticAfter), Is.EqualTo(rests), "frame 4 held the rest");
+      Assert.That(last.Flags.HasFlag(PresentedFrameFlags.StaticAssumed), Is.EqualTo(assumed), "assumed, not said");
+      Assert.That(run.Statistics.ExcludedStaticFrames, Is.Zero);
+    }
+
+    /// <summary>
     /// A 62.5 fps run (16 ms target, 4 captures per frame) in which frame 6 stays on screen and the frame after it may be dropped: the frames
-    /// after frame 6, and whether the analysis assumed frame 6 static. With <paramref name="staticElsewhere"/> frame 2 is a flagged rest.
+    /// after frame 6, and whether the analysis assumed frame 6 static. With <paramref name="staticElsewhere"/> frame 2 is a flagged rest;
+    /// <paramref name="endFlags"/> go on the end marker, whose frame index is far from the run's last frame.
     /// </summary>
     private static (PresentedFrame Held, PresentedFrame After) LostFlag(
       bool staticElsewhere = true,
@@ -405,7 +478,8 @@ namespace MB.FramePacing.Analysis.UnitTest
       bool captureGap = false,
       bool dropped = true,
       bool onDemand = false,
-      bool assume = true
+      bool assume = true,
+      MB.FramePacing.Marker.MarkerFlags endFlags = MB.FramePacing.Marker.MarkerFlags.NoFlags
     )
     {
       const long Target = 16 * Ms;
@@ -424,7 +498,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       ulong next = dropped ? 8u : 7u;
       long aim = onDemand ? MarkerPayload.OnDemandFrameTime.Nanoseconds : Target;
       rows.Show(next, 80 + animationStepMs, 4, targetFrameNanoseconds: aim).Show(next + 1, 96 + animationStepMs, 4, targetFrameNanoseconds: aim);
-      rows.End(1);
+      rows.End(1, flags: endFlags);
       var frames = TimelineAnalyzer.Analyze(rows.Rows, new TimelineOptions { AssumeStatic = assume }).Runs.Single().Frames;
       return (frames[5], frames[6]);
     }
@@ -442,6 +516,24 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(held.Flags.HasFlag(PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed), "frame 6 held a rest");
       Assert.That(after.Flags.HasFlag(PresentedFrameFlags.StaticBefore));
       Assert.That(after.AnimationError, Is.Null, "the rest is not judged");
+    }
+
+    /// <summary>
+    /// The end marker is a frame too: its StaticBefore is the run using the static flags, though no frame inside the run carries one. The
+    /// lost flag is then assumed as in <see cref="LostStaticFlag_IsAssumed_WhenTheClockStoodStillOverALongHold"/>; without it, judged.
+    /// </summary>
+    [TestCase(MB.FramePacing.Marker.MarkerFlags.StaticBefore, true)]
+    [TestCase(MB.FramePacing.Marker.MarkerFlags.NoFlags, false)]
+    public void LostStaticFlag_IsAssumed_WhenOnlyTheEndMarkerUsesTheStaticFlags(MB.FramePacing.Marker.MarkerFlags endFlags, bool assumed)
+    {
+      var (held, after) = LostFlag(staticElsewhere: false, endFlags: endFlags);
+
+      Assert.That(
+        held.Flags & (PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed),
+        Is.EqualTo(assumed ? PresentedFrameFlags.StaticAfter | PresentedFrameFlags.StaticAssumed : PresentedFrameFlags.None),
+        "frame 6 held a rest"
+      );
+      Assert.That(after.AnimationError?.Nanoseconds, Is.EqualTo(assumed ? null : (32 - 120) * Ms), "the rest: assumed static, or judged");
     }
 
     /// <summary>
