@@ -35,6 +35,7 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_workSum;
     uint32_t m_lateCount{0};
     NanosecondTimeSpan m_startsAhead;
+    uint32_t m_minSwapInterval{1};
     uint32_t m_preferredSwapInterval{1};
     uint32_t m_swapInterval{1};
 
@@ -54,11 +55,23 @@ namespace MB::FramePacing::Pacer
       return m_swapInterval;
     }
 
-    //! The fastest swap interval: the preferred one on the display's refresh period (PacerSettings::PreferredSwapIntervalAt).
+    //! The fastest swap interval: the preferred one on the display's refresh period (PacerSettings::PreferredSwapIntervalAt), and
+    //! never faster than the shortest swap interval the present takes (MinSwapInterval).
     [[nodiscard]] uint32_t PreferredSwapInterval() const noexcept
     {
       return m_preferredSwapInterval;
     }
+
+    //! The shortest swap interval the present takes (PacerCapabilities::MinPresentSwapInterval): the rule never runs faster. 1 when
+    //! the present has no shortest one of its own.
+    [[nodiscard]] uint32_t MinSwapInterval() const noexcept
+    {
+      return m_minSwapInterval;
+    }
+
+    //! The present takes no swap interval shorter than minSwapInterval (0 is taken as 1). A floor above the swap interval raises it,
+    //! with an empty window; a lower one lets the rule run faster again as it decides. The same floor changes nothing.
+    void SetMinSwapInterval(uint32_t minSwapInterval) noexcept;
 
     //! The refresh period the rule decides at: its settings'.
     [[nodiscard]] RefreshPeriod Refresh() const noexcept
@@ -82,8 +95,9 @@ namespace MB::FramePacing::Pacer
     //! Empty the window, keeping the swap interval.
     void Clear() noexcept;
 
-    //! Go on from another rule with the same settings: its swap interval and its window, frame for frame. Never allocates: with
-    //! a window of another size (other settings) the swap interval is taken and the window starts empty.
+    //! Go on from another rule with the same settings: its shortest swap interval, its swap interval and its window, frame for
+    //! frame. Never allocates: with a window of another size (other settings) the swap interval is taken and the window starts
+    //! empty.
     void TakeOver(const SwapIntervalRule& other) noexcept;
 
     //! The frames to come are given display times on another clock (a grid of refreshes that starts anew, another pacer's
@@ -103,6 +117,8 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] const Entry& At(std::size_t index) const noexcept;
     [[nodiscard]] bool IsFull() const noexcept;
     void PopFront() noexcept;
+    //! The preferred swap interval of the settings on their refresh period, and no faster than the floor.
+    [[nodiscard]] uint32_t FastestSwapInterval() const noexcept;
   };
 }
 

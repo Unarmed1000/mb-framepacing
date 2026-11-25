@@ -125,9 +125,25 @@ namespace MB::FramePacing::Pacer
   void SwapIntervalRule::SetRefreshPeriod(const RefreshPeriod period) noexcept
   {
     m_settings.SetRefresh(period);
-    m_preferredSwapInterval = m_settings.PreferredSwapIntervalAt(period);
+    m_preferredSwapInterval = FastestSwapInterval();
     m_swapInterval = m_preferredSwapInterval;
     Clear();
+  }
+
+  void SwapIntervalRule::SetMinSwapInterval(const uint32_t minSwapInterval) noexcept
+  {
+    const uint32_t floor = std::max(minSwapInterval, 1u);
+    if (floor == m_minSwapInterval)
+    {
+      return;
+    }
+    m_minSwapInterval = floor;
+    m_preferredSwapInterval = FastestSwapInterval();
+    if (m_swapInterval < m_preferredSwapInterval)
+    {
+      m_swapInterval = m_preferredSwapInterval;
+      Clear();
+    }
   }
 
   void SwapIntervalRule::SetSettings(const PacerSettings& settings)
@@ -143,7 +159,7 @@ namespace MB::FramePacing::Pacer
       m_entries.resize(capacity);
     }
     m_settings = settings;
-    m_preferredSwapInterval = settings.PreferredSwapIntervalAt(settings.Refresh());
+    m_preferredSwapInterval = FastestSwapInterval();
     m_swapInterval = m_preferredSwapInterval;
     Clear();
   }
@@ -170,6 +186,8 @@ namespace MB::FramePacing::Pacer
       // A part that goes on with its own rule: it has it
       return;
     }
+    m_minSwapInterval = other.m_minSwapInterval;
+    m_preferredSwapInterval = FastestSwapInterval();
     m_swapInterval = std::clamp(other.m_swapInterval, m_preferredSwapInterval, PacerSettings::MaxSwapInterval);
     if (m_entries.size() != other.m_entries.size())
     {
@@ -234,5 +252,10 @@ namespace MB::FramePacing::Pacer
     m_startsAhead = NanosecondTimeSpan(m_startsAhead.Nanoseconds() - oldest.NextStartAhead.Nanoseconds());
     m_first = (m_first + 1u) % m_entries.size();
     --m_count;
+  }
+
+  uint32_t SwapIntervalRule::FastestSwapInterval() const noexcept
+  {
+    return std::max(m_settings.PreferredSwapIntervalAt(m_settings.Refresh()), m_minSwapInterval);
   }
 }

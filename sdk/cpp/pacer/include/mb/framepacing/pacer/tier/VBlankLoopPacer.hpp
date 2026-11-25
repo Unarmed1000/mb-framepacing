@@ -280,6 +280,13 @@ namespace MB::FramePacing::Pacer
       m_displayHoldsUpTo = swapInterval;
     }
 
+    //! The shortest swap interval the present takes, from the next frame on (PacerCapabilities::MinPresentSwapInterval; 0 or 1
+    //! for none): the swap interval rule never runs faster (SwapIntervalRule::SetMinSwapInterval).
+    void SetMinSwapInterval(const uint32_t minSwapInterval) noexcept
+    {
+      m_rule.SetMinSwapInterval(minSwapInterval);
+    }
+
     //! Whether the platform reports display times (AddDisplayReport). A change starts the display's slip anew.
     void SetUsesDisplayTimes(bool usesDisplayTimes) noexcept;
 

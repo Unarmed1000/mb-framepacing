@@ -42,7 +42,8 @@ namespace MB::FramePacing::Pacer
     NanosecondTickCount NextFrameStartTime;
     //! The marker's target frame time: SwapInterval refreshes, rounded to a nanosecond.
     NanosecondTimeDuration TargetFrameTime;
-    //! The marker's preferred frame time: the preferred swap interval's refreshes (PacerSettings::PreferredSwapIntervalAt).
+    //! The marker's preferred frame time: the preferred swap interval's refreshes (PacerSettings::PreferredSwapIntervalAt), no
+    //! fewer than the shortest swap interval the present takes (PacerCapabilities::MinPresentSwapInterval).
     NanosecondTimeDuration PreferredFrameTime;
     //! The marker's refresh period: the period the pacer is on (PacerSettings::Refresh), rounded to a nanosecond. Given whether
     //! the application paces or not.

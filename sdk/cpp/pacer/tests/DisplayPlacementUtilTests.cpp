@@ -83,7 +83,7 @@ TEST(DisplayPlacementUtil, ThePlanGetsTheOneValueOfItsTiming)
   EXPECT_EQ(afterDuration.SwapInterval, 1u);
 }
 
-TEST(DisplayPlacementUtil, ThePresentsSwapIntervalIsTheFramesUpToTheLongestThePresentTakes)
+TEST(DisplayPlacementUtil, ThePresentsSwapIntervalIsTheFramesFromTheShortestToTheLongestThePresentTakes)
 {
   using PC::PacerCapabilities;
   using PC::PacerCapability;
@@ -104,6 +104,12 @@ TEST(DisplayPlacementUtil, ThePresentsSwapIntervalIsTheFramesUpToTheLongestThePr
   // With a time the frame before stays, both say the same and both are given
   EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::PresentAfterDuration, 4), 2),
             2u);
+  // A present that takes nothing shorter than 2: never less, whatever the frame's swap interval or a time on the present says
+  const PacerCapabilities twoToFour(PacerCapability::PresentSwapInterval, 4, 2);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(twoToFour, 1), 2u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(twoToFour, 3), 3u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(twoToFour, 6), 4u);
+  EXPECT_EQ(Placement::PresentSwapIntervalFor(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::PresentAtTime, 4, 2), 1), 2u);
 }
 
 TEST(DisplayPlacementUtil, TheDisplaysSidePlacesAFrameAfterTheOneBeforeWhereThePacerSeesWhereFramesWereShown)

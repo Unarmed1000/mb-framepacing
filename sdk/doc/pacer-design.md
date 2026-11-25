@@ -1093,7 +1093,7 @@ One type, a set of capabilities, in generic terms:
 
 | Capability             | The application can …                                                                                                                                  | Examples (not named in the API)                                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `PresentSwapInterval`  | present with a swap interval of 1 to a maximum it gives: the present holds the frame that long                                                         | `eglSwapInterval`, DXGI's sync interval                                                                                              |
+| `PresentSwapInterval`  | present with a swap interval from a minimum to a maximum it gives (decision 23): the present holds the frame that long                                 | `eglSwapInterval`, DXGI's sync interval                                                                                              |
 | `PresentAtTime`        | give a present a time before which the frame is not shown                                                                                              | `VK_EXT_present_timing` (absolute), `EGL_ANDROID_presentation_time`                                                                  |
 | `PresentAfterDuration` | give a present a time the frame before it stays on screen at least                                                                                     | `VK_EXT_present_timing` (relative), Metal's minimum duration                                                                         |
 | `WaitForPresent`       | wait until a present it names was shown, with a timeout                                                                                                | `VK_KHR_present_wait2`, DXGI's waitable swap chain                                                                                   |
@@ -2527,6 +2527,16 @@ pacing by display times beyond the display's slip in major tier 2 (decision 20);
     reach major tier 2 (`PacerTierUtil::FrameCallbackCanHold`). The sub tier stays the same rank in every major tier
     (decision 21) as far as the major tier allows: 1.3 with the callback, and none of major tier 2, which has to see where frames were
     shown. Revisit when a real compositor has been measured.
+
+23. **A present's shortest swap interval**: decided on 2026-11-25 (the user: "PacerCapabilities yes", on the first
+    integration's finding that EGL reports `EGL_MIN_SWAP_INTERVAL` as well as a maximum, and that the pacer took only the
+    maximum). `PacerCapabilities` takes the shortest swap interval next to the longest, with `PresentSwapInterval` only (0 is
+    taken as 1, as the pacer never asks for a present that does not wait for a refresh; above the longest is asserted). The
+    pacer never paces faster than it: the swap interval rule's fastest swap interval is the preferred one or the shortest,
+    whichever is longer (`SwapIntervalRule::SetMinSwapInterval`, given by `TierPacer` from the active set), a present is given
+    a swap interval from the shortest to the longest, and the marker's preferred frame time is the one paced at. An active set
+    never goes below the shortest of the set the application has. It changes no tier and no mark: it limits the rates, and
+    places nothing. Checked by unit tests only.
 
 ## What changes for whom
 

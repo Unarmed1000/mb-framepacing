@@ -1573,3 +1573,43 @@ TEST(TierPacer, EveryScheduleCarriesTheRefreshPeriodTheMarkerSays)
   PC::TierPacer ntsc(PC::PacerSettings(PC::RefreshPeriod::FromRate(60'000, 1'001)), PacerCapabilities());
   EXPECT_EQ(ntsc.BeginFrame(At(Start)).RefreshPeriod.Nanoseconds(), 16'683'333);
 }
+
+TEST(TierPacer, ThePresentsShortestSwapIntervalIsTheFastestItPaces)
+{
+  // A present that takes swap intervals of 2 to 4 (EGL's minimum and maximum, say), and a frame rate of every refresh preferred
+  const PacerCapability swapInterval = PacerCapability::PresentSwapInterval;
+  Loop loop(Settings(), PacerCapabilities(swapInterval, 4, 2));
+  // An active set never goes below the system's shortest
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(swapInterval, 4));
+  EXPECT_EQ(loop.Pacer.ActiveCapabilities(), PacerCapabilities(swapInterval, 4, 2));
+  // A shortest swap interval places nothing: the tier is the one without it
+  EXPECT_EQ(loop.Pacer.Rating().Tier, PC::TierPacer(Settings(), PacerCapabilities(swapInterval, 4)).Rating().Tier);
+
+  // Every frame is two refreshes, given to the present and paced so
+  int64_t previousStart = 0;
+  for (int frame = 0; frame < 20; ++frame)
+  {
+    const PC::FrameSchedule schedule = loop.Frame();
+    ASSERT_EQ(schedule.SwapInterval, 2u) << frame;
+    ASSERT_EQ(schedule.PreferredFrameTime.Nanoseconds(), 2 * Period) << frame;
+    ASSERT_EQ(loop.Present.SwapInterval, 2u) << frame;
+    if (frame > 0)
+    {
+      ASSERT_EQ(loop.StartNanoseconds - previousStart, 2 * Period) << frame;
+    }
+    previousStart = loop.StartNanoseconds;
+  }
+
+  // A system that takes every refresh after all: the rule goes faster as it decides, once its frame window is full
+  loop.Pacer.SetCapabilities(PacerCapabilities(swapInterval, 4));
+  loop.Pacer.SetActiveCapabilities(PacerCapabilities(swapInterval, 4));
+  EXPECT_EQ(loop.Pacer.ActiveCapabilities().MinPresentSwapInterval(), 1u);
+  EXPECT_EQ(loop.Frame().SwapInterval, 2u);
+  uint32_t last = 2;
+  for (int frame = 0; frame < 300 && last == 2u; ++frame)
+  {
+    last = loop.Frame().SwapInterval;
+  }
+  EXPECT_EQ(last, 1u);
+  EXPECT_EQ(loop.Present.SwapInterval, 1u);
+}

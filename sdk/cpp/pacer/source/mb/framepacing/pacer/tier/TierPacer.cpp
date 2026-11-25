@@ -54,6 +54,8 @@ namespace MB::FramePacing::Pacer
     m_vblank.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
     m_grid.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(capabilities));
     m_vblank.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(capabilities));
+    m_grid.SetMinSwapInterval(capabilities.MinPresentSwapInterval());
+    m_vblank.SetMinSwapInterval(capabilities.MinPresentSwapInterval());
     m_grid.SetUsesDisplayTimes(capabilities.Has(PacerCapability::DisplayTimes));
     m_vblank.SetUsesDisplayTimes(capabilities.Has(PacerCapability::DisplayTimes));
     m_grid.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
@@ -133,6 +135,9 @@ namespace MB::FramePacing::Pacer
     m_vblank.SetPresentTiming(timing);
     m_grid.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(active));
     m_vblank.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(active));
+    // The shortest swap interval the present takes: neither part's rule runs faster
+    m_grid.SetMinSwapInterval(active.MinPresentSwapInterval());
+    m_vblank.SetMinSwapInterval(active.MinPresentSwapInterval());
     m_grid.SetUsesDisplayTimes(active.Has(PacerCapability::DisplayTimes));
     m_vblank.SetUsesDisplayTimes(active.Has(PacerCapability::DisplayTimes));
     const bool onVBlanks = active.Has(PacerCapability::VBlankTimes);

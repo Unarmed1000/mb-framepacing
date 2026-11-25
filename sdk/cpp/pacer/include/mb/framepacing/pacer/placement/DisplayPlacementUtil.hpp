@@ -73,17 +73,22 @@ namespace MB::FramePacing::Pacer::DisplayPlacementUtil
   }
 
   //! PresentPlan::SwapInterval for a frame of that swap interval. Where the present takes a swap interval
-  //! (PacerCapability::PresentSwapInterval) it is the frame's, up to the longest the present takes: the display's side then
-  //! shows the frame no sooner than that many refreshes after the frame before it, whenever the loop presents it. Like a
-  //! time the frame before it stays, it places nothing by itself, and it is given next to what the loop does. 1 where the
-  //! present takes none, and where it takes a time before which the frame is not shown: that time says the refresh.
+  //! (PacerCapability::PresentSwapInterval) it is the frame's, from the shortest to the longest the present takes: the display's
+  //! side then shows the frame no sooner than that many refreshes after the frame before it, whenever the loop presents it.
+  //! Like a time the frame before it stays, it places nothing by itself, and it is given next to what the loop does. 1 where the
+  //! present takes none; where it takes a time before which the frame is not shown, that time says the refresh, and it is the
+  //! shortest the present takes (1, or more where the system has no shorter one).
   [[nodiscard]] constexpr uint32_t PresentSwapIntervalFor(const PacerCapabilities& active, const uint32_t swapInterval) noexcept
   {
-    if (!active.Has(PacerCapability::PresentSwapInterval) || active.Has(PacerCapability::PresentAtTime))
+    if (!active.Has(PacerCapability::PresentSwapInterval))
     {
       return 1u;
     }
-    return std::max(std::min(swapInterval, active.MaxPresentSwapInterval()), 1u);
+    if (active.Has(PacerCapability::PresentAtTime))
+    {
+      return active.MinPresentSwapInterval();
+    }
+    return std::clamp(swapInterval, active.MinPresentSwapInterval(), active.MaxPresentSwapInterval());
   }
 
   //! How long before the refresh a frame is for it may be shown.

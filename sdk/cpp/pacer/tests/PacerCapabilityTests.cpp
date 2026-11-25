@@ -116,6 +116,7 @@ TEST(PacerCapabilities, TheBaselineHasNoCapability)
 
   EXPECT_EQ(baseline.Capabilities(), PacerCapability::NoCapabilities);
   EXPECT_EQ(baseline.MaxPresentSwapInterval(), 0u);
+  EXPECT_EQ(baseline.MinPresentSwapInterval(), 0u);
   EXPECT_EQ(baseline, PacerCapabilities(PacerCapability::NoCapabilities));
   for (const PacerCapability capability : Each)
   {
@@ -140,6 +141,23 @@ TEST(PacerCapabilities, ASetKeepsItsCapabilitiesAndASwapIntervalOnlyWithAPresent
   EXPECT_NE(set, PacerCapabilities(set.Capabilities(), 3));
 }
 
+TEST(PacerCapabilities, TheShortestSwapIntervalIsKeptOnlyWithAPresentThatTakesOne)
+{
+  const PacerCapabilities set(PacerCapability::PresentSwapInterval | PacerCapability::DisplayTimes, 4, 2);
+
+  EXPECT_EQ(set.MinPresentSwapInterval(), 2u);
+  EXPECT_EQ(set.MaxPresentSwapInterval(), 4u);
+  // The shortest swap interval is 1 unless said, and 0 (EGL's minimum on many systems) is 1: the pacer never asks for less
+  EXPECT_EQ(PacerCapabilities(PacerCapability::PresentSwapInterval, 4).MinPresentSwapInterval(), 1u);
+  EXPECT_EQ(PacerCapabilities(PacerCapability::PresentSwapInterval, 4, 0), PacerCapabilities(PacerCapability::PresentSwapInterval, 4));
+  // It may be the longest
+  EXPECT_EQ(PacerCapabilities(PacerCapability::PresentSwapInterval, 3, 3).MinPresentSwapInterval(), 3u);
+  // Without a present that takes one it has no meaning and is not kept
+  EXPECT_EQ(PacerCapabilities(PacerCapability::DisplayTimes, 4, 2).MinPresentSwapInterval(), 0u);
+  EXPECT_EQ(PacerCapabilities(PacerCapability::DisplayTimes, 4, 2), PacerCapabilities(PacerCapability::DisplayTimes));
+  EXPECT_NE(set, PacerCapabilities(set.Capabilities(), 4));
+}
+
 TEST(PacerCapabilities, ASetContainsTheSetsThatHaveNoMoreThanItHas)
 {
   const PacerCapabilities has(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes | PacerCapability::DisplayTimes, 3);
@@ -152,6 +170,20 @@ TEST(PacerCapabilities, ASetContainsTheSetsThatHaveNoMoreThanItHas)
   EXPECT_FALSE(has.Contains(PacerCapabilities(PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)));
   EXPECT_FALSE(has.Contains(PacerCapabilities(PacerCapability::PresentSwapInterval, 4)));
   EXPECT_FALSE(PacerCapabilities().Contains(has));
+}
+
+TEST(PacerCapabilities, AnActiveSetNeverGoesBelowTheShortestSwapInterval)
+{
+  const PacerCapabilities has(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes, 4, 2);
+
+  EXPECT_TRUE(has.Contains(has));
+  EXPECT_TRUE(has.Contains(PacerCapabilities(PacerCapability::PresentSwapInterval, 3, 2)));
+  EXPECT_TRUE(has.Contains(PacerCapabilities(PacerCapability::PresentSwapInterval, 4, 3)));
+  // A set without a present that takes a swap interval has no shortest one to compare
+  EXPECT_TRUE(has.Contains(PacerCapabilities(PacerCapability::VBlankTimes)));
+  // A shorter swap interval than the present takes is not contained
+  EXPECT_FALSE(has.Contains(PacerCapabilities(PacerCapability::PresentSwapInterval, 4)));
+  EXPECT_FALSE(has.Contains(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes, 2, 1)));
 }
 
 TEST(PacerCapabilities, TakingACapabilityOutGivesTheActiveSet)
@@ -169,6 +201,10 @@ TEST(PacerCapabilities, TakingACapabilityOutGivesTheActiveSet)
   EXPECT_EQ(has.Without(PacerCapability::DisplayTimes), has);
   EXPECT_EQ(has.Without(PacerCapability::AllCapabilities), PacerCapabilities());
   EXPECT_EQ(PacerCapabilities().Without(PacerCapability::VBlankTimes), PacerCapabilities());
+  // The shortest swap interval stays with the present's swap interval
+  const PacerCapabilities floor(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes, 4, 2);
+  EXPECT_EQ(floor.Without(PacerCapability::VBlankTimes), PacerCapabilities(PacerCapability::PresentSwapInterval, 4, 2));
+  EXPECT_EQ(floor.Without(PacerCapability::PresentSwapInterval).MinPresentSwapInterval(), 0u);
 }
 
 TEST(PacerCapabilities, WhatTwoSetsBothHaveIsASet)
@@ -187,6 +223,21 @@ TEST(PacerCapabilities, WhatTwoSetsBothHaveIsASet)
   EXPECT_EQ(has.IntersectedWith(PacerCapabilities()), PacerCapabilities());
 }
 
+TEST(PacerCapabilities, WhatTwoSetsBothHaveKeepsTheLongerShortestSwapInterval)
+{
+  const PacerCapabilities has(PacerCapability::PresentSwapInterval, 4, 2);
+
+  EXPECT_EQ(has.IntersectedWith(PacerCapabilities(PacerCapability::PresentSwapInterval, 3)),
+            PacerCapabilities(PacerCapability::PresentSwapInterval, 3, 2));
+  EXPECT_EQ(PacerCapabilities(PacerCapability::PresentSwapInterval, 3).IntersectedWith(has),
+            PacerCapabilities(PacerCapability::PresentSwapInterval, 3, 2));
+  // No longer than the shorter longest swap interval
+  EXPECT_EQ(PacerCapabilities(PacerCapability::PresentSwapInterval, 4, 3).IntersectedWith(PacerCapabilities(PacerCapability::PresentSwapInterval, 2)),
+            PacerCapabilities(PacerCapability::PresentSwapInterval, 2, 2));
+  // Without the present's swap interval in both, there is none
+  EXPECT_EQ(has.IntersectedWith(PacerCapabilities(PacerCapability::VBlankTimes)), PacerCapabilities());
+}
+
 TEST(PacerCapabilities, ASetThatCanNotBeIsAssertedAndMadeValidWithoutAsserts)
 {
   const auto unknownBit = static_cast<PacerCapability>(1u << 20u);
@@ -199,11 +250,14 @@ TEST(PacerCapabilities, ASetThatCanNotBeIsAssertedAndMadeValidWithoutAsserts)
   EXPECT_EQ(PacerCapabilities(unknownBit | PacerCapability::DisplayTimes), PacerCapabilities(PacerCapability::DisplayTimes));
   // A present that takes a swap interval takes one of 1 at least
   EXPECT_EQ(PacerCapabilities(PacerCapability::PresentSwapInterval, 0).MaxPresentSwapInterval(), 1u);
+  // Its shortest one is no longer than its longest
+  EXPECT_EQ(PacerCapabilities(PacerCapability::PresentSwapInterval, 2, 3).MinPresentSwapInterval(), 2u);
 #elif GTEST_HAS_DEATH_TEST
   EXPECT_DEATH(static_cast<void>(PacerCapabilities(PresentPair)), "");
   EXPECT_DEATH(static_cast<void>(PacerCapabilities(AcquirePair)), "");
   EXPECT_DEATH(static_cast<void>(PacerCapabilities(unknownBit)), "");
   EXPECT_DEATH(static_cast<void>(PacerCapabilities(PacerCapability::PresentSwapInterval, 0)), "");
+  EXPECT_DEATH(static_cast<void>(PacerCapabilities(PacerCapability::PresentSwapInterval, 2, 3)), "");
 #else
   GTEST_SKIP() << "asserts are on and death tests are not available";
 #endif

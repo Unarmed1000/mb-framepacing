@@ -89,7 +89,7 @@ What a platform can do beyond the baseline, in terms of no graphics API (`PacerC
 | `PresentAtTime`                                                                  | give a present a time before which the frame is not shown                                                    | `VK_EXT_present_timing` (absolute), `EGL_ANDROID_presentation_time`                  |
 | `PresentSkipsOverdue`                                                            | say that of two presents that are both due the later is shown and the earlier never                          | Vulkan's `FIFO_LATEST_READY`, Android's buffers with a time                          |
 | `PresentAfterDuration`                                                           | give a present a time the frame before it stays on screen at least                                           | `VK_EXT_present_timing` (relative), Metal's minimum duration                         |
-| `PresentSwapInterval`                                                            | present with a swap interval of 1 to a maximum it gives                                                      | `eglSwapInterval`, DXGI's sync interval                                              |
+| `PresentSwapInterval`                                                            | present with a swap interval from a minimum to a maximum it gives (1 to 1 unless said)                       | `eglSwapInterval`, DXGI's sync interval                                              |
 | `WaitForGpuWork`                                                                 | wait until the GPU finished a frame it names, with a timeout                                                 | a fence                                                                              |
 | `GpuWorkTimes`, `GpuWorkDurations`                                               | say when the GPU began and ended its work on a frame, or how long it took, frames later                      | calibrated timestamp queries, timer queries                                          |
 | `DisplayTimes`                                                                   | say when a present was shown, or that it never was, frames later                                             | `VK_EXT_present_timing`, DXGI's frame statistics, `EGL_ANDROID_get_frame_timestamps` |
@@ -394,6 +394,12 @@ tools judge a target frame rate by, so the pacer aims where it is measured.
 `SetPreferredSwapInterval` says it in refreshes instead ("half rate on any display" is 2). With both set, the slower of the two counts.
 The result is the pacer's **fastest** rate: the rule only ever goes slower, and with `AutoSwapInterval` off it is a fixed, evenly paced
 frame rate.
+
+**A present that takes no swap interval below a minimum** (EGL reports it as `EGL_MIN_SWAP_INTERVAL`) is given to the pacer with its
+capabilities: `PacerCapabilities(set, maxSwapInterval, minSwapInterval)`, with `PresentSwapInterval` in the set; a minimum of 0 is
+taken as 1. The pacer then never paces faster than that minimum, whatever the target says: the target's swap interval and the rule's
+are raised to it, a present is given no swap interval below it, and the marker's preferred frame time says so. Without
+`PresentSwapInterval` (a Vulkan FIFO swap chain) there is no minimum. An active set keeps the minimum of the set the application has.
 
 **A frame of more than one refresh is held by the best mechanism that is active**: the display's side where the present takes
 a time, a minimum duration or a swap interval, and the loop's own held present or held start for the rest.

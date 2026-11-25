@@ -641,6 +641,55 @@ TEST(SwapIntervalRule, ThePreferredIntervalIsTheFastest)
   EXPECT_EQ(rule.Settings(), settings);
 }
 
+TEST(SwapIntervalRule, TheShortestSwapIntervalThePresentTakesIsTheFastest)
+{
+  PC::SwapIntervalRule rule(Settings());
+  EXPECT_EQ(rule.MinSwapInterval(), 1u);
+  int64_t refresh = 0;
+  static_cast<void>(Feed(rule, refresh, 5, 2 * Ms, false));
+  ASSERT_EQ(rule.FrameWindow().Frames, 5u);
+
+  // A present that takes no swap interval below 2: the rule is raised to it, with an empty frame window
+  rule.SetMinSwapInterval(2);
+  EXPECT_EQ(rule.MinSwapInterval(), 2u);
+  EXPECT_EQ(rule.PreferredSwapInterval(), 2u);
+  EXPECT_EQ(rule.SwapInterval(), 2u);
+  EXPECT_EQ(rule.FrameWindow().Frames, 0u);
+  // The same floor changes nothing
+  static_cast<void>(Feed(rule, refresh, 5, 2 * Ms, false, 2));
+  rule.SetMinSwapInterval(2);
+  EXPECT_EQ(rule.FrameWindow().Frames, 5u);
+  // Light work never takes it faster, and Reset does not go below it
+  EXPECT_EQ(Feed(rule, refresh, 100, 2 * Ms, false, 2), PC::SwapIntervalChange::Unchanged);
+  EXPECT_EQ(rule.SwapInterval(), 2u);
+  rule.Reset(1);
+  EXPECT_EQ(rule.SwapInterval(), 2u);
+  // It still slows down: 40 ms + 1 ms margin needs 3 refreshes
+  EXPECT_EQ(Feed(rule, refresh, 7, 40 * Ms, true, 3), PC::SwapIntervalChange::Slower);
+  EXPECT_EQ(rule.SwapInterval(), 3u);
+
+  // Another rule goes on from it with its floor
+  PC::SwapIntervalRule other(Settings());
+  other.TakeOver(rule);
+  EXPECT_EQ(other.MinSwapInterval(), 2u);
+  EXPECT_EQ(other.PreferredSwapInterval(), 2u);
+  EXPECT_EQ(other.SwapInterval(), 3u);
+
+  // A new refresh period starts again at the floor, where the settings prefer every refresh
+  rule.SetRefreshPeriod(g_hz120);
+  EXPECT_EQ(rule.SwapInterval(), 2u);
+  rule.SetRefreshPeriod(g_hz60);
+  rule.Reset(3);
+
+  // A lower floor (0 is 1) changes the swap interval not at once: the rule goes faster as it decides
+  rule.SetMinSwapInterval(0);
+  EXPECT_EQ(rule.MinSwapInterval(), 1u);
+  EXPECT_EQ(rule.PreferredSwapInterval(), 1u);
+  EXPECT_EQ(rule.SwapInterval(), 3u);
+  EXPECT_EQ(Feed(rule, refresh, 60, 2 * Ms, false, 3), PC::SwapIntervalChange::Faster);
+  EXPECT_EQ(rule.SwapInterval(), 1u);
+}
+
 TEST(SwapIntervalRule, ANewRefreshPeriodStartsAgainAtTheTargetFrameRatesIntervalThere)
 {
   PC::PacerSettings settings = Settings();

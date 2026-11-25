@@ -80,6 +80,9 @@ Part of the notes for Claude; `CLAUDE.md` holds the rules every task needs.
   - **Target frame rate:** `PacerSettings::SetPreferredFrameRate` / `SetPreferredFrameTime` → `PreferredSwapIntervalAt(RefreshPeriod)`
     with the tools' rounding (`FrameTimeRounding.WholeRefreshes`: up, a twentieth of a refresh of slack, at least 1); with
     `PreferredSwapInterval` the slower of the two counts. It is the fastest rate: the rule only goes slower.
+    **A present's shortest swap interval** (decision 23, the user, 2026-11-25: EGL's `EGL_MIN_SWAP_INTERVAL`):
+    `PacerCapabilities(set, max, min)`, kept with `PresentSwapInterval` only (0 is 1); `TierPacer` gives the active set's to both
+    parts' rules (`SwapIntervalRule::SetMinSwapInterval`), so nothing paces or presents faster. No tier or mark.
     **The frame rates a display can show** (the user, 2026-10-07: for a menu, "nothing lower than 20"): `FrameRateStep` and
     `FrameRateStepUtil` (`StepCount`, `StepAt`, `StepFor`/`StepForRate`, `IsStep`/`IsStepRate`; functions of the refresh period
     alone), judged with the same slack through the settings' own rounding, so the two never disagree.
