@@ -418,8 +418,7 @@ TEST(NotPacing, ThePresentsMadeWhileNotPacingAreTheOnesTheFirstWaitAsksFor)
 
 TEST(NotPacing, WaitsNoPlanAskedForAreNotTakenAndTheOtherReportsAre)
 {
-  PC::PacerSettings settings = Settings();
-  settings.SetSystemHoldsLoop(true);
+  const PC::PacerSettings settings = Settings();
   Loop loop(settings, PacerCapabilities(Wait | PacerCapability::WaitForGpuWork | PacerCapability::DisplayTimes));
   PC::FrameSchedule schedule;
   for (int32_t frame = 0; frame < 10; ++frame)

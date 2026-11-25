@@ -192,7 +192,7 @@ The environment's annotations:
 | `refreshPeriodNs`    | the display's refresh period the application works with                                                                                            |
 | `variableRefresh`    | `on`, `off`, `unknown`                                                                                                                             |
 | `vsyncSource`        | what the frame loop is paced by: `present wait`, `vblank times`, `display timing`, `timer`, `none`                                                 |
-| `pacerTier`          | the pacer's tier as it is shown, with its marks (`3.1`, `1.2+s`), or `none`                                                                        |
+| `pacerTier`          | the pacer's tier as it is shown, with its marks (`4.1`, `1.2+s`, `3+`), or `none`                                                                  |
 | `pacerAim`           | `smoothness`, `low latency`, `none`                                                                                                                |
 | `capabilities`       | the pacer's capabilities the platform has, by their names (`WaitForPresent, VBlankTimes`)                                                          |
 | `activeCapabilities` | those that are active, the same way                                                                                                                |

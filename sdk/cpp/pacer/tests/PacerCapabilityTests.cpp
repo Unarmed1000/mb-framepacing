@@ -50,7 +50,7 @@ namespace
     return static_cast<uint32_t>(tier);
   }
 
-  constexpr std::array<PacerTier, 12> EveryTier = {PacerTier::AtTimeVBlankWaitForPresent,
+  constexpr std::array<PacerTier, 13> EveryTier = {PacerTier::AtTimeVBlankWaitForPresent,
                                                    PacerTier::AtTimeVBlankPeriodOnly,
                                                    PacerTier::AtTimeTimerWaitForPresent,
                                                    PacerTier::AtTimeTimerPeriodOnly,
@@ -58,6 +58,7 @@ namespace
                                                    PacerTier::AfterDurationVBlankDisplayTimes,
                                                    PacerTier::AfterDurationTimerWaitForPresent,
                                                    PacerTier::AfterDurationTimerDisplayTimes,
+                                                   PacerTier::SystemHoldsLoop,
                                                    PacerTier::VBlankWaitForPresent,
                                                    PacerTier::VBlankPeriodOnly,
                                                    PacerTier::TimerWaitForPresent,
@@ -68,15 +69,17 @@ namespace
   constexpr PacerCapability TimedPresent = PacerCapability::PresentAtTime;
   constexpr PacerCapability Duration = PacerCapability::PresentAfterDuration;
   constexpr PacerCapability Skips = PacerCapability::PresentSkipsOverdue;
+  // A present or a call for the next image that waits, which raises every set of the frame loop's major tier to the system's hold
+  constexpr PacerCapability SystemHold = PacerCapability::PresentWaits | PacerCapability::AcquireWaits;
   constexpr PacerCapability EveryRaise =
-    TimedPresent | PacerCapability::WaitForPresent | PacerCapability::FrameCallback | PacerCapability::VBlankTimes;
+    TimedPresent | PacerCapability::WaitForPresent | PacerCapability::FrameCallback | PacerCapability::VBlankTimes | SystemHold;
   // What raises a set that sees where frames were shown and has no present that places a frame
   constexpr PacerCapability PlacingPresents = TimedPresent | Duration | PacerCapability::PresentSwapInterval;
 
   // The rating is usable where a constant is needed
   static_assert(PC::PacerTierUtil::Rate(PacerCapabilities()).Tier == PacerTier::TimerPeriodOnly);
   static_assert(PC::PacerTierUtil::Rate(PacerCapabilities(PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)) ==
-                PacerRating{PacerTier::VBlankWaitForPresent, PlacingPresents, false, false});
+                PacerRating{PacerTier::VBlankWaitForPresent, PlacingPresents | SystemHold, false, false});
 }
 
 TEST(PacerCapability, EveryCapabilityIsABitOfItsOwnAndAllOfThemAreAllCapabilities)
@@ -349,18 +352,26 @@ TEST(PacerTier, ATierIsItsCapabilitySet)
   EXPECT_FALSE(Reaches(untimed, PacerTier::AfterDurationTimerDisplayTimes));
   EXPECT_TRUE(Reaches(untimed, PacerTier::VBlankWaitForPresent));
 
-  // What slows a loop when its queue is full, what only measures, a wait for the GPU's work, display times and a display's side
-  // that skips reach no tier above the baseline
-  const PacerCapabilities noTier(PacerCapability::WaitForImage | PacerCapability::PresentWaits | PacerCapability::AcquireWaits |
-                                   PacerCapability::WaitForGpuWork | PacerCapability::GpuWorkTimes | PacerCapability::GpuWorkDurations | shown |
-                                   Skips,
+  // What only measures, a wait for the GPU's work or for an image, display times and a display's side that skips reach no tier
+  // above the baseline
+  const PacerCapabilities noTier(PacerCapability::WaitForImage | PacerCapability::WaitForGpuWork | PacerCapability::GpuWorkTimes |
+                                   PacerCapability::GpuWorkDurations | shown | Skips | PacerCapability::PresentReturnsAtOnce |
+                                   PacerCapability::AcquireReturnsAtOnce,
                                  1);
   for (const PacerTier tier : EveryTier)
   {
     EXPECT_EQ(Reaches(noTier, tier), tier == PacerTier::TimerPeriodOnly) << Number(tier);
   }
+  // A present or a call for the next image that waits while the queue is full reaches the system's hold, and nothing else does
+  EXPECT_TRUE(PC::PacerTierUtil::SystemHoldsTheLoop(PacerCapabilities(PacerCapability::PresentWaits)));
+  EXPECT_TRUE(PC::PacerTierUtil::SystemHoldsTheLoop(PacerCapabilities(PacerCapability::AcquireWaits)));
+  EXPECT_FALSE(PC::PacerTierUtil::SystemHoldsTheLoop(noTier));
+  EXPECT_TRUE(Reaches(PacerCapabilities(PacerCapability::PresentWaits), PacerTier::SystemHoldsLoop));
+  EXPECT_TRUE(Reaches(PacerCapabilities(PacerCapability::AcquireWaits | wait | vblank), PacerTier::SystemHoldsLoop));
+  EXPECT_FALSE(Reaches(PacerCapabilities(wait | vblank | shown), PacerTier::SystemHoldsLoop));
+  EXPECT_FALSE(Reaches(noTier, PacerTier::SystemHoldsLoop));
   // A value that is no tier is reached by nothing better than every set reaches
-  EXPECT_TRUE(Reaches(PacerCapabilities(), static_cast<PacerTier>(13)));
+  EXPECT_TRUE(Reaches(PacerCapabilities(), static_cast<PacerTier>(14)));
 }
 
 TEST(PacerTier, AFrameCallbackHoldsTheLoopOnAGridWhereNothingBetterDoes)
@@ -380,7 +391,7 @@ TEST(PacerTier, AFrameCallbackHoldsTheLoopOnAGridWhereNothingBetterDoes)
   EXPECT_FALSE(HasDisplayHold(PacerCapabilities()));
   EXPECT_TRUE(Reaches(PacerCapabilities(callback), PacerTier::TimerWaitForPresent));
   EXPECT_EQ(Rate(PacerCapabilities(callback)),
-            (PacerRating{PacerTier::TimerWaitForPresent, TimedPresent | PacerCapability::VBlankTimes, false, false, false, true}));
+            (PacerRating{PacerTier::TimerWaitForPresent, TimedPresent | PacerCapability::VBlankTimes | SystemHold, false, false, false, true}));
   // The same with a time on the present: the sub tier is the same rank in every major tier
   EXPECT_EQ(Rate(PacerCapabilities(callback | TimedPresent)),
             (PacerRating{PacerTier::AtTimeTimerWaitForPresent, PacerCapability::VBlankTimes, true, false, false, true}));
@@ -417,6 +428,12 @@ TEST(PacerTier, AFrameCallbackHoldsTheLoopOnAGridWhereNothingBetterDoes)
   EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(vblank)).RaisesTier, callback));
   EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(wait)).RaisesTier, callback));
   EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(Duration | shown)).RaisesTier, callback));
+  // Where the system holds the loop the system's hold paces it, and the callback holds nothing; with a time on the present the
+  // first major tier is above it, and the callback holds as before
+  EXPECT_FALSE(HoldsByFrameCallback(PacerCapabilities(callback | PacerCapability::AcquireWaits)));
+  EXPECT_EQ(Rate(PacerCapabilities(callback | PacerCapability::AcquireWaits)).Tier, PacerTier::SystemHoldsLoop);
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(PacerCapability::PresentWaits)).RaisesTier, callback));
+  EXPECT_TRUE(HoldsByFrameCallback(PacerCapabilities(callback | PacerCapability::AcquireWaits | TimedPresent)));
 }
 
 TEST(PacerTier, TheOrderIsWhoPlacesTheFrameThenWhatHoldsTheLoopThenWhereTheRefreshesAre)
@@ -438,7 +455,15 @@ TEST(PacerTier, TheOrderIsWhoPlacesTheFrameThenWhatHoldsTheLoopThenWhereTheRefre
   EXPECT_EQ(Rate(PacerCapabilities(Duration | vblank | shown)).Tier, PacerTier::AfterDurationVBlankDisplayTimes);
   EXPECT_EQ(Rate(PacerCapabilities(Duration | shown)).Tier, PacerTier::AfterDurationTimerDisplayTimes);
   EXPECT_EQ(Rate(PacerCapabilities(Duration | wait | vblank | shown)).Tier, PacerTier::AfterDurationVBlankWaitForPresent);
-  // Without one the frame loop places the frames: the vertical blank times rank before the wait, as in every major tier
+  // Without one, the system's hold where the system holds the loop, above every tier of the frame loop: a full queue leaves a
+  // wait for a present and vertical blank times nothing to do, and a duration the pacer can not see the result of is the same
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::AcquireWaits | wait | vblank)).Tier, PacerTier::SystemHoldsLoop);
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentWaits)).Tier, PacerTier::SystemHoldsLoop);
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentWaits | Duration | vblank)).Tier, PacerTier::SystemHoldsLoop);
+  // A duration that the pacer sees the result of, and a time, are above it
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentWaits | Duration | wait)).Tier, PacerTier::AfterDurationTimerWaitForPresent);
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentWaits | TimedPresent)).Tier, PacerTier::AtTimeTimerPeriodOnly);
+  // Without either the frame loop places the frames: the vertical blank times rank before the wait, as in every major tier
   EXPECT_EQ(Rate(PacerCapabilities(wait | vblank)).Tier, PacerTier::VBlankWaitForPresent);
   EXPECT_EQ(Rate(PacerCapabilities(vblank)).Tier, PacerTier::VBlankPeriodOnly);
   EXPECT_EQ(Rate(PacerCapabilities(wait)).Tier, PacerTier::TimerWaitForPresent);
@@ -448,7 +473,7 @@ TEST(PacerTier, TheOrderIsWhoPlacesTheFrameThenWhatHoldsTheLoopThenWhereTheRefre
   EXPECT_EQ(Rate(PacerCapabilities(Duration)).Tier, PacerTier::TimerPeriodOnly);
   // A time on the present and a duration: the time
   EXPECT_EQ(Rate(PacerCapabilities(Duration | TimedPresent | wait)).Tier, PacerTier::AtTimeTimerWaitForPresent);
-  // The numbers are 1 to 12 in that order
+  // The numbers are 1 to 13 in that order
   for (uint32_t index = 0; index < EveryTier.size(); ++index)
   {
     EXPECT_EQ(Number(EveryTier[index]), index + 1u);
@@ -461,21 +486,41 @@ TEST(PacerTier, ATierIsAMajorTierAndASubTier)
   using PC::PacerTierUtil::HasPacer;
   using PC::PacerTierUtil::MajorOf;
   using PC::PacerTierUtil::PacedAs;
+  using PC::PacerTierUtil::SubTierCountOf;
   using PC::PacerTierUtil::SubTierOf;
   static_assert(PC::PacerTierUtil::SubTiersPerMajorTier == 4u);
   static_assert(MajorOf(PacerTier::VBlankWaitForPresent) == PacerMajorTier::LoopPlaces);
   static_assert(SubTierOf(PacerTier::VBlankWaitForPresent) == 1u);
+  static_assert(MajorOf(PacerTier::SystemHoldsLoop) == PacerMajorTier::SystemHoldsLoop);
+  static_assert(SubTierOf(PacerTier::SystemHoldsLoop) == 0u);
 
-  // Three major tiers of four sub tiers, in the list's order: who places the frame, and the rank inside that
+  // Four major tiers in the list's order, who places the frame: three of four sub tiers, the rank inside that, and the system's
+  // hold, which has none
+  EXPECT_EQ(SubTierCountOf(PacerMajorTier::DisplayPlacesAtTime), 4u);
+  EXPECT_EQ(SubTierCountOf(PacerMajorTier::DisplayPlacesAfterDuration), 4u);
+  EXPECT_EQ(SubTierCountOf(PacerMajorTier::SystemHoldsLoop), 0u);
+  EXPECT_EQ(SubTierCountOf(PacerMajorTier::LoopPlaces), 4u);
+  EXPECT_EQ(SubTierCountOf(static_cast<PacerMajorTier>(5)), 0u);
+  uint32_t major = 1;
+  uint32_t subTier = 0;
   for (uint32_t index = 0; index < EveryTier.size(); ++index)
   {
     const PacerTier tier = EveryTier[index];
-    EXPECT_EQ(static_cast<uint32_t>(MajorOf(tier)), (index / 4u) + 1u) << index;
-    EXPECT_EQ(SubTierOf(tier), (index % 4u) + 1u) << index;
+    const uint32_t count = SubTierCountOf(static_cast<PacerMajorTier>(major));
+    EXPECT_EQ(static_cast<uint32_t>(MajorOf(tier)), major) << index;
+    EXPECT_EQ(SubTierOf(tier), count == 0u ? 0u : subTier + 1u) << index;
+    if (++subTier >= std::max(count, 1u))
+    {
+      ++major;
+      subTier = 0;
+    }
     // Every tier has a pacer, the second major tier too (decision 20), and is paced as itself
     EXPECT_TRUE(HasPacer(tier)) << index;
     EXPECT_EQ(PacedAs(tier), tier) << index;
+    // Every tier has both aims but the system's hold, which would need a timer for low latency (decision 24)
+    EXPECT_EQ(PC::PacerTierUtil::HasLowLatencyAim(tier), tier != PacerTier::SystemHoldsLoop) << index;
   }
+  EXPECT_EQ(major, 5u);
   EXPECT_EQ(MajorOf(PacerTier::AtTimeTimerPeriodOnly), PacerMajorTier::DisplayPlacesAtTime);
   EXPECT_EQ(MajorOf(PacerTier::AfterDurationVBlankWaitForPresent), PacerMajorTier::DisplayPlacesAfterDuration);
   EXPECT_EQ(MajorOf(PacerTier::TimerPeriodOnly), PacerMajorTier::LoopPlaces);
@@ -490,8 +535,8 @@ TEST(PacerTier, ATierIsAMajorTierAndASubTier)
   // A value that is no tier is taken as the tier next to it
   EXPECT_EQ(MajorOf(static_cast<PacerTier>(0)), PacerMajorTier::DisplayPlacesAtTime);
   EXPECT_EQ(SubTierOf(static_cast<PacerTier>(0)), 1u);
-  EXPECT_EQ(MajorOf(static_cast<PacerTier>(13)), PacerMajorTier::LoopPlaces);
-  EXPECT_EQ(SubTierOf(static_cast<PacerTier>(13)), 4u);
+  EXPECT_EQ(MajorOf(static_cast<PacerTier>(14)), PacerMajorTier::LoopPlaces);
+  EXPECT_EQ(SubTierOf(static_cast<PacerTier>(14)), 4u);
 }
 
 TEST(PacerTier, TheDisplaysSideHoldsAFrameInThreeWays)
@@ -512,9 +557,11 @@ TEST(PacerTier, TheDisplaysSideHoldsAFrameInThreeWays)
   EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentSwapInterval, 4)),
             (PacerRating{PacerTier::TimerPeriodOnly, EveryRaise | PacerCapability::DisplayTimes, true, false}));
   EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::PresentSwapInterval | PacerCapability::VBlankTimes, 4)),
-            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent | PacerCapability::DisplayTimes, true, false}));
+            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent | PacerCapability::DisplayTimes | SystemHold,
+                         true, false}));
   EXPECT_EQ(Rate(PacerCapabilities(Duration | PacerCapability::VBlankTimes)),
-            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent | PacerCapability::DisplayTimes, true, false}));
+            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent | PacerCapability::DisplayTimes | SystemHold,
+                         true, false}));
   // With a wait for a present it is the second major tier
   EXPECT_EQ(Rate(PacerCapabilities(Duration | PacerCapability::VBlankTimes | PacerCapability::WaitForPresent)),
             (PacerRating{PacerTier::AfterDurationVBlankWaitForPresent, TimedPresent, true, false}));
@@ -531,10 +578,21 @@ TEST(PacerTier, ARatingIsTheBestTierWhatWouldRaiseItAndWhetherDisplayTimesAreRep
   EXPECT_EQ(PacerRating(), Rate(PacerCapabilities()));
   // A wait for a present: vertical blank times or a present that places a frame would raise it
   EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::WaitForPresent)),
-            (PacerRating{PacerTier::TimerWaitForPresent, PlacingPresents | PacerCapability::VBlankTimes, false, false}));
-  // Vertical blank times: a wait for a present or a time on the present would
+            (PacerRating{PacerTier::TimerWaitForPresent, PlacingPresents | PacerCapability::VBlankTimes | SystemHold, false, false}));
+  // Vertical blank times: a wait for a present, a time on the present, or the system's hold would
   EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::VBlankTimes)),
-            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent, false, false}));
+            (PacerRating{PacerTier::VBlankPeriodOnly, TimedPresent | PacerCapability::WaitForPresent | SystemHold, false, false}));
+  // The system's hold: a time on the present would raise it, and a wait for a present, a frame callback or vertical blank times
+  // would not; with a duration the pacer can not see the result of, a wait for a present or display times would
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::AcquireWaits)), (PacerRating{PacerTier::SystemHoldsLoop, TimedPresent, false, false}));
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::AcquireWaits | PacerCapability::WaitForPresent)),
+            (PacerRating{PacerTier::SystemHoldsLoop, TimedPresent | Duration | PacerCapability::PresentSwapInterval, false, false}));
+  EXPECT_EQ(Rate(PacerCapabilities(PacerCapability::AcquireWaits | Duration)),
+            (PacerRating{PacerTier::SystemHoldsLoop, TimedPresent | PacerCapability::WaitForPresent | PacerCapability::DisplayTimes, true, false}));
+  // A call that is said to return at once raises nothing: of a pair a set has one or neither
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(PacerCapability::AcquireReturnsAtOnce)).RaisesTier, PacerCapability::AcquireWaits));
+  EXPECT_TRUE(PC::HasCapability(Rate(PacerCapabilities(PacerCapability::AcquireReturnsAtOnce)).RaisesTier, PacerCapability::PresentWaits));
+  EXPECT_FALSE(PC::HasCapability(Rate(PacerCapabilities(PacerCapability::PresentReturnsAtOnce)).RaisesTier, PacerCapability::PresentWaits));
   // A present at a time, and nothing else: a duration raises nothing, a display's side that skips neither
   EXPECT_EQ(Rate(PacerCapabilities(TimedPresent)),
             (PacerRating{PacerTier::AtTimeTimerPeriodOnly,
@@ -659,8 +717,10 @@ namespace
   static_assert(Text::NameOf(PacerTier::VBlankWaitForPresent) == "vertical blank times, wait for a present");
   static_assert(Text::NameOf(PacerTier::AtTimeTimerPeriodOnly) == "time on the present");
   static_assert(Text::NumberOf(PacerTier::AfterDurationTimerDisplayTimes) == "2.4");
-  static_assert(Text::NumberOf(PacerTier::VBlankWaitForPresent) == "3.1");
-  static_assert(Text::MajorTierCount * PC::PacerTierUtil::SubTiersPerMajorTier == Text::TierCount);
+  static_assert(Text::NumberOf(PacerTier::VBlankWaitForPresent) == "4.1");
+  static_assert(Text::NumberOf(PacerTier::SystemHoldsLoop) == "3");
+  // Three major tiers of four sub tiers and one of none
+  static_assert(((Text::MajorTierCount - 1u) * PC::PacerTierUtil::SubTiersPerMajorTier) + 1u == Text::TierCount);
   static_assert(Text::DisplayTimesMark == "+");
   static_assert(Text::SkipsOverdueMark == "s");
   static_assert(Text::FrameCallbackMark == "c");
@@ -699,11 +759,16 @@ TEST(PacerTierText, EveryTierHasANameOfItsOwnAndADescription)
     EXPECT_LE(Text::ShortDescriptionOf(tier).size(), Text::ShortDescriptionMaxLength);
     EXPECT_LT(Text::ShortDescriptionOf(tier).size(), Text::DescriptionOf(tier).size());
     names.insert(Text::NameOf(tier));
-    // Shown as its major tier, a point and its sub tier
+    // Shown as its major tier, a point and its sub tier; a major tier without sub tiers alone
     const std::string_view shown = Text::NumberOf(tier);
     ExpectShowable(shown);
-    ASSERT_EQ(shown.size(), 3u);
     EXPECT_EQ(static_cast<uint32_t>(shown[0] - '0'), static_cast<uint32_t>(PC::PacerTierUtil::MajorOf(tier)));
+    if (PC::PacerTierUtil::SubTierOf(tier) == 0u)
+    {
+      EXPECT_EQ(shown.size(), 1u);
+      continue;
+    }
+    ASSERT_EQ(shown.size(), 3u);
     EXPECT_EQ(shown[1], '.');
     EXPECT_EQ(static_cast<uint32_t>(shown[2] - '0'), PC::PacerTierUtil::SubTierOf(tier));
     // Every tier has a pacer: none says otherwise
@@ -724,17 +789,17 @@ TEST(PacerTierText, EveryTierHasANameOfItsOwnAndADescription)
   }
   EXPECT_EQ(majorNames.size(), Text::MajorTierCount);
   EXPECT_TRUE(Text::NameOf(static_cast<PC::PacerMajorTier>(0)).empty());
-  EXPECT_TRUE(Text::DescriptionOf(static_cast<PC::PacerMajorTier>(4)).empty());
+  EXPECT_TRUE(Text::DescriptionOf(static_cast<PC::PacerMajorTier>(5)).empty());
 
   // A number that is no tier has no text
   EXPECT_TRUE(Text::NameOf(static_cast<PacerTier>(0)).empty());
-  EXPECT_TRUE(Text::NameOf(static_cast<PacerTier>(13)).empty());
+  EXPECT_TRUE(Text::NameOf(static_cast<PacerTier>(14)).empty());
   EXPECT_TRUE(Text::DescriptionOf(static_cast<PacerTier>(0)).empty());
-  EXPECT_TRUE(Text::DescriptionOf(static_cast<PacerTier>(13)).empty());
+  EXPECT_TRUE(Text::DescriptionOf(static_cast<PacerTier>(14)).empty());
   EXPECT_TRUE(Text::ShortDescriptionOf(static_cast<PacerTier>(0)).empty());
-  EXPECT_TRUE(Text::ShortDescriptionOf(static_cast<PacerTier>(13)).empty());
+  EXPECT_TRUE(Text::ShortDescriptionOf(static_cast<PacerTier>(14)).empty());
   EXPECT_TRUE(Text::NumberOf(static_cast<PacerTier>(0)).empty());
-  EXPECT_TRUE(Text::NumberOf(static_cast<PacerTier>(13)).empty());
+  EXPECT_TRUE(Text::NumberOf(static_cast<PacerTier>(14)).empty());
 }
 
 TEST(PacerTierText, EveryCapabilityHasANameOfItsOwnAndASetOfSeveralHasNone)

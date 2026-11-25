@@ -9,13 +9,16 @@ namespace MB::FramePacing::Pacer
 {
   //! EXPERIMENTAL (the pacer module, sdk/doc/pacer-design.md: the redesign, being built). The tiers of pacers: one list, 1 the
   //! best. A tier is the capabilities a set needs to reach it (PacerTierUtil::Reaches): what the application can give the pacer
-  //! decides how its frames are paced. Every tier has both aims (PacerAim), so a tier says nothing of latency.
+  //! decides how its frames are paced. Every tier has both aims (PacerAim), so a tier says nothing of latency, but for the
+  //! system's hold (SystemHoldsLoop), which has the aim of smoothness only: low latency needs a timer, and it has none while the
+  //! system holds the loop (decision 24; PacerTierUtil::HasLowLatencyAim).
   //!
   //! A tier is a way of placing a frame on its refresh, and a present uses one: what can be combined with every way is a
-  //! capability beside the tier, not a tier (decision 19 of the design record). The list is three major tiers (PacerMajorTier: who
-  //! places a frame, by what the present takes) of four sub tiers each, and a tier is written as the two: "3.1"
-  //! (PacerTierUtil::MajorOf and SubTierOf, PacerTierText::NumberOf). A sub tier is a rank inside its major tier, the same in every
-  //! major tier (decision 21 of the design record), from two capabilities:
+  //! capability beside the tier, not a tier (decision 19 of the design record). The list is four major tiers (PacerMajorTier: who
+  //! places a frame, by what the present takes), three of them of four sub tiers each, and a tier is written as the two: "4.1"
+  //! (PacerTierUtil::MajorOf and SubTierOf, PacerTierText::NumberOf). The third, the system's hold, has no sub tiers and is
+  //! written "3" (decision 24). A sub tier is a rank inside its major tier, the same in every major tier (decision 21 of the
+  //! design record), from two capabilities:
   //! - a wait for a present (WaitForPresent): the loop is held until the display took an earlier frame, where without one it is
   //!   held on a timer (or until the GPU finished an earlier frame, where the application can wait for that). On a grid on the
   //!   clock a frame callback (FrameCallback) is that wait too, with the "c" beside the tier;
@@ -23,7 +26,7 @@ namespace MB::FramePacing::Pacer
   //!   refresh periods on the clock.
   //! .1 both, .2 vertical blank times, .3 a wait for a present, .4 neither: the vertical blank times rank first, as the one
   //! measurement there is says (where the frame loop places the frame, on one system). Every order here is a proposal until the
-  //! tiers have been measured against each other, the second major tier against 3.1 first (the record has what is measured).
+  //! tiers have been measured against each other, the second major tier against 4.1 first (the record has what is measured).
   //!
   //! The second major tier (AfterDuration...) needs to know where a frame was shown, as every later duration counts from it: its
   //! sub tiers without a wait for a present are reached only with display times (DisplayTimes, the "+"). TierPacer paces both
@@ -47,14 +50,16 @@ namespace MB::FramePacing::Pacer
     AfterDurationTimerWaitForPresent = 7,
     //! 2.4: a duration on the present and display times, on a timer
     AfterDurationTimerDisplayTimes = 8,
-    //! 3.1: vertical blank times and a wait for a present
-    VBlankWaitForPresent = 9,
-    //! 3.2: vertical blank times
-    VBlankPeriodOnly = 10,
-    //! 3.3: a wait for a present, on a timer
-    TimerWaitForPresent = 11,
-    //! 3.4: a timer and the refresh period only: the baseline, every set reaches it
-    TimerPeriodOnly = 12,
+    //! 3: the system holds the loop while the swap chain's queue is full (PresentWaits or AcquireWaits); no sub tiers
+    SystemHoldsLoop = 9,
+    //! 4.1: vertical blank times and a wait for a present
+    VBlankWaitForPresent = 10,
+    //! 4.2: vertical blank times
+    VBlankPeriodOnly = 11,
+    //! 4.3: a wait for a present, on a timer
+    TimerWaitForPresent = 12,
+    //! 4.4: a timer and the refresh period only: the baseline, every set reaches it
+    TimerPeriodOnly = 13,
   };
 }
 

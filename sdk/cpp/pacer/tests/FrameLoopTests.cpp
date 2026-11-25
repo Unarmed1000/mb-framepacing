@@ -822,10 +822,10 @@ TEST(FrameLoop, WhereTheSystemHoldsTheLoopASwapChainThatIsFullPacesItAndItDoesNo
       settings.DisplayPeriodPpm = ppm;
       const int64_t period = PeriodNanoseconds(settings);
 
-      // The loop says that the system holds it and reports its waits: the swap chain is full from the start and stays full, every
-      // frame is on screen for one refresh, and no frame is late by the pacer's count
-      settings.SystemHoldsLoop = true;
-      const std::vector<Sim::LoopFrame> held = Sim::SimulateTimerPeriodOnlyLoop(settings);
+      // The set says that the system holds the loop (the third major tier), and the loop reports its waits: the swap chain is
+      // full from the start and stays full, every frame is on screen for one refresh, and no frame is late by the pacer's count
+      settings.ReportsSystemWaits = true;
+      const std::vector<Sim::LoopFrame> held = Sim::SimulateTierLoop(settings, PC::PacerCapability::AcquireWaits);
       EXPECT_EQ(DisplayStepsOffTheSwapInterval(held, period), 0) << images << ' ' << ppm;
       for (std::size_t index = 30; index < held.size(); ++index)
       {
@@ -836,7 +836,7 @@ TEST(FrameLoop, WhereTheSystemHoldsTheLoopASwapChainThatIsFullPacesItAndItDoesNo
 
       // Without that the pacer goes by its timer. On a display that is faster than it was told the frames that wait run out, and
       // frames are shown twice
-      settings.SystemHoldsLoop = false;
+      settings.ReportsSystemWaits = false;
       const std::vector<Sim::LoopFrame> timed = Sim::SimulateTimerPeriodOnlyLoop(settings);
       if (ppm < 0)
       {

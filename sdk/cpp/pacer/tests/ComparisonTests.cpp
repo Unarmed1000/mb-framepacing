@@ -110,6 +110,6 @@ TEST(Comparison, SettingsCompareEveryField)
               [](Settings& changed) { changed.SetMinWaitTimeout(Duration(60'000'000)); }, [](Settings& changed) { changed.SetMaxFramesInFlight(2); },
               [](Settings& changed) { changed.SetStartupPauseRefreshes(5); },
               [](Settings& changed) { changed.SetStartupPauseDelay(Milliseconds(600)); }, [](Settings& changed) { changed.SetReadyPlacePercent(60); },
-              [](Settings& changed) { changed.SetSwapChainImages(3); }, [](Settings& changed) { changed.SetSystemHoldsLoop(true); }),
+              [](Settings& changed) { changed.SetSwapChainImages(3); }),
             -1);
 }

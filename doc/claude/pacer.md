@@ -26,29 +26,39 @@ Part of the notes for Claude; `CLAUDE.md` holds the rules every task needs.
   - **Capabilities and tiers** (`pacer/capability/`): an application says what it has and what of it is active (`PacerCapabilities`;
     the active set is how it controls the pacer). A tier is the capabilities a set needs (`PacerTierUtil::Rate`, usable without a
     pacer). **A tier is a way of placing a frame; a capability combines with every way** (the user's ruling, 2026-10-14,
-    decision 19, reversing decision 16). **Three major tiers of four sub tiers, written "3.1"**: 1 = a time on the present
+    decision 19, reversing decision 16). **Four major tiers, three of four sub tiers, written "4.1"; the third has none and
+    is written "3"** (decision 24, 2026-11-25): 1 = a time on the present
     (`PresentAtTime`, the display places against a clock; built against the simulation only); 2 = a duration on the present
     (`PresentAfterDuration`, or `PresentSwapInterval` up to 2 or more; the display places after the frame before) **with a wait
-    for a present or display times** (without either the latency creeps after a late frame: the set falls to 3.x), **paced
+    for a present or display times** (without either the latency creeps after a late frame: the set falls to 4.x), **paced
     as a tier of its own since decision 20** (2026-10-15, the simulation only; `HasPacer` true and `PacedAs` the identity
     for every tier, kept for applications): the loop holds no present (`DisplayPlacementUtil::HoldsUpTo`); **smoothness
     takes the hit** of a frame shown late (the user: "taking the hit ... as retiming would cause stutter"), **low latency
     with display times and no wait** (2.2, 2.4) starts the frames later by the display's slip (`hold/DisplaySlipRule`,
-    `DisplaySlipRefreshes`; never the animation time); still to be measured against 3.1; 3 = the frame loop. Sub tiers from `WaitForPresent` and `VBlankTimes`, **the same rank in
+    `DisplaySlipRefreshes`; never the animation time); still to be measured against 4.1; **3 = the system holds the loop**
+    (`PresentWaits` or `AcquireWaits`; `tier/SystemHeldLoopPacer`, the simulation only): no time to wait for while it holds, a
+    fixed step, the hold checked by rate against the frames' starts (a budget capped at the swap chain's images and frames in
+    flight, a hundredth of slack), and where it does not hold a limit inside the tier, an eighth of a refresh faster than the
+    display, until eight frames in a row start at the display's rate (`TierPacer::SystemHold`: `Holding`, `NotHolding`,
+    `Limited` for a swap interval the present can not give); **smoothness only** (low latency would need a timer:
+    `PacerTierUtil::HasLowLatencyAim`); **a tier never changes into another by itself** (the user's rule from it; two old
+    places still do, recorded in the design record for his decision). `PacerSettings::SystemHoldsLoop` is retired; 4 = the
+    frame loop. Sub tiers from `WaitForPresent` and `VBlankTimes`, **the same rank in
     every major tier** (the user, 2026-10-15, decision 21: a different order per major tier only with proof, and there is a
     measurement for the loop's order only): .1 both, .2 vertical blank times, .3 a wait, .4 neither (major 2: `DisplayTimes`
     with .2 and .4, which have no wait); proposals until measured. **Marks:** "+" display times, **"s"** `PresentSkipsOverdue`
     (`PacerRating::SkipsOverdue`, `PacerTierText::SkipsOverdueMark`: describes the system, a rating only until a pacer relies
     on it), **"c"** a frame callback holds the loop (`PacerRating::HoldsByFrameCallback`, the user's choices of 2026-10-30,
-    decision 22: "3.3c"; the plan's wait for a present is that present's callback, `PresentWaitReport::Taken` says it came, no call
+    decision 22: "4.3c" since decision 24; the plan's wait for a present is that present's callback, `PresentWaitReport::Taken` says it came, no call
     per callback and no event time; on a grid on the clock only, one present nearer than a wait for "shown", unused with
     `WaitForPresent` or `VBlankTimes`, no tier of major tier 2: `PacerTierUtil::FrameCallbackCanHold`). The GPU wait and GPU work times: capabilities, no tier, no mark. `DisplaySideHolds` stays beside the tier. No
     capability that changes how good the pacing is may hide inside a place. `PacerTierText` has the words and `NumberOf(tier)`; an
-    application shows no texts of its own. **Every tier has both aims** (`PacerAim::Smoothness`, the default, and `LowLatency`): an
-    aim is never built in as a tier's only behaviour, and the pacer does not pick it (the user: not now).
+    application shows no texts of its own. **Every tier has both aims** (`PacerAim::Smoothness`, the default, and `LowLatency`),
+    but for the system's hold (decision 24): an aim is never built in as a tier's only behaviour otherwise, and the pacer does
+    not pick it (the user: not now).
   - **Built from parts** (the user: no restart, four whole pacers taken apart under their tests): `TierPacer` (`pacer/tier/`) holds
-    two ways of placing frames, `ClockGridLoopPacer` (a grid on the clock) and `VBlankLoopPacer` (the display's vertical blanks),
-    and hands a run over between them (`PacerHandover`) when the active set changes; the parts are `hold/PresentWaitRule`,
+    three ways of placing frames, `ClockGridLoopPacer` (a grid on the clock), `VBlankLoopPacer` (the display's vertical blanks) and
+    `SystemHeldLoopPacer` (the system's hold), and hands a run over between them (`PacerHandover`) when the active set changes; the parts are `hold/PresentWaitRule`,
     `hold/GpuWaitRule`, `hold/DisplaySlipRule`, `timeline/VBlankTimeline`, `placement/DisplayPlacementUtil`, `display/DisplayErrorCounter`, `tier/FreeRunLoop`,
     `rule/SwapIntervalRule` and `rule/FrameWorkRule`. The four single-tier classes (`TimerPeriodOnlyPacer`, …) are test code
     (`pacer/tests/simulation`): `TierPacer` with its capabilities fixed, kept for their tests.

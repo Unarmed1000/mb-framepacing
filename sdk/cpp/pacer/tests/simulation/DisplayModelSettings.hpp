@@ -26,6 +26,13 @@ namespace MB::FramePacing::Pacer::Simulation
     int32_t Images{0};
     //! Vertical blanks at which the display takes no frame although one is ready, ascending
     std::vector<int64_t> HeldBlanks;
+    //! A stretch of time in which the window is covered (from, until; until 0: none): an acquire returns at once, and a frame
+    //! presented then is never shown and waits for nothing, as measured on the first integration's Windows system
+    int64_t CoveredFromNanoseconds{0};
+    int64_t CoveredUntilNanoseconds{0};
+    //! The longest an acquire waits (0: as long as the images say): a hold that lasts a share of a refresh, as a virtual
+    //! machine's present was measured to wait about a third of one. The frames it lets through are queued all the same
+    int64_t AcquireWaitsAtMostNanoseconds{0};
   };
 }
 

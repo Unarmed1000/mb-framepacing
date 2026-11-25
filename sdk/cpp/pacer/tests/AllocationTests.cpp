@@ -19,6 +19,8 @@
 #include <mb/framepacing/pacer/frame/PresentPlan.hpp>
 #include <mb/framepacing/pacer/frame/PresentReport.hpp>
 #include <mb/framepacing/pacer/frame/PresentWaitReport.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitKind.hpp>
+#include <mb/framepacing/pacer/frame/SystemWaitReport.hpp>
 #include <mb/framepacing/pacer/frame/VBlankReading.hpp>
 #include <mb/framepacing/pacer/rule/SlowDownRule.hpp>
 #include <mb/framepacing/pacer/tier/TierPacer.hpp>
@@ -128,6 +130,59 @@ TEST(Allocations, SwitchingPacingOffAndOnNeverAllocates)
     EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
   }
   EXPECT_GT(checked, 1'200);
+}
+
+TEST(Allocations, TheSystemsHoldPacesFramesWithoutAllocating)
+{
+  // The system holds the loop, stops holding it (a window that is covered), and holds it again; at half rate on a present
+  // without a swap interval the pacer holds the rest
+  PC::PacerSettings settings(PC::RefreshPeriod::FromRate(240));
+  settings.SetSwapChainImages(3);
+  PC::TierPacer pacer(settings, PC::PacerCapabilities(PC::PacerCapability::AcquireWaits));
+  const int64_t period = PC::RefreshPeriod::FromRate(240).ToNanosecondTimeSpan().Nanoseconds();
+
+  int64_t checked = 0;
+  {
+    const FT::AllocationCounter counter;
+    int64_t now = 10 * FP::NanosecondTimeSpan::NanosecondsPerSecond;
+    int64_t lastStart = now;
+    PC::PresentReport report;
+    for (int32_t frame = 0; frame < 3'000; ++frame)
+    {
+      const bool covered = (frame % 1'000) >= 400 && (frame % 1'000) < 600;
+      const PC::FrameStartPlan plan = pacer.PlanFrame(FP::NanosecondTickCount(now));
+      // Held: the acquire lets the loop through a refresh after the frame before; covered: at once
+      int64_t start = covered ? now : std::max(now, lastStart + period);
+      start = plan.WaitsForStartTime() && plan.StartTime.Nanoseconds() > start ? plan.StartTime.Nanoseconds() : start;
+      pacer.AddSystemWait({PC::SystemWaitKind::Acquire, FP::NanosecondTickCount(now), FP::NanosecondTickCount(start)});
+      const PC::FrameSchedule schedule = pacer.BeginFrame(FP::NanosecondTickCount(start));
+      lastStart = start;
+      now = start + 500'000;
+      const PC::PresentPlan present = pacer.EndFrame(FP::NanosecondTickCount(now));
+      report.FrameId = present.FrameId;
+      report.CallTime = FP::NanosecondTickCount(now);
+      report.ReturnTime = FP::NanosecondTickCount(now + 60'000);
+      pacer.AddPresent(report);
+      pacer.AddGpuWork(PC::GpuWorkReport::Times(present.FrameId, FP::NanosecondTickCount(now), FP::NanosecondTickCount(now + 1'000'000)));
+      now += 60'000;
+      checked += static_cast<int64_t>(schedule.SwapInterval);
+      if (frame == 2'000)
+      {
+        PC::PacerSettings halfRate = settings;
+        halfRate.SetPreferredSwapInterval(2);
+        pacer.SetSettings(halfRate);
+      }
+    }
+    EXPECT_GT(pacer.SystemHoldLosses(), 0u);
+    EXPECT_GT(pacer.SystemLimitedFrames(), 0u);
+    pacer.ForgetPresents();
+    pacer.SetRefreshPeriod(PC::RefreshPeriod::FromRate(120));
+    static_cast<void>(pacer.BeginFrame(FP::NanosecondTickCount(now + (1 * FP::NanosecondTimeSpan::NanosecondsPerSecond))));
+    pacer.Reset();
+    static_cast<void>(pacer.BeginFrame(FP::NanosecondTickCount(now + (2 * FP::NanosecondTimeSpan::NanosecondsPerSecond))));
+    EXPECT_EQ(FT::AllocationCounter::Count(), 0u);
+  }
+  EXPECT_GT(checked, 3'000);
 }
 
 TEST(Allocations, ThePacerOfATimerWithAWaitForAPresentPacesFramesWithoutAllocating)

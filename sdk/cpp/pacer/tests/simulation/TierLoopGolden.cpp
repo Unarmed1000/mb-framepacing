@@ -29,13 +29,17 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
     {
       std::string_view Name;
       PacerCapability Named{PacerCapability::NoCapabilities};
+      //! The system holds the loop (the third major tier): a swap chain of three images whose acquire waits while it is full,
+      //! and the loop reports its waits
+      bool SystemHolds{false};
     };
 
-    constexpr std::array<Way, 5> Ways = {{{"timer", PacerCapability::NoCapabilities},
-                                          {"timer-wait", PacerCapability::WaitForPresent},
-                                          {"vblank", PacerCapability::VBlankTimes},
-                                          {"vblank-wait", PacerCapability::VBlankTimes | PacerCapability::WaitForPresent},
-                                          {"timer-callback", PacerCapability::FrameCallback}}};
+    constexpr std::array<Way, 6> Ways = {{{"timer", PacerCapability::NoCapabilities, false},
+                                          {"timer-wait", PacerCapability::WaitForPresent, false},
+                                          {"vblank", PacerCapability::VBlankTimes, false},
+                                          {"vblank-wait", PacerCapability::VBlankTimes | PacerCapability::WaitForPresent, false},
+                                          {"timer-callback", PacerCapability::FrameCallback, false},
+                                          {"held", PacerCapability::AcquireWaits, true}}};
 
     //! A case: its name and what it changes of a loop with light work
     struct Case
@@ -201,6 +205,11 @@ namespace MB::FramePacing::Pacer::Simulation::TierLoopGolden
           run.WritesFrames = item.Name == "gpu-90-unreported";
           run.Settings.Frames = Frames;
           run.Settings.Aim = aim;
+          if (way.SystemHolds)
+          {
+            run.Settings.ReportsSystemWaits = true;
+            run.Settings.Display.Images = 3;
+          }
           const int64_t period =
             RefreshPeriod::FromRate(run.Settings.RateNumerator, run.Settings.RateDenominator).ToNanosecondTimeSpan().Nanoseconds();
           item.Apply(run.Settings, period, way.Named);

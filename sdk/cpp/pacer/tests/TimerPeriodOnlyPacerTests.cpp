@@ -901,17 +901,15 @@ TEST(TimerPeriodOnlyPacer, WithTheAimOfSmoothnessThereIsNoReserveAtTwoRefreshesP
   EXPECT_EQ(pacer.StartupPauses(), 0u);
 }
 
-// Where the system holds the frame loop while its queue of frames is full (PacerSettings::SystemHoldsLoop), the aim of smoothness
-// lets it pace the loop on purpose: the application reports its own waits (SystemWaitReport), a frame the display's side held is
-// not late, and the grid goes with it.
+// The application's own waits (SystemWaitReport) on the grid on the clock: counted, and changing nothing. Where the system holds the
+// loop, the system's hold paces it (the third major tier, SystemHeldLoopPacerTests).
 
 namespace
 {
-  //! Smoothness, the system holds the loop, and a swap chain of two images: no frame can wait, so a frame is due at its step
+  //! Smoothness, and a swap chain of two images: no frame can wait, so a frame is due at its step
   PC::PacerSettings HeldLoopSettings()
   {
     PC::PacerSettings settings(g_hz100);
-    settings.SetSystemHoldsLoop(true);
     settings.SetSwapChainImages(2);
     return settings;
   }
@@ -935,74 +933,26 @@ namespace
   }
 }
 
-TEST(TimerPeriodOnlyPacer, WhereTheSystemHoldsTheLoopAFrameItLetThroughIsNotLateAndTheGridGoesWithIt)
+TEST(TimerPeriodOnlyPacer, TheSystemsWaitsAreCountedAndChangeNothing)
 {
+  // A display 5 % slower than the pacer was told, and a wait for an image in every frame: the pacer takes the frames the system
+  // held for late ones and gives steps up. The reports are counted
   PC::TimerPeriodOnlyPacer pacer(HeldLoopSettings());
-  PC::FrameSchedule schedule = MakeFrame(pacer, Start);
-  // The loop is held to a quarter of a period before the frame is due: it is there first, and the system's wait says when the
-  // frame starts
-  EXPECT_EQ(schedule.NextFrameStartTime, At(Start + Period - (Period / 4)));
-  EXPECT_EQ(pacer.PlanFrame(At(Start + 3'100'000)).StartTime, At(Start + Period - (Period / 4)));
-
-  // A display 5 % slower than the pacer was told: every frame the wait for an image lets the loop go 0.05 of a period later.
-  // No frame is late, no step is lost, and each frame is due a period after the one before it started
+  static_cast<void>(MakeFrame(pacer, Start));
   int64_t start = Start;
   for (int32_t frame = 0; frame < 200; ++frame)
   {
-    const int64_t arrived = pacer.PlanFrame(At(start + 3'100'000)).StartTime.Nanoseconds();
-    ASSERT_EQ(arrived, start + Period - (Period / 4)) << frame;
     start += Period + (Period / 20);
-    pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::FrameSlot, arrived, arrived));
-    pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, arrived, start));
-    schedule = MakeFrame(pacer, start);
-    ASSERT_EQ(schedule.IntendedDisplayTime, At(start + Period)) << frame;
-    ASSERT_EQ(schedule.AnimationStep, g_hz100.TimeFor(1)) << frame;
+    pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, start - (Period / 2), start));
+    static_cast<void>(MakeFrame(pacer, start));
   }
   EXPECT_EQ(pacer.SystemHeldFrames(), 200u);
-  EXPECT_EQ(pacer.FrameSlotHeldFrames(), 0u);
-  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
-  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
-  EXPECT_EQ(pacer.SwapInterval(), 1u);
-
-  // The same loop without the setting: the pacer takes the frames the system held for late ones, and gives steps up
-  PC::PacerSettings unaware = HeldLoopSettings();
-  unaware.SetSystemHoldsLoop(false);
-  PC::TimerPeriodOnlyPacer plain(unaware);
-  static_cast<void>(MakeFrame(plain, Start));
-  start = Start;
-  for (int32_t frame = 0; frame < 200; ++frame)
-  {
-    start += Period + (Period / 20);
-    plain.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, start - (Period / 2), start));
-    static_cast<void>(MakeFrame(plain, start));
-  }
-  // The reports are counted and change nothing
-  EXPECT_EQ(plain.SystemHeldFrames(), 200u);
-  EXPECT_GT(plain.RefreshesBehindClock(), 5u);
+  EXPECT_GT(pacer.RefreshesBehindClock(), 5u);
+  // The loop is held to the step it is due at: no lead before it
+  const PC::FrameSchedule schedule = MakeFrame(pacer, start + Period);
+  EXPECT_EQ(schedule.NextFrameStartTime, schedule.IntendedDisplayTime);
 }
 
-TEST(TimerPeriodOnlyPacer, APresentThatWaitedHoldsTheLoopAsAWaitForAnImageDoes)
-{
-  PC::TimerPeriodOnlyPacer pacer(HeldLoopSettings());
-  int64_t start = Start;
-  static_cast<void>(pacer.BeginFrame(At(start)));
-  for (int32_t frame = 0; frame < 50; ++frame)
-  {
-    // The present waits for the display, 1.6 periods after the frame's start, and the next frame starts when it returns
-    PC::PresentReport report;
-    report.FrameId = pacer.EndFrame(At(start + 3'000'000)).FrameId;
-    report.CallTime = At(start + 3'000'000);
-    report.ReturnTime = At(start + Period + (6 * Period / 10));
-    pacer.AddPresent(report);
-    // Nothing to wait for: the time the loop is held to has passed
-    ASSERT_FALSE(pacer.PlanFrame(report.ReturnTime).WaitsForStartTime()) << frame;
-    start = report.ReturnTime.Nanoseconds();
-    static_cast<void>(pacer.BeginFrame(At(start)));
-  }
-  EXPECT_EQ(pacer.SystemHeldFrames(), 50u);
-  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
-  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
-}
 
 TEST(TimerPeriodOnlyPacer, AWaitForAFrameSlotIsTheGpusAndExcusesNothing)
 {
@@ -1035,115 +985,11 @@ TEST(TimerPeriodOnlyPacer, AWaitForAFrameSlotIsTheGpusAndExcusesNothing)
   EXPECT_EQ(pacer.FrameSlotHeldFrames(), 2u);
 }
 
-TEST(TimerPeriodOnlyPacer, WhereTheSystemDoesNotHoldTheLoopAfterAllTheTimerKeepsItToTheDisplaysRate)
-{
-  PC::TimerPeriodOnlyPacer pacer(HeldLoopSettings());
-  static_cast<void>(MakeFrame(pacer, Start));
-  // Every wait for an image returns at once: the frames start where the loop is held to, a quarter of a period early and a
-  // period apart, and the grid stays where it is
-  int64_t start = Start;
-  for (int32_t frame = 1; frame <= 300; ++frame)
-  {
-    const PC::FrameStartPlan plan = pacer.PlanFrame(At(start + 3'100'000));
-    ASSERT_EQ(plan.StartTime, At(Start + (frame * Period) - (Period / 4))) << frame;
-    start = plan.StartTime.Nanoseconds();
-    pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, start, start + 2'000));
-    static_cast<void>(MakeFrame(pacer, start + 2'000));
-  }
-  EXPECT_EQ(pacer.SystemHeldFrames(), 0u);
-  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
-  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
-  // The frames began where they were held to, to the 2 us of the wait: the loop is in step
-  EXPECT_LE(pacer.FrameWindow().StartsAhead.Duration(), Span(2'000 * int64_t{pacer.FrameWindow().Frames}));
-}
-
-TEST(TimerPeriodOnlyPacer, APresentThatWaitsForAShareOfARefreshDoesNotPaceTheLoop)
-{
-  // Measured on a system whose present waits for about a third of a refresh period in every frame. That wait is over before the
-  // time the loop is held to, so it paces nothing: the timer does, a period apart, and the grid stays where it is
-  PC::TimerPeriodOnlyPacer pacer(HeldLoopSettings());
-  const auto present = [&pacer](const int64_t startNanoseconds, const int64_t returnNanoseconds)
-  {
-    PC::PresentReport report;
-    report.FrameId = pacer.EndFrame(At(startNanoseconds + 3'000'000)).FrameId;
-    report.CallTime = At(startNanoseconds + 3'000'000);
-    report.ReturnTime = At(returnNanoseconds);
-    pacer.AddPresent(report);
-  };
-  // A wait before the first frame: there is no grid yet, and nothing to hold it against
-  pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, Start - Period, Start));
-  int64_t start = Start;
-  static_cast<void>(pacer.BeginFrame(At(start)));
-  for (int32_t frame = 1; frame <= 300; ++frame)
-  {
-    const int64_t returned = start + 3'000'000 + (36 * Period / 100);
-    present(start, returned);
-    const PC::FrameStartPlan plan = pacer.PlanFrame(At(returned));
-    ASSERT_EQ(plan.StartTime, At(Start + (frame * Period) - (Period / 4))) << frame;
-    // The wait for an image returns at once, after the loop was held
-    start = plan.StartTime.Nanoseconds() + 7'000;
-    pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, start - 7'000, start));
-    static_cast<void>(pacer.BeginFrame(At(start)));
-  }
-  // The reports say that the display's side held the loop in every frame, and it is counted; it let none of them through
-  EXPECT_EQ(pacer.SystemHeldFrames(), 301u);
-  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
-  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
-  EXPECT_EQ(pacer.SwapInterval(), 1u);
-
-  // A present that returns an eighth of a period after the time the loop is held to, less a nanosecond: still the timer's frame
-  int64_t heldTo = Start + (301 * Period) - (Period / 4);
-  present(start, heldTo + (Period / 8) - 1);
-  EXPECT_FALSE(pacer.PlanFrame(At(heldTo + (Period / 8) - 1)).WaitsForStartTime());
-  start = heldTo + (Period / 8) - 1;
-  EXPECT_EQ(pacer.BeginFrame(At(start)).NextFrameStartTime, At(heldTo + Period));
-  // An eighth of a period: the display's side let the loop through, and the grid goes to where the frame starts
-  heldTo += Period;
-  present(start, heldTo + (Period / 8));
-  EXPECT_FALSE(pacer.PlanFrame(At(heldTo + (Period / 8))).WaitsForStartTime());
-  start = heldTo + (Period / 8);
-  EXPECT_EQ(pacer.BeginFrame(At(start)).NextFrameStartTime, At(start + Period - (Period / 4)));
-  // A wait for an image that begins when the loop was held and takes that long is the same
-  heldTo = start + Period - (Period / 4);
-  present(start, start + 3'060'000);
-  EXPECT_EQ(pacer.PlanFrame(At(start + 3'100'000)).StartTime, At(heldTo));
-  pacer.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, heldTo, heldTo + (3 * Period / 10)));
-  start = heldTo + (3 * Period / 10);
-  EXPECT_EQ(pacer.BeginFrame(At(start)).NextFrameStartTime, At(start + Period - (Period / 4)));
-  EXPECT_EQ(pacer.FrameWindow().LateFrames, 0u);
-  EXPECT_EQ(pacer.RefreshesBehindClock(), 0u);
-}
-
-TEST(TimerPeriodOnlyPacer, TheSystemPacesTheLoopOnlyWithTheAimOfSmoothnessAtOneRefreshPerFrame)
-{
-  // Low latency keeps no frames waiting, so the system has nothing to hold the loop with: the loop is held to the time the frame
-  // is due, and a frame the system held is late
-  PC::PacerSettings settings = HeldLoopSettings();
-  settings.SetAim(PC::PacerAim::LowLatency);
-  settings.SetStartupPauseRefreshes(0);
-  PC::TimerPeriodOnlyPacer lowLatency(settings);
-  EXPECT_EQ(MakeFrame(lowLatency, Start).NextFrameStartTime, At(Start + Period));
-  lowLatency.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, Start + Period, Start + Period + (6 * Period / 10)));
-  static_cast<void>(MakeFrame(lowLatency, Start + Period + (6 * Period / 10)));
-  EXPECT_EQ(lowLatency.SystemHeldFrames(), 1u);
-  EXPECT_EQ(lowLatency.FrameWindow().LateFrames, 1u);
-
-  // At two refreshes per frame the display takes a frame before the next one is made: the same
-  settings = HeldLoopSettings();
-  settings.SetPreferredSwapInterval(2);
-  PC::TimerPeriodOnlyPacer halfRate(settings);
-  EXPECT_EQ(MakeFrame(halfRate, Start).NextFrameStartTime, At(Start + (2 * Period)));
-  halfRate.AddSystemWait(SystemWait(PC::SystemWaitKind::Acquire, Start + (2 * Period), Start + (3 * Period)));
-  static_cast<void>(MakeFrame(halfRate, Start + (3 * Period)));
-  EXPECT_EQ(halfRate.FrameWindow().LateFrames, 1u);
-}
-
 TEST(PacerSettings, TheReserveIsWhatWasAskedForAndNoMoreThanTheSwapChainHolds)
 {
   PC::PacerSettings settings(g_hz100);
   // Two presents may wait by default, the frame itself counted: one frame of reserve. The swap chain's images are not known
   EXPECT_EQ(settings.SwapChainImages(), 0u);
-  EXPECT_FALSE(settings.SystemHoldsLoop());
   EXPECT_EQ(settings.ReserveFrames(), 1u);
   settings.SetWaitingPresents(4);
   EXPECT_EQ(settings.ReserveFrames(), 3u);
@@ -1159,16 +1005,6 @@ TEST(PacerSettings, TheReserveIsWhatWasAskedForAndNoMoreThanTheSwapChainHolds)
   settings.SetSwapChainImages(1);
   EXPECT_EQ(settings.ReserveFrames(), 0u);
 
-  // Where the system holds the loop the reserve is what the swap chain holds, whatever was asked for; without the images known
-  // it is what was asked for
-  settings.SetSystemHoldsLoop(true);
-  EXPECT_TRUE(settings.SystemHoldsLoop());
-  settings.SetSwapChainImages(8);
-  EXPECT_EQ(settings.ReserveFrames(), 6u);
-  settings.SetSwapChainImages(3);
-  EXPECT_EQ(settings.ReserveFrames(), 1u);
-  settings.SetSwapChainImages(0);
-  EXPECT_EQ(settings.ReserveFrames(), 3u);
   EXPECT_NE(settings, PC::PacerSettings(g_hz100));
 
   settings.SetSwapChainImages(PC::PacerSettings::MaxSwapChainImages);

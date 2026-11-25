@@ -16,7 +16,7 @@ namespace MB::FramePacing::Pacer
     PacerTier Tier{PacerTier::TimerPeriodOnly};
     //! The capabilities any one of which, added to the set, raises its tier; none at the best tier.
     PacerCapability RaisesTier{PacerCapability::PresentAtTime | PacerCapability::WaitForPresent | PacerCapability::FrameCallback |
-                               PacerCapability::VBlankTimes};
+                               PacerCapability::VBlankTimes | PacerCapability::PresentWaits | PacerCapability::AcquireWaits};
     //! The present can hold a frame for two refreshes or more (a time, a minimum duration, or a swap interval of 2 or more).
     //! True at every tier where the display's side places the frame; where the frame loop does (a duration without a wait for a
     //! present or display times), it says that a present's minimum duration or swap interval holds such a frame, where without

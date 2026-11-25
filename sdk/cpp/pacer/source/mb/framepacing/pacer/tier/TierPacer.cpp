@@ -48,7 +48,8 @@ namespace MB::FramePacing::Pacer
     , m_active(capabilities)
     , m_grid(settings, PacerTierUtil::HasDisplayHold(capabilities))
     , m_vblank(settings, PacerTierUtil::HasDisplayHold(capabilities))
-    , m_onVBlanks(capabilities.Has(PacerCapability::VBlankTimes))
+    , m_held(settings)
+    , m_part(PartFor(capabilities))
   {
     m_grid.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
     m_vblank.SetPresentTiming(DisplayPlacementUtil::TimingFor(capabilities));
@@ -56,11 +57,23 @@ namespace MB::FramePacing::Pacer
     m_vblank.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(capabilities));
     m_grid.SetMinSwapInterval(capabilities.MinPresentSwapInterval());
     m_vblank.SetMinSwapInterval(capabilities.MinPresentSwapInterval());
+    m_held.SetPresentSwapIntervals(capabilities.MinPresentSwapInterval(), capabilities.MaxPresentSwapInterval());
     m_grid.SetUsesDisplayTimes(capabilities.Has(PacerCapability::DisplayTimes));
     m_vblank.SetUsesDisplayTimes(capabilities.Has(PacerCapability::DisplayTimes));
     m_grid.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
     m_vblank.SetWaitsForGpuWork(capabilities.Has(PacerCapability::WaitForGpuWork));
     m_grid.SetWaitEndsWhenTaken(PacerTierUtil::HoldsByFrameCallback(capabilities));
+  }
+
+  TierPacer::PacerPart TierPacer::PartFor(const PacerCapabilities& active) noexcept
+  {
+    // The system's hold where the set is in its major tier; else the display's vertical blanks where they are active, and a
+    // grid on the clock where not
+    if (PacerTierUtil::Rate(active).Tier == PacerTier::SystemHoldsLoop)
+    {
+      return PacerPart::Held;
+    }
+    return active.Has(PacerCapability::VBlankTimes) ? PacerPart::VBlank : PacerPart::Grid;
   }
 
   void TierPacer::SetCapabilities(const PacerCapabilities& capabilities) noexcept
@@ -101,8 +114,13 @@ namespace MB::FramePacing::Pacer
 
   PacerTier TierPacer::WorkingTier() const noexcept
   {
+    // The system's hold is its tier whether the system holds or the pacer limits the frames
+    if (m_part == PacerPart::Held)
+    {
+      return PacerTier::SystemHoldsLoop;
+    }
     // What is really pacing: the vertical blanks once one was read, and the wait while it is made
-    const bool onVBlanks = m_onVBlanks && m_vblank.HasVBlankReading();
+    const bool onVBlanks = m_part == PacerPart::VBlank && m_vblank.HasVBlankReading();
     const bool waits = PacerTierUtil::HasDisplayHold(m_active) && !PresentWaitsStopped();
     // The display's side places a frame at a time, or after the one before it where the pacer sees where frames were shown
     PresentTiming placement = DisplayPlacementUtil::TimingFor(m_active);
@@ -119,12 +137,65 @@ namespace MB::FramePacing::Pacer
     {
       return m_free.IsFrameOpen();
     }
-    return m_onVBlanks ? m_vblank.IsFrameOpen() : m_grid.IsFrameOpen();
+    switch (m_part)
+    {
+    case PacerPart::VBlank:
+      return m_vblank.IsFrameOpen();
+    case PacerPart::Held:
+      return m_held.IsFrameOpen();
+    case PacerPart::Grid:
+      break;
+    }
+    return m_grid.IsFrameOpen();
   }
 
   const SwapIntervalRule& TierPacer::Rule() const noexcept
   {
-    return m_onVBlanks ? m_vblank.Rule() : m_grid.Rule();
+    switch (m_part)
+    {
+    case PacerPart::VBlank:
+      return m_vblank.Rule();
+    case PacerPart::Held:
+      return m_held.Rule();
+    case PacerPart::Grid:
+      break;
+    }
+    return m_grid.Rule();
+  }
+
+  PacerHandover TierPacer::GiveOverFrom(const PacerPart part) const noexcept
+  {
+    switch (part)
+    {
+    case PacerPart::VBlank:
+      return m_vblank.GiveOver();
+    case PacerPart::Held:
+      return m_held.GiveOver();
+    case PacerPart::Grid:
+      break;
+    }
+    return m_grid.GiveOver();
+  }
+
+  void TierPacer::TakeOverInto(const PacerPart part, const PacerHandover& handover, const SwapIntervalRule& rule, const bool forgetsVBlanks) noexcept
+  {
+    switch (part)
+    {
+    case PacerPart::VBlank:
+      // The vertical blanks are read anew when they are taken up: a reading from before says nothing of now
+      if (forgetsVBlanks)
+      {
+        m_vblank.ForgetVBlanks();
+      }
+      m_vblank.TakeOver(handover, rule);
+      return;
+    case PacerPart::Held:
+      m_held.TakeOver(handover, rule);
+      return;
+    case PacerPart::Grid:
+      break;
+    }
+    m_grid.TakeOver(handover, rule);
   }
 
   void TierPacer::Apply(const PacerCapabilities& active) noexcept
@@ -135,29 +206,24 @@ namespace MB::FramePacing::Pacer
     m_vblank.SetPresentTiming(timing);
     m_grid.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(active));
     m_vblank.SetDisplayHoldsUpTo(DisplayPlacementUtil::HoldsUpTo(active));
-    // The shortest swap interval the present takes: neither part's rule runs faster
+    // The shortest swap interval the present takes: no part's rule runs faster
     m_grid.SetMinSwapInterval(active.MinPresentSwapInterval());
     m_vblank.SetMinSwapInterval(active.MinPresentSwapInterval());
+    m_held.SetPresentSwapIntervals(active.MinPresentSwapInterval(), active.MaxPresentSwapInterval());
     m_grid.SetUsesDisplayTimes(active.Has(PacerCapability::DisplayTimes));
     m_vblank.SetUsesDisplayTimes(active.Has(PacerCapability::DisplayTimes));
-    const bool onVBlanks = active.Has(PacerCapability::VBlankTimes);
-    if (onVBlanks != m_onVBlanks)
+    const PacerPart part = PartFor(active);
+    if (part != m_part)
     {
-      // Another part places the frames from the next one on. The vertical blanks are read anew when they are taken up, and
-      // forgotten when they are given up: a reading from before says nothing of now
-      // (while the application is not pacing, the frames are the free run's: the part only takes the rule now, and the
-      // frames when pacing starts again)
-      if (onVBlanks)
+      // Another part places the frames from the next one on, with the rule of the part before. The vertical blanks are
+      // forgotten when they are given up (while the application is not pacing, the frames are the free run's: the part only
+      // takes the rule now, and the frames when pacing starts again)
+      TakeOverInto(part, m_isPacing ? GiveOverFrom(m_part) : m_free.GiveOver(), Rule(), true);
+      if (m_part == PacerPart::VBlank)
       {
         m_vblank.ForgetVBlanks();
-        m_vblank.TakeOver(m_isPacing ? m_grid.GiveOver() : m_free.GiveOver(), m_grid.Rule());
       }
-      else
-      {
-        m_grid.TakeOver(m_isPacing ? m_vblank.GiveOver() : m_free.GiveOver(), m_vblank.Rule());
-        m_vblank.ForgetVBlanks();
-      }
-      m_onVBlanks = onVBlanks;
+      m_part = part;
     }
     const bool waits = PacerTierUtil::HasDisplayHold(active);
     m_grid.SetWaitsForPresent(waits);
@@ -179,17 +245,13 @@ namespace MB::FramePacing::Pacer
     if (!isPacing)
     {
       // The frames go on unplaced, with what the part that paced them hands over
-      m_free.TakeOver(m_onVBlanks ? m_vblank.GiveOver() : m_grid.GiveOver());
-    }
-    else if (m_onVBlanks)
-    {
-      // The part that would pace has the rule already, and places the frames from its first one on. The vertical blanks
-      // were read all along
-      m_vblank.TakeOver(m_free.GiveOver(), m_vblank.Rule());
+      m_free.TakeOver(GiveOverFrom(m_part));
     }
     else
     {
-      m_grid.TakeOver(m_free.GiveOver(), m_grid.Rule());
+      // The part that would pace has the rule already, and places the frames from its first one on. The vertical blanks
+      // were read all along
+      TakeOverInto(m_part, m_free.GiveOver(), Rule(), false);
     }
     m_isPacing = isPacing;
   }
@@ -210,7 +272,7 @@ namespace MB::FramePacing::Pacer
 
   void TierPacer::AddVBlank(const VBlankReading& reading) noexcept
   {
-    if (m_onVBlanks)
+    if (m_part == PacerPart::VBlank)
     {
       m_vblank.AddVBlank(reading);
     }
@@ -223,17 +285,27 @@ namespace MB::FramePacing::Pacer
       // Not pacing: nothing to wait for
       return {};
     }
-    return m_onVBlanks ? m_vblank.PlanFrame(now) : m_grid.PlanFrame(now);
+    switch (m_part)
+    {
+    case PacerPart::VBlank:
+      return m_vblank.PlanFrame(now);
+    case PacerPart::Held:
+      return m_held.PlanFrame(now);
+    case PacerPart::Grid:
+      break;
+    }
+    return m_grid.PlanFrame(now);
   }
 
   void TierPacer::AddPresentWait(const PresentWaitReport& report) noexcept
   {
-    // A wait the plan did not ask for is not taken: the wait is not active, or the application is not pacing
-    if (!m_isPacing || !PacerTierUtil::HasDisplayHold(m_active))
+    // A wait the plan did not ask for is not taken: the wait is not active, the system's hold asks for none, or the application
+    // is not pacing
+    if (!m_isPacing || !PacerTierUtil::HasDisplayHold(m_active) || m_part == PacerPart::Held)
     {
       return;
     }
-    if (m_onVBlanks)
+    if (m_part == PacerPart::VBlank)
     {
       m_vblank.AddPresentWait(report);
     }
@@ -246,11 +318,11 @@ namespace MB::FramePacing::Pacer
   void TierPacer::AddGpuWait(const GpuWaitReport& report) noexcept
   {
     // A wait the plan did not ask for is not taken
-    if (!m_isPacing || !m_active.Has(PacerCapability::WaitForGpuWork) || PacerTierUtil::HasDisplayHold(m_active))
+    if (!m_isPacing || !m_active.Has(PacerCapability::WaitForGpuWork) || PacerTierUtil::HasDisplayHold(m_active) || m_part == PacerPart::Held)
     {
       return;
     }
-    if (m_onVBlanks)
+    if (m_part == PacerPart::VBlank)
     {
       m_vblank.AddGpuWait(report);
     }
@@ -273,7 +345,18 @@ namespace MB::FramePacing::Pacer
     }
     else
     {
-      schedule = m_onVBlanks ? m_vblank.BeginFrame(cpuStartTime) : m_grid.BeginFrame(cpuStartTime);
+      switch (m_part)
+      {
+      case PacerPart::VBlank:
+        schedule = m_vblank.BeginFrame(cpuStartTime);
+        break;
+      case PacerPart::Held:
+        schedule = m_held.BeginFrame(cpuStartTime);
+        break;
+      case PacerPart::Grid:
+        schedule = m_grid.BeginFrame(cpuStartTime);
+        break;
+      }
     }
     // The display's period is known whether the frame is paced or not
     schedule.RefreshPeriod = NanosecondTimeDuration(Refresh().ToNanosecondTimeSpan());
@@ -293,7 +376,18 @@ namespace MB::FramePacing::Pacer
     }
     else
     {
-      plan = m_onVBlanks ? m_vblank.EndFrame(workDoneTime) : m_grid.EndFrame(workDoneTime);
+      switch (m_part)
+      {
+      case PacerPart::VBlank:
+        plan = m_vblank.EndFrame(workDoneTime);
+        break;
+      case PacerPart::Held:
+        plan = m_held.EndFrame(workDoneTime);
+        break;
+      case PacerPart::Grid:
+        plan = m_grid.EndFrame(workDoneTime);
+        break;
+      }
       // The present's own swap interval, where it takes one: given next to what the loop does, as a minimum duration is
       plan.SwapInterval = DisplayPlacementUtil::PresentSwapIntervalFor(m_active, SwapInterval());
     }
@@ -308,7 +402,16 @@ namespace MB::FramePacing::Pacer
     {
       return m_free.CpuBusyAt(now);
     }
-    return m_onVBlanks ? m_vblank.CpuBusyAt(now) : m_grid.CpuBusyAt(now);
+    switch (m_part)
+    {
+    case PacerPart::VBlank:
+      return m_vblank.CpuBusyAt(now);
+    case PacerPart::Held:
+      return m_held.CpuBusyAt(now);
+    case PacerPart::Grid:
+      break;
+    }
+    return m_grid.CpuBusyAt(now);
   }
 
   void TierPacer::AddPresent(const PresentReport& report) noexcept
@@ -316,15 +419,20 @@ namespace MB::FramePacing::Pacer
     if (!m_isPacing)
     {
       m_free.AddPresent(report);
+      return;
     }
-    else if (m_onVBlanks)
+    switch (m_part)
     {
+    case PacerPart::VBlank:
       m_vblank.AddPresent(report);
+      return;
+    case PacerPart::Held:
+      m_held.AddPresent(report);
+      return;
+    case PacerPart::Grid:
+      break;
     }
-    else
-    {
-      m_grid.AddPresent(report);
-    }
+    m_grid.AddPresent(report);
   }
 
   void TierPacer::AddGpuWork(const GpuWorkReport& report) noexcept
@@ -332,15 +440,20 @@ namespace MB::FramePacing::Pacer
     if (!m_isPacing)
     {
       m_free.AddGpuWork(report, Settings().FrameMargin());
+      return;
     }
-    else if (m_onVBlanks)
+    switch (m_part)
     {
+    case PacerPart::VBlank:
       m_vblank.AddGpuWork(report);
+      return;
+    case PacerPart::Held:
+      m_held.AddGpuWork(report);
+      return;
+    case PacerPart::Grid:
+      break;
     }
-    else
-    {
-      m_grid.AddGpuWork(report);
-    }
+    m_grid.AddGpuWork(report);
   }
 
   void TierPacer::AddSystemWait(const SystemWaitReport& report) noexcept
@@ -350,14 +463,18 @@ namespace MB::FramePacing::Pacer
       // A loop that is not paced is held by nothing of the pacer's: there is nothing to tell the wait apart from
       return;
     }
-    if (m_onVBlanks)
+    switch (m_part)
     {
+    case PacerPart::VBlank:
       m_vblank.AddSystemWait(report);
+      return;
+    case PacerPart::Held:
+      m_held.AddSystemWait(report);
+      return;
+    case PacerPart::Grid:
+      break;
     }
-    else
-    {
-      m_grid.AddSystemWait(report);
-    }
+    m_grid.AddSystemWait(report);
   }
 
   void TierPacer::AddDisplayReport(const DisplayReport& report) noexcept
@@ -367,17 +484,19 @@ namespace MB::FramePacing::Pacer
       return;
     }
     m_display.AddDisplayReport(report, Refresh());
-    // The part that places the frames follows the display's slip where it does (the second major tier, low latency)
-    if (m_isPacing)
+    // The part that places the frames follows the display's slip where it does (the second major tier, low latency); the
+    // system's hold paces nothing by display times
+    if (!m_isPacing)
     {
-      if (m_onVBlanks)
-      {
-        m_vblank.AddDisplayReport(report);
-      }
-      else
-      {
-        m_grid.AddDisplayReport(report);
-      }
+      return;
+    }
+    if (m_part == PacerPart::VBlank)
+    {
+      m_vblank.AddDisplayReport(report);
+    }
+    else if (m_part == PacerPart::Grid)
+    {
+      m_grid.AddDisplayReport(report);
     }
   }
 
@@ -386,15 +505,20 @@ namespace MB::FramePacing::Pacer
     if (!m_isPacing)
     {
       m_free.ForgetPresents();
+      return;
     }
-    else if (m_onVBlanks)
+    switch (m_part)
     {
+    case PacerPart::VBlank:
       m_vblank.ForgetPresents();
+      return;
+    case PacerPart::Held:
+      m_held.ForgetPresents();
+      return;
+    case PacerPart::Grid:
+      break;
     }
-    else
-    {
-      m_grid.ForgetPresents();
-    }
+    m_grid.ForgetPresents();
   }
 
   void TierPacer::SetRefreshPeriod(const RefreshPeriod period) noexcept
@@ -406,6 +530,7 @@ namespace MB::FramePacing::Pacer
     }
     m_grid.SetRefreshPeriod(period);
     m_vblank.SetRefreshPeriod(period);
+    m_held.SetRefreshPeriod(period);
   }
 
   void TierPacer::SetSettings(const PacerSettings& settings)
@@ -416,12 +541,14 @@ namespace MB::FramePacing::Pacer
     }
     m_grid.SetSettings(settings);
     m_vblank.SetSettings(settings);
+    m_held.SetSettings(settings);
   }
 
   void TierPacer::Reset() noexcept
   {
     m_grid.Reset();
     m_vblank.Reset();
+    m_held.Reset();
     m_free.Reset();
     m_display.Restart();
   }

@@ -57,8 +57,19 @@ namespace MB::FramePacing::Pacer::Simulation
     return Take(presentNanoseconds, gpuEndNanoseconds, earliestBlank);
   }
 
+  bool DisplayModel::IsCovered(const int64_t nanoseconds) const noexcept
+  {
+    return nanoseconds >= m_settings.CoveredFromNanoseconds && nanoseconds < m_settings.CoveredUntilNanoseconds;
+  }
+
   int64_t DisplayModel::Take(const int64_t presentNanoseconds, const int64_t gpuEndNanoseconds, const int64_t earliestBlank)
   {
+    if (IsCovered(presentNanoseconds))
+    {
+      // A covered window's frame is never shown: it waits for nothing, and takes no blank
+      m_presents.push_back({presentNanoseconds, presentNanoseconds});
+      return presentNanoseconds;
+    }
     // The first blank the frame is ready for in time
     int64_t blank = std::max(BlankAtOrAfter(std::max(presentNanoseconds, gpuEndNanoseconds) + m_settings.LatchLeadNanoseconds), earliestBlank);
     while (std::binary_search(m_settings.HeldBlanks.begin(), m_settings.HeldBlanks.end(), blank))
@@ -88,7 +99,7 @@ namespace MB::FramePacing::Pacer::Simulation
 
   int64_t DisplayModel::AcquireNanoseconds(const int64_t nanoseconds) const noexcept
   {
-    if (m_settings.Images <= 0)
+    if (m_settings.Images <= 0 || IsCovered(nanoseconds))
     {
       return nanoseconds;
     }
@@ -100,6 +111,7 @@ namespace MB::FramePacing::Pacer::Simulation
     }
     // The waiting frames are the last `pending` presents: the acquire returns when all but `allowed` of them are shown
     const std::size_t first = m_presents.size() - static_cast<std::size_t>(pending);
-    return m_presents[first + static_cast<std::size_t>(pending - allowed - 1)].ShownNanoseconds;
+    const int64_t returns = m_presents[first + static_cast<std::size_t>(pending - allowed - 1)].ShownNanoseconds;
+    return m_settings.AcquireWaitsAtMostNanoseconds > 0 ? std::min(returns, nanoseconds + m_settings.AcquireWaitsAtMostNanoseconds) : returns;
   }
 }

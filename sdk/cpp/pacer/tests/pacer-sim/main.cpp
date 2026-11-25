@@ -30,8 +30,10 @@
 //                       may wait
 //   --display-ppm       the display's refresh period is that many parts per million longer than the loop was told
 //   --swap-interval     the swap interval a tier pacer's application prefers: 4 is 60 frames a second at 240 Hz
-//   --system-holds      the loop tells the pacer of the lowest tier of its own waits and that the system holds it while its
-//                       queue is full; with --images the display has that many, and the pacer is told so
+//   --system-holds      the system holds the loop while its queue is full (the third major tier: an acquire that waits), and
+//                       the loop tells the pacer of its own waits; with --images the display has that many, and the pacer is
+//                       told so. --covered <from>,<until> (nanoseconds on the loop's clock): the window is covered then (an
+//                       acquire returns at once, nothing is shown); --acquire-at-most <nanoseconds>: an acquire waits no longer
 //   --gpu-wait          a tier pacer's application can wait for the GPU's work on a frame: the plans of the pacers without a
 //                       wait for a present ask for it, and the loop makes no frame slot wait of its own
 //   --present-at-time   a tier pacer's present takes a time before which the frame is not shown: the tier with a timed present
@@ -41,6 +43,7 @@
 #include <mb/framepacing/core/time/NanosecondTimeSpan.hpp>
 #include <mb/framepacing/pacer/PacerAim.hpp>
 #include <mb/framepacing/pacer/RefreshPeriod.hpp>
+#include <mb/framepacing/pacer/capability/PacerCapability.hpp>
 #include <algorithm>
 #include <exception>
 #include <filesystem>
@@ -70,7 +73,8 @@ namespace
                  "          [--wait-for-present <presents that may wait>] [--gpu-reports] [--frames-in-flight <n>]\n"
                  "          [--startup-pause <refreshes>] [--smooth] [--vblank-pacer] [--ready-place <percent>]\n"
                  "          [--display-ppm <parts per million>] [--swap-interval <refreshes>] [--system-holds] [--vblank-wait-pacer]\n"
-                 "          [--present-at-time] [--present-after-duration] [--gpu-wait]\n";
+                 "          [--present-at-time] [--present-after-duration] [--gpu-wait] [--covered <from>,<until>]\n"
+                 "          [--acquire-at-most <nanoseconds>]\n";
     return 2;
   }
 
@@ -92,6 +96,7 @@ namespace
     bool tierPacer = false;
     bool waitForPresent = false;
     bool vblankPacer = false;
+    bool systemHolds = false;
     bool vblankWaitPacer = false;
     for (std::size_t index = 2; index < args.size(); ++index)
     {
@@ -138,7 +143,8 @@ namespace
       }
       if (name == "--system-holds")
       {
-        settings.SystemHoldsLoop = true;
+        settings.ReportsSystemWaits = true;
+        systemHolds = true;
         continue;
       }
       if (name == "--gpu-reports")
@@ -186,6 +192,20 @@ namespace
       else if (name == "--images")
       {
         settings.Display.Images = static_cast<int32_t>(Number(value));
+      }
+      else if (name == "--covered")
+      {
+        const std::size_t comma = value.find(',');
+        if (comma == std::string_view::npos)
+        {
+          return Usage();
+        }
+        settings.Display.CoveredFromNanoseconds = Number(value.substr(0, comma));
+        settings.Display.CoveredUntilNanoseconds = Number(value.substr(comma + 1));
+      }
+      else if (name == "--acquire-at-most")
+      {
+        settings.Display.AcquireWaitsAtMostNanoseconds = Number(value);
       }
       else if (name == "--frames-in-flight")
       {
@@ -243,6 +263,11 @@ namespace
     const int64_t periodNanoseconds = MB::FramePacing::Pacer::RefreshPeriod::FromRate(settings.RateNumerator).ToNanosecondTimeSpan().Nanoseconds();
     settings.GpuWork = {(periodNanoseconds * gpuPercent) / 100, (periodNanoseconds * gpuPercent) / 100};
     settings.Display.LatchLeadNanoseconds = (periodNanoseconds * latchLeadPercent) / 100;
+    if (systemHolds)
+    {
+      std::cout << Sim::ToFrameLog(Sim::SimulateTierLoop(settings, MB::FramePacing::Pacer::PacerCapability::AcquireWaits), settings);
+      return 0;
+    }
     if (vblankWaitPacer)
     {
       std::cout << Sim::ToFrameLog(Sim::SimulateVBlankWaitForPresentLoop(settings), settings);

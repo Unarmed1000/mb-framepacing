@@ -52,6 +52,9 @@ namespace MB::FramePacing::Pacer::Simulation
     uint64_t RefreshesBehindClock{0};
     //! For a tier pacer's loop: the waits for a present were stopped when this frame started (TierPacer::PresentWaitsStopped)
     bool PresentWaitsStopped{false};
+    //! Where the system holds the loop (the third major tier): whether it does, as the pacer saw it after the frame began
+    //! (TierPacer::SystemHold: 0 holding, 1 not holding, 2 limited). Not in the golden runs' text
+    uint8_t SystemHold{0};
     //! For a tier pacer's loop that reports display times: what the pacer counted from them when this frame started
     //! (DisplayErrorState)
     uint64_t DisplayJudgedFrames{0};

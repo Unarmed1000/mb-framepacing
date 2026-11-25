@@ -150,7 +150,7 @@ namespace MB.FramePacing.Trace
     /// <summary>What the frame loop is paced by: one of the VsyncSource values.</summary>
     public const string VsyncSource = "vsyncSource";
 
-    /// <summary>The pacer's tier as it is shown, \"3.1\" with its marks, or \"none\".</summary>
+    /// <summary>The pacer's tier as it is shown, \"4.1\" or \"3\" with its marks, or \"none\".</summary>
     public const string PacerTier = "pacerTier";
 
     /// <summary>The pacer's aim: smoothness, low latency or none.</summary>

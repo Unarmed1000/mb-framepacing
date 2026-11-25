@@ -26,6 +26,9 @@
 #include <mb/framepacing/pacer/rule/FrameWindowState.hpp>
 #include <mb/framepacing/pacer/tier/ClockGridLoopPacer.hpp>
 #include <mb/framepacing/pacer/tier/FreeRunLoop.hpp>
+#include <mb/framepacing/pacer/tier/PacerHandover.hpp>
+#include <mb/framepacing/pacer/tier/SystemHeldLoopPacer.hpp>
+#include <mb/framepacing/pacer/tier/SystemHoldState.hpp>
 #include <mb/framepacing/pacer/tier/VBlankLoopPacer.hpp>
 #include <cstdint>
 
@@ -68,6 +71,11 @@ namespace MB::FramePacing::Pacer
   //! the set has no such wait (PacerTierUtil::HoldsByFrameCallback, the "c" beside the tier): the plan's wait is then that
   //! present's callback, and it stops and starts again as that wait does.
   //!
+  //! Where the system holds the loop (PacerCapability::PresentWaits or AcquireWaits, and no time or duration on the present
+  //! that puts the set in a better major tier) the system's hold paces it (the third major tier, "3": SystemHeldLoopPacer): no
+  //! time to wait for while the system holds, and the pacer's own limit where the frames' starts say it does not (SystemHold).
+  //! That tier has the aim of smoothness only.
+  //!
   //! A set that says the display's side skips a frame that is overdue (PacerCapability::PresentSkipsOverdue) is rated with it
   //! (PacerRating::SkipsOverdue) and paced as without it: every present is taken as shown, which one that was skipped is not.
   //!
@@ -89,10 +97,18 @@ namespace MB::FramePacing::Pacer
     PacerCapabilities m_active;
     PacerCapabilities m_pendingActive;
     bool m_hasPendingActive{false};
-    // The two ways a frame is placed, of which one paces: on a grid on the clock, or on the display's vertical blanks
+    // The parts that place a frame, of which one paces: on a grid on the clock, on the display's vertical blanks, or where the
+    // system holds the loop
+    enum class PacerPart : uint8_t
+    {
+      Grid,
+      VBlank,
+      Held,
+    };
     ClockGridLoopPacer m_grid;
     VBlankLoopPacer m_vblank;
-    bool m_onVBlanks;
+    SystemHeldLoopPacer m_held;
+    PacerPart m_part;
     // The frames while the application is not pacing: neither of the two places them, and the one that would keeps the
     // swap interval rule
     FreeRunLoop m_free;
@@ -150,8 +166,8 @@ namespace MB::FramePacing::Pacer
 
     //! The tier that is pacing this frame. Below the active tier while something a capability promised is missing (no
     //! vertical blank reading so far, waits for a present that stopped because none is shown: with a duration on the present
-    //! and nothing else to see where frames were shown, the loop places the frames). While the application is not pacing
-    //! (IsPacing) it is the tier that would pace.
+    //! and nothing else to see where frames were shown, the loop places the frames). The system's hold stays its tier whether
+    //! the system holds or not (SystemHold). While the application is not pacing (IsPacing) it is the tier that would pace.
     [[nodiscard]] PacerTier WorkingTier() const noexcept;
 
     //! A vertical blank of the display the window is on. Taken with PacerCapability::VBlankTimes active.
@@ -184,8 +200,8 @@ namespace MB::FramePacing::Pacer
     //! The GPU's work on an earlier frame, where the application has it.
     void AddGpuWork(const GpuWorkReport& report) noexcept;
 
-    //! A wait the application made by itself before the frame starts (for an image, for a frame slot). On the grid on the
-    //! clock the system may be what paces the loop (PacerSettings::SystemHoldsLoop). On vertical blanks a start that the
+    //! A wait the application made by itself before the frame starts (for an image, for a frame slot). Where the system holds
+    //! the loop, it says the system holds it again after the frames were limited. On vertical blanks a start that the
     //! display's side held is not stepped over by the animation time (DisplayHeldRefreshes).
     void AddSystemWait(const SystemWaitReport& report) noexcept;
 
@@ -231,7 +247,8 @@ namespace MB::FramePacing::Pacer
     //! The refreshes the animation time is behind the clock: what was lost and not caught up with.
     [[nodiscard]] uint64_t RefreshesBehindClock() const noexcept
     {
-      return m_onVBlanks ? m_vblank.RefreshesBehindClock() : m_grid.RefreshesBehindClock();
+      return m_part == PacerPart::Held ? m_held.RefreshesBehindClock()
+                                       : (m_part == PacerPart::VBlank ? m_vblank.RefreshesBehindClock() : m_grid.RefreshesBehindClock());
     }
 
     //! The pauses after start-up that were made, since the pacer was made.
@@ -267,19 +284,21 @@ namespace MB::FramePacing::Pacer
     //! True while no wait for a present is made because the waits ran out (PresentWaitRule).
     [[nodiscard]] bool PresentWaitsStopped() const noexcept
     {
-      return m_onVBlanks ? m_vblank.PresentWaitsStopped() : m_grid.PresentWaitsStopped();
+      return m_part != PacerPart::Held && (m_part == PacerPart::VBlank ? m_vblank.PresentWaitsStopped() : m_grid.PresentWaitsStopped());
     }
 
     //! The waits for a present that ended without the present being shown, since the pacer was made.
     [[nodiscard]] uint64_t PresentWaitTimeouts() const noexcept
     {
-      return m_onVBlanks ? m_vblank.PresentWaitTimeouts() : m_grid.PresentWaitTimeouts();
+      return m_part == PacerPart::Held ? m_held.PresentWaitTimeouts()
+                                       : (m_part == PacerPart::VBlank ? m_vblank.PresentWaitTimeouts() : m_grid.PresentWaitTimeouts());
     }
 
     //! The waits for the GPU's work that ended without the GPU done with the frame, since the pacer was made.
     [[nodiscard]] uint64_t GpuWaitTimeouts() const noexcept
     {
-      return m_onVBlanks ? m_vblank.GpuWaitTimeouts() : m_grid.GpuWaitTimeouts();
+      return m_part == PacerPart::Held ? m_held.GpuWaitTimeouts()
+                                       : (m_part == PacerPart::VBlank ? m_vblank.GpuWaitTimeouts() : m_grid.GpuWaitTimeouts());
     }
 
     //! The refreshes frame starts were late by while the display's side held the loop, on vertical blanks: not stepped over
@@ -308,48 +327,81 @@ namespace MB::FramePacing::Pacer
       return m_grid.FrameSlotHeldFrames();
     }
 
+    //! Where the system holds the loop (the third major tier): whether it does, as the frames' starts say. Holding where
+    //! another tier paces.
+    [[nodiscard]] SystemHoldState SystemHold() const noexcept
+    {
+      return m_part == PacerPart::Held ? m_held.Hold() : SystemHoldState::Holding;
+    }
+
+    //! The times the frames were found to start faster than the display can show them where the system was to hold the loop,
+    //! since the pacer was made.
+    [[nodiscard]] uint64_t SystemHoldLosses() const noexcept
+    {
+      return m_held.HoldLosses();
+    }
+
+    //! The frames the pacer limited where the system was to hold the loop (SystemHoldState::NotHolding, Limited), since the
+    //! pacer was made.
+    [[nodiscard]] uint64_t SystemLimitedFrames() const noexcept
+    {
+      return m_held.LimitedFrames();
+    }
+
     //! The GPU time a frame is judged with: the newest that was reported, zero without one.
     [[nodiscard]] NanosecondTimeDuration GpuTime() const noexcept
     {
-      return !m_isPacing ? m_free.GpuTime() : (m_onVBlanks ? m_vblank.GpuTime() : m_grid.GpuTime());
+      if (!m_isPacing)
+      {
+        return m_free.GpuTime();
+      }
+      return m_part == PacerPart::Held ? m_held.GpuTime() : (m_part == PacerPart::VBlank ? m_vblank.GpuTime() : m_grid.GpuTime());
     }
 
     //! How long the last present held the frame loop.
     [[nodiscard]] NanosecondTimeDuration LastPresentBlocked() const noexcept
     {
-      return !m_isPacing ? m_free.LastPresentBlocked() : (m_onVBlanks ? m_vblank.LastPresentBlocked() : m_grid.LastPresentBlocked());
+      if (!m_isPacing)
+      {
+        return m_free.LastPresentBlocked();
+      }
+      return m_part == PacerPart::Held ? m_held.LastPresentBlocked()
+                                       : (m_part == PacerPart::VBlank ? m_vblank.LastPresentBlocked() : m_grid.LastPresentBlocked());
     }
 
     //! What the rule's frame window holds.
     [[nodiscard]] FrameWindowState FrameWindow() const noexcept
     {
-      return m_onVBlanks ? m_vblank.FrameWindow() : m_grid.FrameWindow();
+      return m_part == PacerPart::Held ? m_held.FrameWindow() : (m_part == PacerPart::VBlank ? m_vblank.FrameWindow() : m_grid.FrameWindow());
     }
 
     //! The swap interval of the frames now.
     [[nodiscard]] uint32_t SwapInterval() const noexcept
     {
-      return m_onVBlanks ? m_vblank.SwapInterval() : m_grid.SwapInterval();
+      return m_part == PacerPart::Held ? m_held.SwapInterval() : (m_part == PacerPart::VBlank ? m_vblank.SwapInterval() : m_grid.SwapInterval());
     }
 
     //! The refresh period the pacer is on.
     [[nodiscard]] RefreshPeriod Refresh() const noexcept
     {
-      return m_onVBlanks ? m_vblank.Refresh() : m_grid.Refresh();
+      return m_part == PacerPart::Held ? m_held.Refresh() : (m_part == PacerPart::VBlank ? m_vblank.Refresh() : m_grid.Refresh());
     }
 
     //! The settings the pacer has.
     [[nodiscard]] const PacerSettings& Settings() const noexcept
     {
-      return m_onVBlanks ? m_vblank.Settings() : m_grid.Settings();
+      return m_part == PacerPart::Held ? m_held.Settings() : (m_part == PacerPart::VBlank ? m_vblank.Settings() : m_grid.Settings());
     }
 
   private:
+    [[nodiscard]] static PacerPart PartFor(const PacerCapabilities& active) noexcept;
     [[nodiscard]] bool IsFrameOpen() const noexcept;
     void Apply(const PacerCapabilities& active) noexcept;
     void ApplyPacing(bool isPacing) noexcept;
     void ApplyPending() noexcept;
     [[nodiscard]] const SwapIntervalRule& Rule() const noexcept;
+    [[nodiscard]] PacerHandover GiveOverFrom(PacerPart part) const noexcept;
+    void TakeOverInto(PacerPart part, const PacerHandover& handover, const SwapIntervalRule& rule, bool forgetsVBlanks) noexcept;
   };
 }
 

@@ -54,8 +54,12 @@ namespace MB::FramePacing::Pacer::Simulation
     //! The frames presented at or before a time that are shown after it
     [[nodiscard]] int32_t Pending(int64_t nanoseconds) const noexcept;
 
-    //! When an acquire called at a time returns: the time itself where nothing bounds the waiting frames
+    //! When an acquire called at a time returns: the time itself where nothing bounds the waiting frames, or the window is
+    //! covered; no later than DisplayModelSettings::AcquireWaitsAtMostNanoseconds after it
     [[nodiscard]] int64_t AcquireNanoseconds(int64_t nanoseconds) const noexcept;
+
+    //! True when the window is covered at the time (DisplayModelSettings::CoveredFromNanoseconds)
+    [[nodiscard]] bool IsCovered(int64_t nanoseconds) const noexcept;
 
   private:
     //! The display takes the frame at the first vertical blank it is ready for, and no sooner than at earliestBlank

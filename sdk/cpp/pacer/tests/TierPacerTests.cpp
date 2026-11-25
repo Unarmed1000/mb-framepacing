@@ -1351,8 +1351,7 @@ TEST(TierPacer, AWaitOfTheSystemsAndAFrameBegunAtOnceRightAfterTheGridTookTheFra
   // on: their ids by one, the animation time forward
   for (const PC::PacerAim aim : {PC::PacerAim::LowLatency, PC::PacerAim::Smoothness})
   {
-    PC::PacerSettings settings = Settings(aim);
-    settings.SetSystemHoldsLoop(true);
+    const PC::PacerSettings settings = Settings(aim);
     Loop loop(settings, PacerCapabilities(VBlank));
     PC::FrameSchedule before;
     for (int32_t frame = 0; frame < 30; ++frame)

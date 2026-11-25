@@ -129,7 +129,7 @@ namespace MB::FramePacing::Pacer
     }
     // One image is on screen and one is drawn into: the rest can wait
     const uint32_t held = m_swapChainImages > 2u ? m_swapChainImages - 2u : 0u;
-    return m_systemHoldsLoop ? held : std::min(asked, held);
+    return std::min(asked, held);
   }
 
   void PacerSettings::SetPresentWaitSwapIntervals(const uint32_t swapIntervals) noexcept

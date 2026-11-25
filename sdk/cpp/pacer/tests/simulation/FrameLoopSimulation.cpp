@@ -190,17 +190,11 @@ namespace MB::FramePacing::Pacer::Simulation
     pacerSettings.SetMaxFramesInFlight(settings.MaxFramesInFlight);
     pacerSettings.SetStartupPauseRefreshes(settings.StartupPauseRefreshes);
     pacerSettings.SetReadyPlacePercent(settings.ReadyPlacePercent);
-    // The loop's own waits are reported to the pacer where the settings say so. That the system holds the loop while its
-    // queue is full, with the images it has, is said by the application that has neither vertical blank times nor a wait
-    // for a present: the one case that setting was built and measured for
-    const bool tellsOfSystemWaits = settings.SystemHoldsLoop;
-    if (tellsOfSystemWaits && named == PacerCapability::NoCapabilities)
+    // The loop's own waits are reported to the pacer where the settings say so, with the swap chain's images
+    const bool tellsOfSystemWaits = settings.ReportsSystemWaits;
+    if (tellsOfSystemWaits && settings.Display.Images > 0)
     {
-      pacerSettings.SetSystemHoldsLoop(true);
-      if (settings.Display.Images > 0)
-      {
-        pacerSettings.SetSwapChainImages(static_cast<uint32_t>(settings.Display.Images));
-      }
+      pacerSettings.SetSwapChainImages(static_cast<uint32_t>(settings.Display.Images));
     }
     TierPacer pacer(pacerSettings, CapabilitiesOf(settings, named));
     DisplayModel display(DisplayPeriod(settings), settings.Display);
@@ -357,6 +351,7 @@ namespace MB::FramePacing::Pacer::Simulation
       frame.WindowLateFrames = window.LateFrames;
       frame.RefreshesBehindClock = pacer.RefreshesBehindClock();
       frame.PresentWaitsStopped = pacer.PresentWaitsStopped();
+      frame.SystemHold = static_cast<uint8_t>(pacer.SystemHold());
       SetDisplayErrors(frame, pacer);
 
       frame.WorkCpuNanoseconds = CpuWork(settings, cpuWork, index, random);

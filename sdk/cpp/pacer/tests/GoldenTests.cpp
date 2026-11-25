@@ -208,8 +208,8 @@ TEST(Golden, EveryRunOfTheTierPacersLoopGivesTheBytesOfItsGoldenFile)
     GTEST_SKIP() << "test-data/pacer not found";
   }
   const std::vector<Sim::TierLoopGoldenRun> runs = Sim::TierLoopGolden::Runs();
-  // Five ways of pacing, two aims, seventeen cases
-  ASSERT_EQ(runs.size(), 170u);
+  // Six ways of pacing, two aims, seventeen cases
+  ASSERT_EQ(runs.size(), 204u);
   uint32_t whole = 0;
   for (const Sim::TierLoopGoldenRun& run : runs)
   {
@@ -221,7 +221,7 @@ TEST(Golden, EveryRunOfTheTierPacersLoopGivesTheBytesOfItsGoldenFile)
       EXPECT_TRUE(Sim::TierLoopGolden::Simulate(run) == expected) << run.Name;
     }
   }
-  EXPECT_EQ(whole, 10u);
+  EXPECT_EQ(whole, 12u);
 
   // The digest file, line by line, so that a difference names its run
   const std::string expected = ReadText(*folder / Sim::TierLoopGolden::DigestFileName);
@@ -237,6 +237,6 @@ TEST(Golden, EveryRunOfTheTierPacersLoopGivesTheBytesOfItsGoldenFile)
     EXPECT_EQ(line, expectedLine);
     ++count;
   }
-  EXPECT_EQ(count, 171u);
+  EXPECT_EQ(count, 205u);
   EXPECT_TRUE(digests == expected);
 }

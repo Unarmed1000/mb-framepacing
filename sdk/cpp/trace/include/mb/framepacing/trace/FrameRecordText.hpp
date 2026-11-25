@@ -112,7 +112,7 @@ namespace MB::FramePacing::Trace::FrameRecordText
   inline constexpr std::string_view VariableRefresh = "variableRefresh";
   //! What the frame loop is paced by: one of the VsyncSource values.
   inline constexpr std::string_view VsyncSource = "vsyncSource";
-  //! The pacer's tier as it is shown, \"3.1\" with its marks, or \"none\".
+  //! The pacer's tier as it is shown, \"4.1\" or \"3\" with its marks, or \"none\".
   inline constexpr std::string_view PacerTier = "pacerTier";
   //! The pacer's aim: smoothness, low latency or none.
   inline constexpr std::string_view PacerAim = "pacerAim";

@@ -37,7 +37,6 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_startupPauseDelay{500 * NanosecondTimeSpan::NanosecondsPerMillisecond};
     uint32_t m_readyPlacePercent{50};
     uint32_t m_swapChainImages{0};
-    bool m_systemHoldsLoop{false};
 
   public:
     static constexpr uint32_t MaxSwapInterval = 100;
@@ -223,24 +222,9 @@ namespace MB::FramePacing::Pacer
 
     void SetSwapChainImages(uint32_t images) noexcept;
 
-    //! True when the system holds the frame loop while its queue of frames is full (a present or a wait for an image that
-    //! waits for the display), and the application reports those waits (SystemWaitReport). Off by default. With
-    //! PacerAim::Smoothness a tier pacer then lets the system pace the loop on purpose: the reserve is what the swap chain
-    //! holds, a frame the system held is not late, and the pacer's own start time only keeps the loop from running away
-    //! where the system does not hold it after all.
-    [[nodiscard]] bool SystemHoldsLoop() const noexcept
-    {
-      return m_systemHoldsLoop;
-    }
-
-    void SetSystemHoldsLoop(const bool systemHoldsLoop) noexcept
-    {
-      m_systemHoldsLoop = systemHoldsLoop;
-    }
-
     //! The frames a tier pacer makes ahead of the display with PacerAim::Smoothness at one refresh per frame: WaitingPresents
-    //! less one, and no more than the swap chain can hold when its images are known. Where the system holds the loop
-    //! (SystemHoldsLoop) and the images are known it is what the swap chain holds, whatever WaitingPresents says.
+    //! less one, and no more than the swap chain can hold when its images are known. (Where the system holds the loop, the
+    //! system's hold paces it, with the swap chain's queue full: PacerCapability::PresentWaits and AcquireWaits.)
     [[nodiscard]] uint32_t ReserveFrames() const noexcept;
 
     //! The longest a wait for a present may take, in swap intervals of the frame that waits (1 to MaxPresentWaitSwapIntervals;
@@ -328,8 +312,7 @@ namespace MB::FramePacing::Pacer
              m_waitingPresents == other.m_waitingPresents && m_presentWaitSwapIntervals == other.m_presentWaitSwapIntervals &&
              m_minWaitTimeout == other.m_minWaitTimeout && m_maxFramesInFlight == other.m_maxFramesInFlight &&
              m_startupPauseRefreshes == other.m_startupPauseRefreshes && m_startupPauseDelay == other.m_startupPauseDelay &&
-             m_readyPlacePercent == other.m_readyPlacePercent && m_swapChainImages == other.m_swapChainImages &&
-             m_systemHoldsLoop == other.m_systemHoldsLoop;
+             m_readyPlacePercent == other.m_readyPlacePercent && m_swapChainImages == other.m_swapChainImages;
     }
 
     constexpr bool operator!=(const PacerSettings& other) const noexcept

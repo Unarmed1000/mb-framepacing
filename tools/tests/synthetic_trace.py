@@ -405,7 +405,7 @@ EXAMPLE_ENVIRONMENT: dict[str, int | str] = {
     "maxFramesInFlight": 2,
     "variableRefresh": "off",
     "vsyncSource": "present wait",
-    "pacerTier": "3.1+",
+    "pacerTier": "4.1+",
     "pacerAim": "smoothness",
     "capabilities": "WaitForPresent, VBlankTimes, DisplayTimes",
     "activeCapabilities": "WaitForPresent, VBlankTimes, DisplayTimes",

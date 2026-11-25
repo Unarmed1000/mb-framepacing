@@ -17,8 +17,33 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
 {
   //! The shortest "longest swap interval" with which a present's swap interval holds a frame for more than one refresh.
   inline constexpr uint32_t MinHoldingSwapInterval = 2;
-  //! The sub tiers a major tier has.
+  //! The sub tiers a major tier that has sub tiers has (all but the system's hold: SubTierCountOf).
   inline constexpr uint32_t SubTiersPerMajorTier = 4;
+
+  //! The sub tiers a major tier has: SubTiersPerMajorTier, and none for the system's hold, which is one tier written "3"
+  //! (decision 24): a full queue leaves the wait for a present and the vertical blank times its sub tiers would rank nothing to
+  //! do. A value that is no major tier has none.
+  [[nodiscard]] constexpr uint32_t SubTierCountOf(const PacerMajorTier major) noexcept
+  {
+    switch (major)
+    {
+    case PacerMajorTier::DisplayPlacesAtTime:
+    case PacerMajorTier::DisplayPlacesAfterDuration:
+    case PacerMajorTier::LoopPlaces:
+      return SubTiersPerMajorTier;
+    case PacerMajorTier::SystemHoldsLoop:
+      break;
+    }
+    return 0;
+  }
+
+  //! Whether the system holds the loop while its swap chain's queue is full: the present or the call for the next image waits
+  //! for room (PresentWaits, AcquireWaits). A claim from what the platform documents, which the pacer of the system's hold checks
+  //! against the frames' starts.
+  [[nodiscard]] constexpr bool SystemHoldsTheLoop(const PacerCapabilities& capabilities) noexcept
+  {
+    return capabilities.Has(PacerCapability::PresentWaits) || capabilities.Has(PacerCapability::AcquireWaits);
+  }
 
   //! Whether the display's side places a frame against a clock: the present takes a time before which the frame is not shown
   //! (PresentAtTime), so the frame is shown at the refresh it is for whenever the present is made.
@@ -48,12 +73,15 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
   //! Whether a frame callback would hold the loop in this set, were it there. Not with a wait for a present, which says more.
   //! Not with vertical blank times: there a wait's return is read as the refresh a frame was shown at, and a window system's call
   //! says that the display's side took a frame, which may be before it is shown. And not where display times reach the second
-  //! major tier: the display's side places the frames there, and the loop follows its slip.
+  //! major tier: the display's side places the frames there, and the loop follows its slip. And not where the system holds the
+  //! loop (SystemHoldsTheLoop) and no time on the present puts the set in the first major tier: the system's hold paces those.
   [[nodiscard]] constexpr bool FrameCallbackCanHold(const PacerCapabilities& capabilities) noexcept
   {
     const bool placedAfterFrameBefore =
       HasPresentAfterDuration(capabilities) && !HasPresentAtTime(capabilities) && capabilities.Has(PacerCapability::DisplayTimes);
-    return !capabilities.Has(PacerCapability::WaitForPresent) && !capabilities.Has(PacerCapability::VBlankTimes) && !placedAfterFrameBefore;
+    const bool heldBySystem = SystemHoldsTheLoop(capabilities) && !HasPresentAtTime(capabilities);
+    return !capabilities.Has(PacerCapability::WaitForPresent) && !capabilities.Has(PacerCapability::VBlankTimes) && !placedAfterFrameBefore &&
+           !heldBySystem;
   }
 
   //! Whether a frame callback holds the loop: the set has one, and it can (FrameCallbackCanHold). The plan's wait for a present
@@ -77,19 +105,40 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     {
       return PacerMajorTier::DisplayPlacesAtTime;
     }
-    return number <= (2u * SubTiersPerMajorTier) ? PacerMajorTier::DisplayPlacesAfterDuration : PacerMajorTier::LoopPlaces;
+    if (number <= (2u * SubTiersPerMajorTier))
+    {
+      return PacerMajorTier::DisplayPlacesAfterDuration;
+    }
+    return tier == PacerTier::SystemHoldsLoop ? PacerMajorTier::SystemHoldsLoop : PacerMajorTier::LoopPlaces;
   }
 
-  //! The sub tier of a tier, 1 to SubTiersPerMajorTier: its rank inside its major tier. 3 and 2 are tier "3.2". A value that is
-  //! no tier is taken as the tier next to it.
+  //! The sub tier of a tier, 1 to SubTiersPerMajorTier: its rank inside its major tier; 4 and 2 are tier "4.2". 0 for the
+  //! system's hold, whose major tier has no sub tiers (SubTierCountOf). A value that is no tier is taken as the tier next to it.
   [[nodiscard]] constexpr uint32_t SubTierOf(const PacerTier tier) noexcept
   {
     const auto number = static_cast<uint32_t>(tier);
+    const auto held = static_cast<uint32_t>(PacerTier::SystemHoldsLoop);
     if (number == 0u)
     {
       return 1u;
     }
-    return number > (3u * SubTiersPerMajorTier) ? SubTiersPerMajorTier : (((number - 1u) % SubTiersPerMajorTier) + 1u);
+    if (number < held)
+    {
+      return ((number - 1u) % SubTiersPerMajorTier) + 1u;
+    }
+    if (number == held)
+    {
+      return 0u;
+    }
+    return number > (held + SubTiersPerMajorTier) ? SubTiersPerMajorTier : (number - held);
+  }
+
+  //! Whether a tier has the aim of low latency besides the aim of smoothness: every tier but the system's hold, where low latency
+  //! would need a timer and the tier has none while the system holds the loop (decision 24). There the aim of low latency is paced
+  //! as smoothness, and an application can show that.
+  [[nodiscard]] constexpr bool HasLowLatencyAim(const PacerTier tier) noexcept
+  {
+    return tier != PacerTier::SystemHoldsLoop;
   }
 
   //! Whether a pacer is built for the tier: for every tier (TierPacer), since the second major tier has its own (decision 20 of
@@ -108,8 +157,9 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
 
   //! Whether the set reaches the tier: it has what the tier's major tier needs (a time on the present; a duration on the present),
   //! and the wait for a present, the vertical blank times and the display times that the tier is named for. On a grid on the clock
-  //! a frame callback is that wait, but for the second major tier, which has to see where frames were shown. TimerPeriodOnly needs
-  //! nothing, so every set reaches it.
+  //! a frame callback is that wait, but for the second major tier, which has to see where frames were shown. The system's hold
+  //! needs a present or a call for the next image that waits (SystemHoldsTheLoop). TimerPeriodOnly needs nothing, so every set
+  //! reaches it.
   [[nodiscard]] constexpr bool Reaches(const PacerCapabilities& capabilities, const PacerTier tier) noexcept
   {
     const bool atTime = HasPresentAtTime(capabilities);
@@ -136,6 +186,8 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
       return afterDuration && vblank && displayTimes;
     case PacerTier::AfterDurationTimerDisplayTimes:
       return afterDuration && displayTimes;
+    case PacerTier::SystemHoldsLoop:
+      return SystemHoldsTheLoop(capabilities);
     case PacerTier::VBlankWaitForPresent:
       return vblank && wait;
     case PacerTier::VBlankPeriodOnly:
@@ -175,7 +227,9 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     // What the set does not have and would be raised by: a time on the present; without one, a duration on the present (or a
     // swap interval of two or more) where the set sees where frames were shown, and display times where it has a duration and no
     // wait for a present; a wait for a present, which a frame callback that holds the loop is at its tier unless a duration needs
-    // the real one; a frame callback where one would hold the loop and the set has none; vertical blank times
+    // the real one; a frame callback where one would hold the loop and the set has none; vertical blank times; and below the
+    // system's hold, a present or a call for the next image that waits. The system's hold has no sub tiers, so there a wait, a
+    // frame callback or vertical blank times raise nothing but where a duration on the present needs a wait to see the frames
     const bool atTime = HasPresentAtTime(capabilities);
     const bool afterDuration = HasPresentAfterDuration(capabilities);
     const bool wait = capabilities.Has(PacerCapability::WaitForPresent);
@@ -197,7 +251,8 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
         rating.RaisesTier = rating.RaisesTier | PacerCapability::DisplayTimes;
       }
     }
-    if (!wait && (!rating.HoldsByFrameCallback || (afterDuration && !atTime)))
+    const bool held = rating.Tier == PacerTier::SystemHoldsLoop;
+    if (!wait && (!rating.HoldsByFrameCallback || (afterDuration && !atTime)) && (!held || afterDuration))
     {
       rating.RaisesTier = rating.RaisesTier | PacerCapability::WaitForPresent;
     }
@@ -205,9 +260,21 @@ namespace MB::FramePacing::Pacer::PacerTierUtil
     {
       rating.RaisesTier = rating.RaisesTier | PacerCapability::FrameCallback;
     }
-    if (!capabilities.Has(PacerCapability::VBlankTimes))
+    if (!capabilities.Has(PacerCapability::VBlankTimes) && !held)
     {
       rating.RaisesTier = rating.RaisesTier | PacerCapability::VBlankTimes;
+    }
+    if (MajorOf(rating.Tier) == PacerMajorTier::LoopPlaces)
+    {
+      // Either one that the set does not exclude by saying the call returns at once
+      if (!capabilities.Has(PacerCapability::PresentReturnsAtOnce))
+      {
+        rating.RaisesTier = rating.RaisesTier | PacerCapability::PresentWaits;
+      }
+      if (!capabilities.Has(PacerCapability::AcquireReturnsAtOnce))
+      {
+        rating.RaisesTier = rating.RaisesTier | PacerCapability::AcquireWaits;
+      }
     }
     return rating;
   }

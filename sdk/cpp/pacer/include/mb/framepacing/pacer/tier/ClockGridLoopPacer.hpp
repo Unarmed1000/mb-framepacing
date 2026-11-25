@@ -108,8 +108,6 @@ namespace MB::FramePacing::Pacer
     // in which the GPU did (for a frame slot): how long, and the frames each held
     NanosecondTimeSpan m_displayHeld;
     NanosecondTimeSpan m_frameSlotHeld;
-    // The part of the display's side's waits that came after the time the pacer holds the loop to before the next frame
-    NanosecondTimeSpan m_displayHeldPastTimer;
     uint64_t m_systemHeldFrames{0};
     uint64_t m_frameSlotHeldFrames{0};
     // The pause after start-up: still to be made, whether a wait for a present held a frame since it was asked for, the
@@ -171,11 +169,9 @@ namespace MB::FramePacing::Pacer
 
     //! A wait of the application's own before the frame that is about to start (for a frame slot, for an image), after the
     //! wait and before BeginFrame. A wait for an image, like a present that waited (AddPresent), is the display's side
-    //! holding the loop while its queue is full. With PacerSettings::SystemHoldsLoop and the aim of smoothness, at one
-    //! refresh per frame, a frame whose start that held for a share of a refresh period is one the system let through when
-    //! it had room: it is not late and loses no step, and the grid is moved to its start, so the loop is paced by the
-    //! display and does not drift. A wait for a frame slot is the GPU's: it excuses nothing (a frame that is late by it is
-    //! late by the GPU's work) and is counted. Without the setting the reports are counted and change nothing.
+    //! holding the loop while its queue is full; a wait for a frame slot is the GPU's. Both are counted (SystemHeldFrames,
+    //! FrameSlotHeldFrames) and change nothing: where the system holds the loop, the system's hold paces it (major tier 3,
+    //! SystemHeldLoopPacer), not this grid.
     void AddSystemWait(const SystemWaitReport& report) noexcept;
 
     //! The presents made so far are gone (a swap chain was made anew, for a window that is resized, say): the pause after
@@ -363,11 +359,7 @@ namespace MB::FramePacing::Pacer
     [[nodiscard]] int64_t SlotAfterPresent() const noexcept;
     [[nodiscard]] int64_t Reserve() const noexcept;
     [[nodiscard]] uint32_t FramesInFlightNow() const noexcept;
-    [[nodiscard]] bool LetsTheSystemPace() const noexcept;
     [[nodiscard]] bool HeldByTheDisplaysSide() const noexcept;
-    [[nodiscard]] bool LetThroughByTheDisplay() const noexcept;
-    [[nodiscard]] NanosecondTimeDuration HeldPastTheTimer(NanosecondTickCount beginTime, NanosecondTickCount endTime) const noexcept;
-    [[nodiscard]] NanosecondTickCount StartTimeOf(int64_t slot) const noexcept;
     [[nodiscard]] NanosecondTickCount DueTime(int64_t slot) const noexcept;
     [[nodiscard]] int64_t SmoothSlotFor(NanosecondTickCount time) const noexcept;
     [[nodiscard]] NanosecondTickCount TimeOfSlot(int64_t slot) const noexcept;

@@ -82,7 +82,7 @@ TEST(DisplayHeldLoop, WithVerticalBlankTimesAStartTheAcquireHeldIsNotSteppedOver
 
     // Told of them: every frame's animation time is a refresh after the one before it, and the refreshes the loop was held
     // for are behind the clock. What the display did is the same: one frame on screen for seven refreshes, the others for one
-    settings.SystemHoldsLoop = true;
+    settings.ReportsSystemWaits = true;
     const std::vector<Sim::LoopFrame> told = Sim::SimulateTierLoop(settings, PacerCapability::VBlankTimes);
     ASSERT_EQ(told.size(), untold.size());
     int32_t heldOnScreen = 0;
@@ -109,7 +109,7 @@ TEST(DisplayHeldLoop, WithAWaitForAPresentTheWaitAlreadySaysSo)
   for (const bool tellsOfWaits : {false, true})
   {
     Sim::LoopSettings settings = Loop(PC::PacerAim::Smoothness);
-    settings.SystemHoldsLoop = tellsOfWaits;
+    settings.ReportsSystemWaits = tellsOfWaits;
     const int64_t period = PeriodNanoseconds(settings);
     const std::vector<Sim::LoopFrame> frames = Sim::SimulateTierLoop(settings, PacerCapability::VBlankTimes | PacerCapability::WaitForPresent);
     for (std::size_t index = Settled; index < frames.size(); ++index)

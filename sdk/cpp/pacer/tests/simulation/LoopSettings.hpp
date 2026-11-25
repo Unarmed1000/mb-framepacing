@@ -70,10 +70,10 @@ namespace MB::FramePacing::Pacer::Simulation
     uint32_t ReadyPlacePercent{50};
     //! How far the vertical blank times the loop is given are off the display's: drawn anew for every reading. Zero: exact
     NanosecondRange VBlankReadingError;
-    //! The loop tells a tier pacer of its own waits (for a frame slot, for an image). The loop that has neither vertical
-    //! blank times nor a wait for a present also says that the system holds it while its queue is full, and gives the
-    //! display's images as the swap chain's (where the display has a number of them)
-    bool SystemHoldsLoop{false};
+    //! The loop tells a tier pacer of its own waits (for a frame slot, for an image), and gives the display's images as the
+    //! swap chain's (where the display has a number of them). That the system holds the loop is a capability of the set
+    //! (PacerCapability::AcquireWaits), not this
+    bool ReportsSystemWaits{false};
     //! For the tier pacers: the application can wait until the GPU finished a frame (PacerCapability::WaitForGpuWork). The
     //! loop then makes that wait where a plan asks for it, and no wait for a frame slot of its own next to it
     //! (WaitsForPreviousGpuWork has no part in such a frame)

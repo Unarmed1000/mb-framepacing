@@ -15,16 +15,16 @@
 //! text is a string literal: it is there for the life of the program, nothing is allocated, and its data() ends with a zero, so it
 //! can be given to a function that takes a C string. A value that is not one of the type's has no text: empty.
 //!
-//! A tier is shown as its major tier and its sub tier (NumberOf): "1.1" is the best and "3.4" the baseline that every set
-//! reaches. A rating that reports display times (PacerRating::ReportsDisplayTimes) is shown with DisplayTimesMark after it, and
-//! one whose display skips a frame that is overdue (PacerRating::SkipsOverdue) with SkipsOverdueMark after that, and one that a
-//! frame callback holds (PacerRating::HoldsByFrameCallback) with FrameCallbackMark last: "3.1+", "1.2+s", "3.1s", "3.3c".
+//! A tier is shown as its major tier and its sub tier (NumberOf): "1.1" is the best and "4.4" the baseline that every set
+//! reaches; the system's hold, a major tier without sub tiers, is "3". A rating that reports display times (PacerRating::ReportsDisplayTimes) is
+//! shown with DisplayTimesMark after it, and one whose display skips a frame that is overdue (PacerRating::SkipsOverdue) with SkipsOverdueMark after
+//! that, and one that a frame callback holds (PacerRating::HoldsByFrameCallback) with FrameCallbackMark last: "4.1+", "1.2+s", "3+", "4.3c".
 namespace MB::FramePacing::Pacer::PacerTierText
 {
   //! The tiers there are: PacerTier's values are 1 to this.
-  inline constexpr uint32_t TierCount = 12;
+  inline constexpr uint32_t TierCount = 13;
   //! The major tiers there are: PacerMajorTier's values are 1 to this.
-  inline constexpr uint32_t MajorTierCount = 3;
+  inline constexpr uint32_t MajorTierCount = 4;
   //! What follows a tier's number when the application reports display times.
   inline constexpr std::string_view DisplayTimesMark = "+";
   //! What follows a tier's number (and DisplayTimesMark) when the display's side skips a frame that is overdue.
@@ -45,7 +45,7 @@ namespace MB::FramePacing::Pacer::PacerTierText
     "pacing starts again with a history.";
   inline constexpr std::string_view NotPacingShortDescription = "Frames are not paced; reports are taken";
 
-  //! A tier as it is shown: its major tier, a point and its sub tier.
+  //! A tier as it is shown: its major tier, a point and its sub tier; a major tier without sub tiers alone ("3").
   [[nodiscard]] constexpr std::string_view NumberOf(const PacerTier tier) noexcept
   {
     switch (tier)
@@ -66,14 +66,16 @@ namespace MB::FramePacing::Pacer::PacerTierText
       return "2.3";
     case PacerTier::AfterDurationTimerDisplayTimes:
       return "2.4";
+    case PacerTier::SystemHoldsLoop:
+      return "3";
     case PacerTier::VBlankWaitForPresent:
-      return "3.1";
+      return "4.1";
     case PacerTier::VBlankPeriodOnly:
-      return "3.2";
+      return "4.2";
     case PacerTier::TimerWaitForPresent:
-      return "3.3";
+      return "4.3";
     case PacerTier::TimerPeriodOnly:
-      return "3.4";
+      return "4.4";
     }
     return {};
   }
@@ -87,6 +89,8 @@ namespace MB::FramePacing::Pacer::PacerTierText
       return "the display places a frame at a time";
     case PacerMajorTier::DisplayPlacesAfterDuration:
       return "the display places a frame after the one before";
+    case PacerMajorTier::SystemHoldsLoop:
+      return "the system holds the loop to the display";
     case PacerMajorTier::LoopPlaces:
       return "the frame loop places a frame";
     }
@@ -108,6 +112,11 @@ namespace MB::FramePacing::Pacer::PacerTierText
              "early. After a late frame every later duration counts from it: the display stays smooth, and the pacer has to see "
              "where frames were shown, from a wait for a present or display times, or the latency creeps up. With the aim of "
              "low latency it starts the frames later when it sees that.";
+    case PacerMajorTier::SystemHoldsLoop:
+      return "The present or the call for the next image waits while the swap chain's queue is full, so the display's side "
+             "takes a frame every swap interval and the loop runs into that hold: no time to wait for while the system holds. "
+             "The pacer checks the hold against the frames' starts, and limits the frame time itself where the system does not "
+             "hold. It has no sub tiers, and the aim of smoothness only: low latency would need a timer.";
     case PacerMajorTier::LoopPlaces:
       return "The present takes no time before which the frame is not shown, so the frame loop places a frame: it has to make "
              "the present at the right moment in the refresh before the one the frame is for.";
@@ -136,6 +145,8 @@ namespace MB::FramePacing::Pacer::PacerTierText
       return "duration on the present, vertical blank times, display times";
     case PacerTier::AfterDurationTimerDisplayTimes:
       return "duration on the present, display times";
+    case PacerTier::SystemHoldsLoop:
+      return "the system holds the loop";
     case PacerTier::VBlankWaitForPresent:
       return "vertical blank times, wait for a present";
     case PacerTier::VBlankPeriodOnly:
@@ -190,6 +201,11 @@ namespace MB::FramePacing::Pacer::PacerTierText
              "the one before, counted in refresh periods on the clock. The application reports when its frames were shown, so "
              "the pacer sees a late frame move the ones after it: with the aim of low latency it starts the frames that much "
              "later.";
+    case PacerTier::SystemHoldsLoop:
+      return "The present or the call for the next image waits while the swap chain's queue is full, so the system holds the "
+             "loop to the display: the pacer gives no time to wait for, and every frame steps its swap interval. Where the frames "
+             "start faster than the display can show them, the system is not holding, and the pacer limits the frame time "
+             "itself until it holds again. The aim of smoothness only: the queue stays full.";
     case PacerTier::VBlankWaitForPresent:
       return "The pacer knows where the display's refreshes are from vertical blank times, and before a frame the loop waits "
              "until the display took an earlier present: every frame is for one refresh, the frames that wait to be shown stay "
@@ -228,6 +244,8 @@ namespace MB::FramePacing::Pacer::PacerTierText
       return "Duration on the present, refreshes, reports.";
     case PacerTier::AfterDurationTimerDisplayTimes:
       return "Duration on the present, a clock, reports.";
+    case PacerTier::SystemHoldsLoop:
+      return "The system holds the loop; no timer.";
     case PacerTier::VBlankWaitForPresent:
       return "On the refreshes; knows what was shown.";
     case PacerTier::VBlankPeriodOnly:

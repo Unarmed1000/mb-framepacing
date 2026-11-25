@@ -6,6 +6,9 @@
 > pacer it led to is the one the library has now, and [pacer.md](pacer.md) is the guide to using it. Where a part says
 > "proposed" or "not built", the date beside it says as of when; "What is still missing" has the state. The pacer stays
 > experimental and off by default.
+>
+> **Decision 24 (2026-11-25) inserted the system's hold as the third major tier** ("The system holds the loop"): what was written
+> before it of the frame loop's tiers 3.1 to 3.4 (and 3.3c) is of 4.1 to 4.4 (and 4.3c) now.
 
 ## The rule it has to meet
 
@@ -664,6 +667,10 @@ and no hint is taken yet. What speaks against a hint as the fix, and for it as a
 
 ## A loop the system holds
 
+> Retired by decision 24 (2026-11-25): the setting below and the grid's path it drove are gone. A set that says the system holds
+> the loop is paced by the system's hold, the third major tier ("The system holds the loop"). What follows is the record of the
+> first try.
+
 Decision 6, built for the pacer on a timer with the refresh period only (`TimerPeriodOnlyPacer`). Checked on the simulation
 only: **not measured.**
 
@@ -1064,6 +1071,62 @@ that was not shown and a narrow band, so nothing was changed for it.
 **What it does not answer.** Whether a real compositor holds calls back like this, and what a present does then: that needs a real
 one. The tier's rank against 3.4 is a proposal, as every order here is. And a loop that stands in its present stands with its application's thread, which
 no pacer can help: a present mode that does not wait for the call, or the FIFO protocol, can.
+
+## The system holds the loop
+
+Decision 24, built on 2026-11-25 against the simulation and unit tests only: **not measured.** Proposed by the first
+integration: a pacer driven by vsync alone, for a system whose back-pressure holds the frame loop (a Vulkan FIFO swap chain's
+acquire, `eglSwapBuffers` with a swap interval).
+
+**Where it sits.** Its own major tier, the third, written "3": the display's side places the frames, by holding the loop while the
+swap chain's queue is full, so it ranks above every tier of the frame loop, which are 4.1 to 4.4 since. It has no sub tiers: the
+sub tiers rank a wait for a present and vertical blank times, and a queue the system keeps full leaves both nothing to do (a
+wait for a present would keep the queue short, against the hold). Weighed and set aside on the way: a sub tier of the frame
+loop's major tier, the number 3.4 with 3.1 to 3.3 left empty, and four sub tiers of its own from vertical blank times and display
+times. A set reaches it with `PresentWaits` or `AcquireWaits`, a claim from what the platform documents, which the pacer
+checks. **A tier never changes into another by itself** (the user's rule, from this decision): what the tier does when the
+system does not hold the loop is part of it, and only the application's active set changes the tier.
+
+**While the system holds the loop** the plan is empty: no time to wait for and no wait. Every frame's animation step is its
+swap interval and nothing is caught up with; a frame that runs long costs nothing while the frames in the queue cover it. A
+refresh the display shows twice because the queue ran empty is not seen in this tier (no vertical blank times or display times
+to see it by): one hitch, and the animation time stays that refresh behind the clock. A frame is late by its work alone, which
+the swap interval rule answers. **The aim of smoothness only** (the user: low latency "seems impossible for vsync only and no
+timers"): the queue stays full, and the aim of low latency is paced as smoothness, which `PacerTierUtil::HasLowLatencyAim`
+says. It is the one exception to "every tier has both aims".
+
+**Whether the system holds, by rate** (`SystemHeldLoopPacer`), from the frames' starts the application reports: a budget of display
+time, refilled by the time between two starts, capped at what the swap chain can queue (its images and the frames in flight; four
+images where they are not known) and starting full, from which each frame takes its swap interval less a hundredth. A frame that
+starts with none left began before the display could take the frames ahead of it: the system does not hold the loop
+(`SystemHoldState::NotHolding`). Which wait held the loop does not matter (in a window the system's hold was measured as a wait
+for a frame slot). In the first integration's numbers the told refresh periods differ by about 0.003 % and frame starts jitter by
+about 0.3 ms at 240 Hz, well inside the hundredth; a G-SYNC run that started frames 0.7 ms apart under FIFO, which its own check for
+a variable refresh rate missed, is the kind of run it flags.
+
+**Where it does not hold**, the pacer limits the frame time itself: a cadence from the frame where the hold was found missing (no
+catching up), an eighth of a refresh faster than the display. The eighth is how the hold shows again: a system that holds holds
+the frames to the display's rate, and eight frames in a row that start no sooner than that (less the hundredth), though the
+limit would let them start sooner, say it holds again. A hold of a share of a refresh can not give eight such frames in a row:
+each would need its hold to grow by about a ninth of a refresh. Watching for a wait past the limit was built first and dropped
+the same day: at a limit of exactly the display's rate a hold that came back could stay unseen, and a hold of a share of a
+refresh passed it and the pacer went between the two states. A frame that starts more than a frame after its limit starts the
+cadence again. The same limit, at the swap interval itself, holds a swap interval the present can not give (none above one
+without `PresentSwapInterval`, nothing above its longest): `SystemHoldState::Limited`. The system's own waits are reports only
+here.
+
+**What the simulation shows** (240 Hz, three images, light work, smoothness): a swap chain whose acquire holds the loop keeps three
+images' worth waiting and every frame on screen for one refresh, with the display's period 0.2 % off either way, and is never taken
+for one that does not hold. A window covered for 3 s: no more than four frames start back to back before the pacer sees it, then
+about 820 frames in the 3 s (an eighth more than the display's rate, not the thousands an unlimited loop starts), and the system
+holds again, and is seen to, within half a second of the window being back. An acquire that lets the loop through after a third
+of a refresh at the most: limited from the first frames on, at the limit's rate, and never taken for a hold. The golden runs have
+the system's hold as a sixth way; its low-latency runs are byte for byte its smoothness runs.
+
+**What it does not answer.** All of it is the simulation's: no system has run it, and the hundredth, the queue taken without an
+image count and the eighth are proposals until one has. Whether a real covered window, compositor or driver behaves as modelled
+is to be measured, and how the tier ranks against the frame loop's tiers. Its rank above 4.1 means a set that has a wait for a
+present and vertical blank times as well is paced by the system's hold: the application chooses by its active set.
 
 ## Every time is in nanoseconds
 
@@ -2275,6 +2338,13 @@ at four cost nothing; 3.4 at three gives 4, 4; 4.4 at four gives 5, 5; 5.4 at fo
    compositor and GPU, with both aims, against 3.4, with a capture; whether a real compositor holds calls back and what a present
    does then. Not built: with low latency, a start held after the call.
 
+10. **The system's hold measured** (decision 24, 2026-11-25: the simulation only, "The system holds the loop"): on a real swap
+    chain with `PresentWaits` or `AcquireWaits` declared, a covered window, and a capture; the hundredth of slack, the queue taken
+    without an image count and the limit's eighth against real runs; and its rank against the frame loop's tiers. Also open, by the
+    user's rule that a tier never changes into another by itself: two places where `WorkingTier()` still moves today (a tier with
+    vertical blank times reports the timer's until its first reading; after two waits for a present that ran out it reports
+    4.4), for his decision.
+
 Not planned, and written down above: a pacer that relies on a display's side that skips (the "s"); an aim the pacer picks;
 pacing by display times beyond the display's slip in major tier 2 (decision 20); variable refresh.
 
@@ -2537,6 +2607,15 @@ pacing by display times beyond the display's slip in major tier 2 (decision 20);
     a swap interval from the shortest to the longest, and the marker's preferred frame time is the one paced at. An active set
     never goes below the shortest of the set the application has. It changes no tier and no mark: it limits the rates, and
     places nothing. Checked by unit tests only.
+
+24. **The system holds the loop: a major tier of its own**: decided on 2026-11-25 (the user's choices, on the first
+    integration's proposal of a pacer driven by vsync alone; "The system holds the loop"). The user's words on the way: a FIFO
+    that does not block when full is "a broken system", but the broken state "MUST be possible to detect" and the frame time is
+    limited then; "I dont think a TIER should auto change to something else ever"; it "should be inserted at 3"; a major tier
+    with no sub tiers, written "3", over 3.4 and over four sub tiers of its own ("B seems better"); and low latency "seems
+    impossible for vsync only and no timers", so the tier has the aim of smoothness only. `PacerSettings::SystemHoldsLoop` and
+    the grid's path it drove are retired (a set that says the system holds the loop is paced by the system's hold), and the
+    frame loop's tiers are 4.1 to 4.4 since. Checked by unit tests and the simulation only. Revisit when a system has run it.
 
 ## What changes for whom
 
