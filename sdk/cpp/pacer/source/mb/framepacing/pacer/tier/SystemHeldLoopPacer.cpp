@@ -26,11 +26,11 @@ namespace MB::FramePacing::Pacer
 
   int64_t SystemHeldLoopPacer::Capacity() const noexcept
   {
-    // What the swap chain can queue: its images and the frames in flight, each a swap interval of display time. More frames
-    // than that can not start ahead of the display while the system holds the loop
+    // What the swap chain can queue: its images, the frames in flight and a few more, each a swap interval of display time. More
+    // frames than that can not start ahead of the display while the system holds the loop
     const PacerSettings& settings = m_rule.Settings();
     const uint32_t images = settings.SwapChainImages() > 0 ? settings.SwapChainImages() : UnknownSwapChainImages;
-    const int64_t frames = int64_t{images} + int64_t{settings.MaxFramesInFlight()};
+    const int64_t frames = int64_t{images} + int64_t{settings.MaxFramesInFlight()} + int64_t{ExtraQueuedFrames};
     return frames * m_rule.Refresh().TimeFor(m_rule.SwapInterval()).Nanoseconds();
   }
 
@@ -39,7 +39,7 @@ namespace MB::FramePacing::Pacer
     // The queue fills from empty: as many frames as it holds may start back to back. The frame window's frames are counted on
     // from here
     m_budget = Capacity();
-    m_heldInARow = 0;
+    m_recentCount = 0;
     m_slots = 0;
     m_rule.RebaseNewest(NanosecondTimeSpan());
   }
@@ -57,6 +57,7 @@ namespace MB::FramePacing::Pacer
 
   FrameSchedule SystemHeldLoopPacer::BeginFrame(const NanosecondTickCount cpuStartTime) noexcept
   {
+    static_assert(decltype(m_recentStarts){}.size() == HeldFramesToHoldAgain);
     const RefreshPeriod period = m_rule.Refresh();
     const bool isFirstFrame = m_frameId == 0;
     SwapIntervalChange change = SwapIntervalChange::Unchanged;
@@ -80,15 +81,14 @@ namespace MB::FramePacing::Pacer
       const NanosecondTimeSpan frameTime = period.TimeFor(m_swapInterval);
       if (m_notHolding)
       {
-        // Limited, an eighth of a refresh faster than the display: frames in a row that start no sooner than the display can show
-        // them say that something holds them to its rate, the system again (or work that takes longer, which needs no limit).
-        // The queue is full then, and one frame's time of slack is left
-        const bool atTheDisplaysRate = gap.Nanoseconds() >= frameTime.Nanoseconds() - (frameTime.Nanoseconds() / SlackDivisor);
-        m_heldInARow = atTheDisplaysRate ? m_heldInARow + 1u : 0u;
-        if (m_heldInARow >= HeldFramesToHoldAgain)
+        // Limited, an eighth of a refresh faster than the display: the last frames taking no less time than the display shows
+        // them in say that something holds them to its rate, the system again (or work that takes longer, which needs no
+        // limit). The queue is full then, and one frame's time of slack is left
+        const int64_t displayed = int64_t{HeldFramesToHoldAgain} * (frameTime.Nanoseconds() - (frameTime.Nanoseconds() / SlackDivisor));
+        if (m_recentCount == HeldFramesToHoldAgain && (cpuStartTime - m_recentStarts[m_recentNext]).Nanoseconds() >= displayed)
         {
           m_notHolding = false;
-          m_heldInARow = 0;
+          m_recentCount = 0;
           m_budget = frameTime.Nanoseconds();
         }
       }
@@ -102,7 +102,7 @@ namespace MB::FramePacing::Pacer
         if (m_budget < 0)
         {
           m_notHolding = true;
-          m_heldInARow = 0;
+          m_recentCount = 0;
           ++m_holdLosses;
           limitStartsHere = true;
         }
@@ -116,6 +116,13 @@ namespace MB::FramePacing::Pacer
       change = m_rule.AddFrame(period.TimeFor(m_slots), work, late);
     }
 
+    // The starts the frames are judged by while they are limited
+    if (m_notHolding)
+    {
+      m_recentStarts[m_recentNext] = cpuStartTime;
+      m_recentNext = (m_recentNext + 1u) % HeldFramesToHoldAgain;
+      m_recentCount = m_recentCount < HeldFramesToHoldAgain ? m_recentCount + 1u : m_recentCount;
+    }
     m_startsAgain = false;
     m_wait.BeginFrame();
     m_gpuWait.BeginFrame();
@@ -244,7 +251,7 @@ namespace MB::FramePacing::Pacer
     m_presentTaken = false;
     m_startsAgain = true;
     m_notHolding = false;
-    m_heldInARow = 0;
+    m_recentCount = 0;
   }
 
   SystemHoldState SystemHeldLoopPacer::Hold() const noexcept
@@ -301,6 +308,6 @@ namespace MB::FramePacing::Pacer
     // The system is taken to hold the loop, and checked from the next frame on
     m_startsAgain = true;
     m_notHolding = false;
-    m_heldInARow = 0;
+    m_recentCount = 0;
   }
 }

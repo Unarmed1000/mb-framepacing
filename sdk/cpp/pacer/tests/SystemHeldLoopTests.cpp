@@ -91,8 +91,8 @@ TEST(SystemHeldLoop, ACoveredWindowIsLimitedToTheDisplaysRateAndHeldAgainWhenItI
       ASSERT_NEAR(static_cast<double>(frame.AnimationStepNanoseconds), static_cast<double>(period), 1.0) << index;
     }
   }
-  // The queue holds four frames: no more start back to back before the pacer sees it
-  EXPECT_LE(backToBack, 4);
+  // The queue is taken to hold six frames: no more start back to back before the pacer sees it, but for the one that it sees by
+  EXPECT_LE(backToBack, 7);
   // About 3 s of frames at an eighth more than 240 Hz, not the thousands an unlimited loop would start
   EXPECT_GT(coveredFrames, 790);
   EXPECT_LT(coveredFrames, 850);

@@ -165,8 +165,8 @@ TEST(SystemHeldLoopPacer, ALongFrameTheQueueCoversCostsNothing)
 
 TEST(SystemHeldLoopPacer, FramesThatStartFasterThanTheDisplayCanShowThemSayTheSystemDoesNotHold)
 {
-  // The queue holds four frames (three images, one in flight). With it full, the fourth frame that starts back to back after a
-  // frame the system held is more than it can take
+  // The queue is taken to hold six frames (three images, one in flight, ExtraQueuedFrames). With it full, the sixth frame that
+  // starts back to back after a frame the system held is more than it can take
   Loop loop(Settings(), PacerCapabilities(Held));
   static_cast<void>(loop.Frame(Start));
   loop.HeldFrames(100);
@@ -178,7 +178,7 @@ TEST(SystemHeldLoopPacer, FramesThatStartFasterThanTheDisplayCanShowThemSayTheSy
     static_cast<void>(loop.Frame(loop.StartNanoseconds + 200'000, 0, 50'000));
     ++started;
   }
-  EXPECT_EQ(started, 4);
+  EXPECT_EQ(started, 3 + 1 + static_cast<int32_t>(PC::SystemHeldLoopPacer::ExtraQueuedFrames));
   EXPECT_EQ(loop.Pacer.SystemHold(), SystemHoldState::NotHolding);
   EXPECT_EQ(loop.Pacer.SystemHoldLosses(), 1u);
   // The tier stays the tier
@@ -198,8 +198,8 @@ TEST(SystemHeldLoopPacer, FramesThatStartFasterThanTheDisplayCanShowThemSayTheSy
   EXPECT_EQ(loop.Pacer.SystemLimitedFrames(), 30u);
   EXPECT_EQ(loop.Pacer.SystemHold(), SystemHoldState::NotHolding);
 
-  // Frames in a row that start no sooner than the display can show them, though the limit would let them start sooner, say
-  // that the system holds the loop again; one that starts at the limit breaks the run
+  // The last eight frames taking no less time than the display shows them in, though the limit would let them start sooner, say
+  // that the system holds the loop again; one that starts at the limit keeps it from that while it is among them
   for (int32_t frame = 0; frame < 7; ++frame)
   {
     static_cast<void>(loop.Frame(loop.StartNanoseconds + Period, Period / 2));
@@ -219,6 +219,28 @@ TEST(SystemHeldLoopPacer, FramesThatStartFasterThanTheDisplayCanShowThemSayTheSy
   loop.HeldFrames(100);
   EXPECT_EQ(loop.Pacer.SystemHold(), SystemHoldState::Holding);
   EXPECT_EQ(loop.Pacer.SystemHoldLosses(), 1u);
+}
+
+TEST(SystemHeldLoopPacer, StartsThatJitterAroundTheDisplaysRateSayTheSystemHoldsAgain)
+{
+  // Measured on one system: frame starts the system held to a 4.167 ms refresh were 3.8 to 4.6 ms apart. The return goes by the
+  // last eight frames together, so starts a tenth of a refresh early and late by turns are the display's rate
+  Loop loop(Settings(), PacerCapabilities(Held));
+  static_cast<void>(loop.Frame(Start));
+  loop.HeldFrames(50);
+  while (loop.Pacer.SystemHold() == SystemHoldState::Holding)
+  {
+    static_cast<void>(loop.Frame(loop.StartNanoseconds + 200'000, 0, 50'000));
+  }
+  int32_t frames = 0;
+  while (loop.Pacer.SystemHold() == SystemHoldState::NotHolding && frames < 100)
+  {
+    const int64_t apart = (frames % 2) == 0 ? Period - (Period / 10) : Period + (Period / 10);
+    static_cast<void>(loop.Frame(std::max(loop.StartNanoseconds + apart, loop.Now), Period / 2));
+    ++frames;
+  }
+  EXPECT_EQ(loop.Pacer.SystemHold(), SystemHoldState::Holding);
+  EXPECT_LE(frames, 10);
 }
 
 TEST(SystemHeldLoopPacer, AHoldThatLastsAShareOfARefreshStaysLimited)
@@ -268,7 +290,7 @@ TEST(SystemHeldLoopPacer, ADisplayALittleOffTheToldPeriodNeverTripsIt)
     static_cast<void>(loop.Frame(loop.StartNanoseconds + 200'000, 0, 50'000));
     ++started;
   }
-  EXPECT_EQ(started, static_cast<int32_t>(PC::SystemHeldLoopPacer::UnknownSwapChainImages) + 1);
+  EXPECT_EQ(started, static_cast<int32_t>(PC::SystemHeldLoopPacer::UnknownSwapChainImages + 1u + PC::SystemHeldLoopPacer::ExtraQueuedFrames));
 }
 
 TEST(SystemHeldLoopPacer, ASwapIntervalThePresentCanNotGiveIsHeldByThePacer)

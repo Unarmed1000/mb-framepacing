@@ -39,7 +39,7 @@ Part of the notes for Claude; `CLAUDE.md` holds the rules every task needs.
     (`PresentWaits` or `AcquireWaits`; `tier/SystemHeldLoopPacer`, the simulation only): no time to wait for while it holds, a
     fixed step, the hold checked by rate against the frames' starts (a budget capped at the swap chain's images and frames in
     flight, a hundredth of slack), and where it does not hold a limit inside the tier, an eighth of a refresh faster than the
-    display, until eight frames in a row start at the display's rate (`TierPacer::SystemHold`: `Holding`, `NotHolding`,
+    display, until the last eight frames take no less time than the display shows them in (`TierPacer::SystemHold`: `Holding`, `NotHolding`,
     `Limited` for a swap interval the present can not give); **smoothness only** (low latency would need a timer:
     `PacerTierUtil::HasLowLatencyAim`); **a tier never changes into another by itself** (the user's rule from it; two old
     places still do, recorded in the design record for his decision). `PacerSettings::SystemHoldsLoop` is retired; 4 = the

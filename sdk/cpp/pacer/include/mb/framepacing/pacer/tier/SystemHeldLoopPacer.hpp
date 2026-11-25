@@ -22,6 +22,7 @@
 #include <mb/framepacing/pacer/rule/SwapIntervalRule.hpp>
 #include <mb/framepacing/pacer/tier/PacerHandover.hpp>
 #include <mb/framepacing/pacer/tier/SystemHoldState.hpp>
+#include <array>
 #include <cstdint>
 
 namespace MB::FramePacing::Pacer
@@ -35,16 +36,16 @@ namespace MB::FramePacing::Pacer
   //! late by its work alone, which the swap interval rule answers.
   //!
   //! Whether the system holds the loop is checked against the frames' starts, by rate (SystemHoldState): a budget of display
-  //! time, refilled by the time between two frames' starts and capped at what the swap chain can queue, from which each frame
-  //! takes its swap interval less a hundredth. Where a frame starts with none left, more frames began than the display can show:
-  //! the system is not holding (a window that is covered, a hold that lasts a share of a refresh), and the pacer limits the frame
-  //! time itself. The limit is a cadence counted from the frame where the hold was found missing, an eighth of a refresh faster
-  //! than the display, so that a system that holds again shows it by holding the frames to the display's rate: frames in a row
-  //! that start no sooner than the display can show them (less the slack), though the limit would let them start sooner, say
-  //! that it holds the loop again. A hold of a share of a refresh can not do that for so many frames in a row. A frame that
-  //! starts more than a frame late starts the cadence again (nothing is caught up with). The same limit, at the swap interval
-  //! itself, holds a swap interval longer than the present can hold a frame for (SystemHoldState::Limited). The system's own
-  //! waits say nothing more than the rate does, and are taken as reports only.
+  //! time, refilled by the time between two frames' starts and capped at what the swap chain can queue (its images, the frames in
+  //! flight and ExtraQueuedFrames), from which each frame takes its swap interval less a hundredth. Where a frame starts with none left, more frames
+  //! began than the display can show: the system is not holding (a window that is covered, a hold that lasts a share of a refresh), and the pacer
+  //! limits the frame time itself. The limit is a cadence counted from the frame where the hold was found missing, an eighth of a refresh faster than
+  //! the display, so that a system that holds again shows it by holding the frames to the display's rate: the last HeldFramesToHoldAgain frames
+  //! taking no less time than the display shows them in (less the slack), though the limit would let them start sooner, say that it holds the loop
+  //! again. Over so many frames the starts' jitter evens out, and a hold of a share of a refresh can not make up the limit's eighth on each of them.
+  //! A frame that starts more than a frame late starts the cadence again (nothing is caught up with). The same limit, at the swap interval itself,
+  //! holds a swap interval longer than the present can hold a frame for (SystemHoldState::Limited). The system's own waits say nothing more than the
+  //! rate does, and are taken as reports only.
   //!
   //! The aim of smoothness only: low latency would need a timer, and the queue stays full (PacerTierUtil::HasLowLatencyAim). An
   //! application that asks for low latency is paced as with smoothness.
@@ -74,11 +75,13 @@ namespace MB::FramePacing::Pacer
     NanosecondTimeSpan m_lastAnimationTime;
     uint64_t m_refreshesBehindClock{0};
     NanosecondTimeDuration m_lastPresentBlocked;
-    // The budget of display time, in nanoseconds; whether the system was found not to hold the loop, and the frames in a row
-    // since that started no sooner than the display can show them
+    // The budget of display time, in nanoseconds; whether the system was found not to hold the loop, and the starts of the
+    // frames since (the last HeldFramesToHoldAgain of them, the oldest at m_recentNext once there are that many)
     int64_t m_budget{0};
     bool m_notHolding{false};
-    uint32_t m_heldInARow{0};
+    std::array<NanosecondTickCount, 8> m_recentStarts{};
+    uint32_t m_recentCount{0};
+    uint32_t m_recentNext{0};
     // The time the next frame is limited to, where it is limited (NotHolding, Limited)
     NanosecondTickCount m_limitTime;
     uint64_t m_holdLosses{0};
@@ -94,13 +97,17 @@ namespace MB::FramePacing::Pacer
     //! The share of a frame's swap interval it may start early by, against the refresh period it was told, before it counts
     //! against the system's hold: one in this many.
     static constexpr int64_t SlackDivisor = 100;
-    //! The frames in a row that start no sooner than the display can show them, while the frames are limited, that say the
-    //! system holds the loop again.
+    //! The frames whose starts, while the frames are limited, have to take no less time than the display shows them in to say
+    //! that the system holds the loop again.
     static constexpr uint32_t HeldFramesToHoldAgain = 8;
     //! While the system does not hold the loop the limit runs this share of a refresh period faster than the display: one in this
-    //! many. HeldFramesToHoldAgain frames that each start that much later than the limit lets them, less the slack, take more than
-    //! a hold of a share of a refresh can give.
+    //! many. HeldFramesToHoldAgain frames that start that much later each than the limit lets them, less the slack, take more
+    //! than a hold of a share of a refresh can give.
     static constexpr int64_t ProbeDivisor = 8;
+    //! The frames the queue is taken to hold beyond the swap chain's images and the frames in flight: the first frames of a new swap
+    //! chain run that far ahead (on one system, with three images and one frame in flight, five frames started back to back after
+    //! the first).
+    static constexpr uint32_t ExtraQueuedFrames = 2;
     //! The images the queue is taken to have where the application does not know its swap chain's (PacerSettings::SwapChainImages).
     static constexpr uint32_t UnknownSwapChainImages = 4;
 
