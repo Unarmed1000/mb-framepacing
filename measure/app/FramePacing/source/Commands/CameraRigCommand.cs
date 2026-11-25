@@ -78,14 +78,11 @@ namespace MB.FramePacing.App.Commands
       AnsiConsole
         .Status()
         .Spinner(Spinner.Known.Dots)
-        .Start(
-          $"Verifying the camera rig {Markup.Escape(Path.GetFileName(rigPath))}...",
-          _ =>
-          {
-            using var source = FfmpegCaptureSource.Start(options with { Roi = null, Scale = null, Camera = null }, TimeSpan.FromSeconds(30));
-            checks = CameraCalibrator.Verify(rig, source, new CameraCalibratorOptions(), cancellationToken);
-          }
-        );
+        .Start($"Verifying the camera rig {Markup.Escape(Path.GetFileName(rigPath))}...", _ =>
+        {
+          using var source = FfmpegCaptureSource.Start(options with { Roi = null, Scale = null, Camera = null }, TimeSpan.FromSeconds(30));
+          checks = CameraCalibrator.Verify(rig, source, new CameraCalibratorOptions(), cancellationToken);
+        });
       PrintChecks(checks);
       if (checks.Any(c => c.Level == CameraCheckLevel.Fail))
         throw new InvalidOperationException("The camera rig check failed; recalibrate with 'camera-rig calibrate'.");
@@ -160,14 +157,11 @@ namespace MB.FramePacing.App.Commands
                 AnsiConsole
                   .Status()
                   .Spinner(Spinner.Known.Dots)
-                  .Start(
-                    $"Calibrating from {Markup.Escape(options.Device.Name)}...",
-                    _ =>
-                    {
-                      using var capture = FfmpegCaptureSource.Start(options, TimeSpan.FromSeconds(30));
-                      rig = CameraCalibrator.Calibrate(capture, calibratorOptions, cancellationToken) with { Source = options.Device.Name };
-                    }
-                  ),
+                  .Start($"Calibrating from {Markup.Escape(options.Device.Name)}...", _ =>
+                  {
+                    using var capture = FfmpegCaptureSource.Start(options, TimeSpan.FromSeconds(30));
+                    rig = CameraCalibrator.Calibrate(capture, calibratorOptions, cancellationToken) with { Source = options.Device.Name };
+                  }),
               CancellationToken.None
             );
 

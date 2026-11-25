@@ -132,10 +132,7 @@ namespace MB.FramePacing.Analysis.UnitTest
 
       // With a trace to join: the frame record of the application's own trace counts before the one the joined trace has (which is 1500 ns late for
       // every ninth frame), and the frames only the joined trace names are held against its
-      var both = Stored() with
-      {
-        AppTracePath = appTrace,
-      };
+      var both = Stored() with { AppTracePath = appTrace };
       var joined = CaptureAnalyzer.Analyze(m_capture, new AnalysisOptions { Trace = both, TraceProcessorPath = processor });
 
       var lineUp = joined.TraceJoinOf(0)!.LineUp!;
@@ -213,10 +210,7 @@ namespace MB.FramePacing.Analysis.UnitTest
       Assert.That(File.Exists(Path.Combine(report.OutputDirectory, TraceFile)), Is.False);
 
       // Another trace for this analysis: the options' wins
-      var other = Stored() with
-      {
-        Process = null,
-      };
+      var other = Stored() with { Process = null };
       Assert.That(CaptureAnalyzer.TraceOf(m_capture, new AnalysisOptions { Trace = other }), Is.EqualTo(other));
     }
 

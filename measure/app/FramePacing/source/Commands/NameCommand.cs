@@ -35,8 +35,8 @@ namespace MB.FramePacing.App.Commands
         try
         {
           string folder = Path.GetFullPath(parseResult.GetValue(folderArgument)!);
-          var session =
-            CaptureSessionInfo.TryLoad(folder) ?? throw new FileNotFoundException($"'{folder}' has no {CaptureSessionInfo.FileName}", folder);
+          var session = CaptureSessionInfo.TryLoad(folder)
+            ?? throw new FileNotFoundException($"'{folder}' has no {CaptureSessionInfo.FileName}", folder);
           string? name = parseResult.GetValue(nameArgument) is { Length: > 0 } text ? text : null;
           (session with { Name = name }).Save(folder);
           AnsiConsole.MarkupLineInterpolated(

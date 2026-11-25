@@ -131,8 +131,7 @@ namespace MB.FramePacing.Gui.ViewModels
       }
       foreach (var item in OtherSources())
         Devices.Add(item);
-      SelectedDevice =
-        Devices.FirstOrDefault(d => d == previous)
+      SelectedDevice = Devices.FirstOrDefault(d => d == previous)
         ?? Devices.FirstOrDefault(d => d.Title == previous?.Title)
         ?? Devices.First(d => d.Kind == SourceKind.VideoFile);
     }
@@ -566,8 +565,7 @@ namespace MB.FramePacing.Gui.ViewModels
     {
       if (choice.Source.Kind == SourceKind.SyntheticCamera)
         return new SyntheticCameraSource(CreateSyntheticCamera());
-      var options =
-        CreateFfmpegOptions(choice, Path.Combine(Path.GetTempPath(), "mb-framepacing-camera"))
+      var options = CreateFfmpegOptions(choice, Path.Combine(Path.GetTempPath(), "mb-framepacing-camera"))
         ?? throw new InvalidOperationException("Choose the camera (a capture device), a clip filmed with it or the synthetic camera as the source.");
       return FfmpegCaptureSource.Start(options, TimeSpan.FromSeconds(30));
     }
@@ -705,8 +703,7 @@ namespace MB.FramePacing.Gui.ViewModels
         var workDirectory = Path.Combine(Path.GetTempPath(), "mb-framepacing-locate");
         var result = await Task.Run(() =>
         {
-          var options =
-            CreateFfmpegOptions(choice, workDirectory)
+          var options = CreateFfmpegOptions(choice, workDirectory)
             ?? throw new InvalidOperationException("The synthetic sources need no region; choose a capture device or a file.");
           return FfmpegMarkerLocator.Locate(options, FfmpegMarkerLocator.DefaultTimeout, CancellationToken.None);
         });

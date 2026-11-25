@@ -35,8 +35,7 @@ namespace MB.FramePacing.Charts.Playback
     /// <summary>The template's text around its placeholders: before the title, before the report cards, before the data, after it.</summary>
     private static readonly Lazy<string[]> g_template = new Lazy<string[]>(() =>
     {
-      using var stream =
-        Assembly.GetExecutingAssembly().GetManifestResourceStream(TemplateName)
+      using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(TemplateName)
         ?? throw new InvalidOperationException($"The resource {TemplateName} is missing");
       using var reader = new StreamReader(stream);
       string template = reader.ReadToEnd();
@@ -72,10 +71,8 @@ namespace MB.FramePacing.Charts.Playback
       options ??= ReportOptions.Default;
       var cards = Cards(section, options);
       var svgs = new string[cards.Count];
-      Parallel.For(
-        0,
-        cards.Count,
-        i => svgs[i] = SvgCardWriter.Write(cards[i].Drawing, null, cards[i].SecondsPerScreen != null ? $"pb-card-{i}" : null)
+      Parallel.For(0, cards.Count, i =>
+        svgs[i] = SvgCardWriter.Write(cards[i].Drawing, null, cards[i].SecondsPerScreen != null ? $"pb-card-{i}" : null)
       );
       string title = (options.Title ?? RunHeadline.Title(section.Run.Run)) + SectionTitle(section) + " · playback";
       var template = g_template.Value;
@@ -130,14 +127,11 @@ namespace MB.FramePacing.Charts.Playback
       double from = section.FromSeconds;
       var steps = PlaybackZoom.Steps(section.ToSeconds - from, section.FrameCount, ReportCard.PlotWidth(ReportCard.Width));
       var cards = new PlaybackCard[steps.Count + 1];
-      Parallel.For(
-        0,
-        cards.Length,
-        i =>
-          cards[i] =
-            i == 0
-              ? new PlaybackCard(null, ReportCard.Build(section, cardOptions))
-              : new PlaybackCard(steps[i - 1], ReportCard.Build(section, cardOptions, visible: (from, from + steps[i - 1])))
+      Parallel.For(0, cards.Length, i =>
+        cards[i] =
+          i == 0
+            ? new PlaybackCard(null, ReportCard.Build(section, cardOptions))
+            : new PlaybackCard(steps[i - 1], ReportCard.Build(section, cardOptions, visible: (from, from + steps[i - 1])))
       );
       return cards;
     }

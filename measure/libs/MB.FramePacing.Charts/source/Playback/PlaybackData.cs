@@ -191,12 +191,8 @@ namespace MB.FramePacing.Charts.Playback
       // The page reads capture before t, and t before step: each is written against the one before it
       int end = section.End;
       WriteColumn(json, "capture", first, end, i => i == first ? frames[i].FirstCaptureIndex : CaptureStep(i));
-      WriteColumn(
-        json,
-        "index",
-        first,
-        end,
-        i => i == first ? (long)frames[i].FrameIndex : (long)frames[i].FrameIndex - (long)frames[i - 1].FrameIndex
+      WriteColumn(json, "index", first, end, i =>
+        i == first ? (long)frames[i].FrameIndex : (long)frames[i].FrameIndex - (long)frames[i - 1].FrameIndex
       );
       WriteColumn(json, "t", first, end, i => i == first ? Time(i) : Time(i) - Time(i - 1) - (CaptureStep(i) * period));
       WriteColumn(json, "step", first, end, i => Step(i) is { } step ? step - (i + 1 < end ? Time(i + 1) - Time(i) : 0) : null);

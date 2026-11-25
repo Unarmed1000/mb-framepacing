@@ -116,16 +116,14 @@ namespace MB.FramePacing.Charts
       m_stops = Once(() => new FrameSequence(count, StopOfHold));
       m_absolutePanelErrors = Once(() =>
         anyStop.Value
-          ? new FrameSequence(
-            count,
-            i =>
-              (StopOfHold(i), AnimationErrorRule.OnArrival(Frames[i], measured)?.Nanoseconds) switch
-              {
-                ({ } stop, { } onArrival) => Math.Max(Math.Abs(stop), Math.Abs(onArrival)),
-                ({ } stop, null) => Math.Abs(stop),
-                (null, { } onArrival) => Math.Abs(onArrival),
-                _ => null,
-              }
+          ? new FrameSequence(count, i =>
+            (StopOfHold(i), AnimationErrorRule.OnArrival(Frames[i], measured)?.Nanoseconds) switch
+            {
+              ({ } stop, { } onArrival) => Math.Max(Math.Abs(stop), Math.Abs(onArrival)),
+              ({ } stop, null) => Math.Abs(stop),
+              (null, { } onArrival) => Math.Abs(onArrival),
+              _ => null,
+            }
           )
           : AbsoluteErrors
       );
@@ -138,9 +136,8 @@ namespace MB.FramePacing.Charts
       m_holds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].DisplayDelta?.Nanoseconds : null));
       m_animatingHolds = Once(() =>
         anyStatic.Value
-          ? new FrameSequence(
-            count,
-            i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].DisplayDelta?.Nanoseconds : null
+          ? new FrameSequence(count, i =>
+            HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].DisplayDelta?.Nanoseconds : null
           )
           : Holds
       );
@@ -162,9 +159,8 @@ namespace MB.FramePacing.Charts
       m_animationHolds = Once(() => new FrameSequence(count, i => HasNext(i) ? Frames[i + 1].AnimationDelta?.Nanoseconds : null));
       m_animatingAnimationHolds = Once(() =>
         anyStatic.Value
-          ? new FrameSequence(
-            count,
-            i => HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].AnimationDelta?.Nanoseconds : null
+          ? new FrameSequence(count, i =>
+            HasNext(i) && (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 ? Frames[i + 1].AnimationDelta?.Nanoseconds : null
           )
           : AnimationHolds
       );
@@ -202,11 +198,9 @@ namespace MB.FramePacing.Charts
           kind => Once(() => new FrameSequence(count, i => HasNext(i) && HoldKinds[i] == kind ? Frames[i + 1].DisplayDelta?.Nanoseconds : null))
         );
       m_uncertainSteps = Once(() =>
-        new RankBits(
-          count,
-          i =>
-            Frames[i].DisplayDelta.HasValue
-            && (Frames[i].Flags & (PresentedFrameFlags.UncertainStep | PresentedFrameFlags.StaticBefore)) == PresentedFrameFlags.UncertainStep
+        new RankBits(count, i =>
+          Frames[i].DisplayDelta.HasValue
+          && (Frames[i].Flags & (PresentedFrameFlags.UncertainStep | PresentedFrameFlags.StaticBefore)) == PresentedFrameFlags.UncertainStep
         )
       );
       m_staticSteps = Once(() =>
@@ -214,28 +208,24 @@ namespace MB.FramePacing.Charts
       );
       m_animatingFrameTimes = Once(() =>
         anyStatic.Value
-          ? new FrameSequence(
-            count,
-            i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTime?.Nanoseconds is > 0 and var t ? t : null
+          ? new FrameSequence(count, i =>
+            (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].FrameTime?.Nanoseconds is > 0 and var t ? t : null
           )
           : FrameTimes
       );
       m_assumedStatic = Once(() => new RankBits(count, i => (Frames[i].Flags & PresentedFrameFlags.StaticAssumed) != 0));
       m_deltaTimeJitter = Once(() => new RankBits(count, i => (Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) != 0));
       m_otherErrors = Once(() =>
-        new RankBits(
-          count,
-          i =>
-            (Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) == 0
-            && AnimationErrorRule.OnArrival(Frames[i], measured)?.Nanoseconds is { } e
-            && e != 0
+        new RankBits(count, i =>
+          (Frames[i].Flags & PresentedFrameFlags.DeltaTimeJitter) == 0
+          && AnimationErrorRule.OnArrival(Frames[i], measured)?.Nanoseconds is { } e
+          && e != 0
         )
       );
       m_animatingCpuBusy = Once(() =>
         anyStatic.Value
-          ? new FrameSequence(
-            count,
-            i => (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].CpuBusy.Nanoseconds > 0 ? Frames[i].CpuBusy.Nanoseconds : null
+          ? new FrameSequence(count, i =>
+            (Frames[i].Flags & PresentedFrameFlags.StaticAfter) == 0 && Frames[i].CpuBusy.Nanoseconds > 0 ? Frames[i].CpuBusy.Nanoseconds : null
           )
           : CpuBusy
       );
@@ -301,18 +291,16 @@ namespace MB.FramePacing.Charts
         Func<PresentedFrame, NanosecondTimeDuration?> preferred,
         bool withStatic
       ) =>
-        new FrameSequence(
-          count,
-          i =>
-            refresh > NanosecondTimeDuration.Zero
-            && HasNext(i)
-            && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
-              ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch
-              {
-                (null, null) => null,
-                var (t, p) => Math.Max(t?.Nanoseconds ?? 0, p?.Nanoseconds ?? 0),
-              }
-              : null
+        new FrameSequence(count, i =>
+          refresh > NanosecondTimeDuration.Zero
+          && HasNext(i)
+          && (withStatic || ((Frames[i].Flags | Frames[i + 1].Flags) & PresentedFrameFlags.StaticAfter) == 0)
+            ? (target(Frames[i + 1]), preferred(Frames[i + 1])) switch
+            {
+              (null, null) => null,
+              var (t, p) => Math.Max(t?.Nanoseconds ?? 0, p?.Nanoseconds ?? 0),
+            }
+            : null
         );
       m_stepReferences = Once(() => Stretches(f => Rounded(FrameReference.Target(f)), f => Rounded(FrameReference.Preferred(f))));
       m_frameTimeReferences = Once(() => Stretches(FrameReference.Target, FrameReference.Preferred));

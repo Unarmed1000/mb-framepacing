@@ -90,9 +90,8 @@ namespace MB.FramePacing.App.Commands
       AnsiConsole
         .Status()
         .Spinner(Spinner.Known.Dots)
-        .Start(
-          $"Looking for the marker in {Markup.Escape(options.Device.Name)}...",
-          _ => result = FfmpegMarkerLocator.Locate(options, timeout, cancellationToken)
+        .Start($"Looking for the marker in {Markup.Escape(options.Device.Name)}...", _ =>
+          result = FfmpegMarkerLocator.Locate(options, timeout, cancellationToken)
         );
       Print(result!);
       return result!;

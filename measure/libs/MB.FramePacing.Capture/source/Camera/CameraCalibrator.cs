@@ -248,15 +248,11 @@ namespace MB.FramePacing.Capture.Camera
       var refined = new List<HomographyRefinement>();
       var chosen = hits.Where((_, i) => i % step == 0).Take(refineFrames).ToList();
       var results = new HomographyRefinement?[chosen.Count];
-      Parallel.For(
-        0,
-        chosen.Count,
-        i =>
-        {
-          var fit = HomographyRefiner.Refine(frames.Frames[chosen[i].FrameIndex], initial, MarkerRenderer.GenerateModules(chosen[i].Payload));
-          results[i] = fit.Converged && fit.RelativeResidual < 0.25 ? fit : null;
-        }
-      );
+      Parallel.For(0, chosen.Count, i =>
+      {
+        var fit = HomographyRefiner.Refine(frames.Frames[chosen[i].FrameIndex], initial, MarkerRenderer.GenerateModules(chosen[i].Payload));
+        results[i] = fit.Converged && fit.RelativeResidual < 0.25 ? fit : null;
+      });
       foreach (var result in results)
       {
         if (result is { } fit)

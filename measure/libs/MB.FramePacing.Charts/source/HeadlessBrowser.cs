@@ -64,8 +64,9 @@ namespace MB.FramePacing.Charts
     /// </summary>
     public static void SavePng(string svgPath, string pngPath, string? browser = null)
     {
-      string found =
-        browser ?? Find() ?? throw new InvalidOperationException($"Saving a PNG needs Edge or Chrome: set {EnvironmentVariable} to its executable");
+      string found = browser
+        ?? Find()
+        ?? throw new InvalidOperationException($"Saving a PNG needs Edge or Chrome: set {EnvironmentVariable} to its executable");
       string content = File.ReadAllText(svgPath);
       int width = int.Parse(Regex.Match(content, "width=\"(\\d+)\"").Groups[1].Value);
       int height = int.Parse(Regex.Match(content, "height=\"(\\d+)\"").Groups[1].Value);
@@ -94,8 +95,9 @@ namespace MB.FramePacing.Charts
       string? browser = null
     )
     {
-      string found =
-        browser ?? Find() ?? throw new InvalidOperationException($"Saving a PNG needs Edge or Chrome: set {EnvironmentVariable} to its executable");
+      string found = browser
+        ?? Find()
+        ?? throw new InvalidOperationException($"Saving a PNG needs Edge or Chrome: set {EnvironmentVariable} to its executable");
       string url = new Uri(Path.GetFullPath(pagePath)).AbsoluteUri + (fragment.Length > 0 ? "#" + fragment : string.Empty);
       var extra = new[]
       {
@@ -114,29 +116,18 @@ namespace MB.FramePacing.Charts
     /// </summary>
     public static string PageDocument(string pagePath, string fragment, int settleMilliseconds = 5000, string? browser = null)
     {
-      string found =
-        browser ?? Find() ?? throw new InvalidOperationException($"Reading a page needs Edge or Chrome: set {EnvironmentVariable} to its executable");
+      string found = browser
+        ?? Find()
+        ?? throw new InvalidOperationException($"Reading a page needs Edge or Chrome: set {EnvironmentVariable} to its executable");
       string url = new Uri(Path.GetFullPath(pagePath)).AbsoluteUri + (fragment.Length > 0 ? "#" + fragment : string.Empty);
       var extra = new[] { "--dump-dom", $"--virtual-time-budget={settleMilliseconds}" };
       string document = string.Empty;
-      var result = SaveWithRetries(
-        noSandbox =>
-          Attempt(
-            found,
-            url,
-            1600,
-            1000,
-            noSandbox,
-            extra,
-            arguments =>
-            {
-              var (attempt, output) = RunForOutput(found, arguments);
-              document = output;
-              return attempt;
-            }
-          ),
-        OperatingSystem.IsLinux()
-      );
+      var result = SaveWithRetries(noSandbox => Attempt(found, url, 1600, 1000, noSandbox, extra, arguments =>
+          {
+            var (attempt, output) = RunForOutput(found, arguments);
+            document = output;
+            return attempt;
+          }), OperatingSystem.IsLinux());
       if (result.Saved)
         return document;
       if (result.TimedOut)

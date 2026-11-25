@@ -153,10 +153,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
 
       // With it the frames are where their slices are; these markers have no CPU busy time and no schedule, so nothing ties the
       // capture's clock to the application's
-      var data = bare with
-      {
-        FrameRecords = new[] { new FrameRecordSlice(4, 1, 50, 50), new FrameRecordSlice(4, 2, 150, 150) },
-      };
+      var data = bare with { FrameRecords = new[] { new FrameRecordSlice(4, 1, 50, 50), new FrameRecordSlice(4, 2, 150, 150) } };
       Assert.That(Assert.Throws<TraceException>(() => TraceJoiner.Join(none, data, options))!.Message, Does.Contain("capture offset"));
       // With the offset given it is placed, and says what by
       var given = TraceJoiner.Join(none, data, options with { CaptureOffsetNs = 40 });

@@ -138,8 +138,7 @@ namespace MB.FramePacing.Gui.ViewModels
       var config = MainWindowViewModel.SafeLoadConfig();
       FfmpegPathText = config.FfmpegPath ?? "not set: found on the PATH or in the usual install folders";
       CaptureDirectoryText = config.CaptureDirectory ?? MainWindowViewModel.DefaultCaptureDirectory;
-      TraceProcessorText =
-        TraceViewModel.FindProcessor(out _)
+      TraceProcessorText = TraceViewModel.FindProcessor(out _)
         ?? "not found: download a release for this system (its zip holds trace_processor_shell), then pick the program here";
       m_refreshing = true;
       PlaybackTranscodeIndex = (int)(config.PlaybackTranscode ?? PlaybackTranscodeChoice.Ask);

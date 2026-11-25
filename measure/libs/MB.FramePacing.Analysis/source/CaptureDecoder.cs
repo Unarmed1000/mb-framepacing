@@ -66,8 +66,7 @@ namespace MB.FramePacing.Analysis
         records[next] = ToRecord(header, live.Decode(image));
         Report();
       }
-      var layout =
-        live.Finish()
+      var layout = live.Finish()
         ?? throw new InvalidOperationException(
           "No frame markers were found in the capture. Check that the application draws the marker, and see sdk/doc/marker-format.md 'Sizing'."
         );

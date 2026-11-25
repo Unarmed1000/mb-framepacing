@@ -210,13 +210,10 @@ namespace MB.FramePacing.App.Commands
       AnsiConsole
         .Status()
         .Spinner(Spinner.Known.Dots)
-        .Start(
-          "Starting...",
-          context =>
-          {
-            result = CaptureRunner.Run(source, options, progress => context.Status(Describe(progress)), cancellationToken);
-          }
-        );
+        .Start("Starting...", context =>
+        {
+          result = CaptureRunner.Run(source, options, progress => context.Status(Describe(progress)), cancellationToken);
+        });
       return result!;
     }
 

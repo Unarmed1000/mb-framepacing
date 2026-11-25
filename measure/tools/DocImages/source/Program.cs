@@ -301,10 +301,7 @@ namespace MB.FramePacing.DocImages
       if (wizard.Rig == null)
         throw new InvalidOperationException("The synthetic camera did not calibrate: " + wizard.StatusText + wizard.ErrorText);
       // A fixed calibration time, so the images do not change with every run
-      wizard.Rig = wizard.Rig with
-      {
-        CreatedUtc = new DateTime(2026, 9, 23, 10, 0, 0, DateTimeKind.Utc),
-      };
+      wizard.Rig = wizard.Rig with { CreatedUtc = new DateTime(2026, 9, 23, 10, 0, 0, DateTimeKind.Utc) };
       await Task.Delay(300);
       Save(wizardWindow, Path.Combine(output, "gui-camera-wizard.png"));
       wizard.NextCommand.Execute(null); // save

@@ -43,12 +43,7 @@ namespace MB.FramePacing.Charts.UnitTest
         )
         .ToList();
       // The counts the analysis gives such a run: one frame the target dropped, one whose present failed
-      var counts = chart.Run.Counts with
-      {
-        SkippedFrameIndices = 2,
-        DroppedFrames = 1,
-        PresentFailedFrames = 1,
-      };
+      var counts = chart.Run.Counts with { SkippedFrameIndices = 2, DroppedFrames = 1, PresentFailedFrames = 1 };
       return chart with { Run = chart.Run with { Frames = frames, Counts = counts } };
     }
 

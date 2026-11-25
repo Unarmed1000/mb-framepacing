@@ -345,19 +345,16 @@ namespace MB.FramePacing.Charts.UnitTest
       Assert.That(shortVideo.Warnings, Has.Count.EqualTo(1));
       Assert.That(shortVideo.Warnings[0], Does.Contain("1.0 s long"));
 
-      var longVideo = await Save(
-        g_playable,
-        answer: false,
-        videoUrl: "../../videos/run.mp4",
-        probe: _ => g_playable with { Duration = TimeSpan.FromHours(1) }
+      var longVideo = await Save(g_playable, answer: false, videoUrl: "../../videos/run.mp4", probe: _ =>
+        g_playable with
+        {
+          Duration = TimeSpan.FromHours(1),
+        }
       );
       Assert.That(longVideo.Warnings, Is.Empty);
 
-      var unreadable = await Save(
-        g_playable,
-        answer: false,
-        videoUrl: "../../videos/run.mp4",
-        probe: _ => throw new InvalidDataException("no video")
+      var unreadable = await Save(g_playable, answer: false, videoUrl: "../../videos/run.mp4", probe: _ =>
+        throw new InvalidDataException("no video")
       );
       Assert.That(unreadable.Warnings, Is.Empty, "a file ffmpeg cannot describe is not judged");
     }

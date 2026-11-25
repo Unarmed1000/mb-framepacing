@@ -255,8 +255,7 @@ namespace MB.FramePacing.App.Commands
           {
             if (parseResult.GetValue(timelineOption))
             {
-              double from =
-                parseResult.GetValue(fromOption)
+              double from = parseResult.GetValue(fromOption)
                 ?? throw new InvalidOperationException("--timeline needs --from (seconds since the run's first frame)");
               double to = parseResult.GetValue(toOption) ?? from + ReportFiles.TimelineSeconds;
               var given = parseResult.GetValue(descriptionOption);

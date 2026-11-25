@@ -185,19 +185,13 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       );
       // Its record from a trace of the application's own: the capture alone has no snapshot of the record's clock, so nothing ties
       // the two files, and the run is not inside the trace
-      var tied = bareOptions with
-      {
-        AppTracePath = TraceTestData.File(TraceTestData.AppTrace),
-      };
+      var tied = bareOptions with { AppTracePath = TraceTestData.File(TraceTestData.AppTrace) };
       Assert.That(
         Assert.Throws<TraceException>(() => TraceJoiner.Join(run, TraceLoader.Load(m_processor, tied), tied))!.Message,
         Does.Contain("whose clock the trace does not share")
       );
       // Another run's markers: the trace's record is not theirs
-      var other = run with
-      {
-        RunId = 9,
-      };
+      var other = run with { RunId = 9 };
       var stored = TraceTestData.Options(TraceTestData.SyntheticTrace, withProcess: false);
       Assert.That(
         Assert.Throws<TraceException>(() => TraceJoiner.Join(other, TraceLoader.Load(m_processor, stored), stored))!.Message,
@@ -216,10 +210,7 @@ namespace MB.FramePacing.TraceJoin.UnitTest
       Assert.Throws<TraceException>(() => TraceLoader.Load(m_processor, options with { Path = TraceTestData.File("no-such.pftrace") }));
 
       // Without vertical blanks the display times stay where the frames put them
-      var none = options with
-      {
-        VBlanks = "none",
-      };
+      var none = options with { VBlanks = "none" };
       var join = TraceJoiner.Join(run, TraceLoader.Load(m_processor, none), none);
       Assert.That(join.Fit, Is.Null);
       Assert.That(join.Alignment.VBlankShiftNs, Is.Zero);

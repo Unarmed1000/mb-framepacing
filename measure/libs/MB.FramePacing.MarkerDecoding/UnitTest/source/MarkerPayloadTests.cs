@@ -297,10 +297,7 @@ namespace MB.FramePacing.MarkerDecoding.UnitTest
       Assert.That(decoded.TargetFrameTime, Is.EqualTo(MarkerPayload.OnDemandFrameTime));
 
       // CPU busy has no on demand: the same count of nanoseconds is a duration as any other, the longest a marker carries
-      var busy = onDemand with
-      {
-        CpuBusy = MarkerPayload.OnDemandFrameTime,
-      };
+      var busy = onDemand with { CpuBusy = MarkerPayload.OnDemandFrameTime };
       Assert.That(busy.ToFrameMarker().CpuBusy, Is.EqualTo(MB.FramePacing.Marker.Payload.MaxCpuBusy));
       Assert.That(MarkerPayload.TryDecode(busy.Encode(), out decoded), Is.True);
       Assert.That(decoded, Is.EqualTo(busy), "the longest a marker carries, as it is");

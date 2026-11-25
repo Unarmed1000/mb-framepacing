@@ -437,12 +437,10 @@ namespace MB.FramePacing.Analysis.UnitTest
       // A window that moved to another display: each rate that is not the capture's, the most frames first
       var moved = TimelineAnalyzer
         .Analyze(
-          WithRefreshPeriods(
-            rows,
-            index =>
-              index < 5 ? 16 * Ms
-              : index < 8 ? 8_333_333
-              : 6_944_444
+          WithRefreshPeriods(rows, index =>
+            index < 5 ? 16 * Ms
+            : index < 8 ? 8_333_333
+            : 6_944_444
           ),
           new TimelineOptions()
         )

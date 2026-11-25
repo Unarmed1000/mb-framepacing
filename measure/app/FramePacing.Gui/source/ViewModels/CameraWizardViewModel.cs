@@ -51,8 +51,9 @@ namespace MB.FramePacing.Gui.ViewModels
       m_openSource = openSource;
       foreach (var source in sources)
         Sources.Add(source);
-      SelectedSource =
-        Sources.FirstOrDefault(s => s == initial.Source) ?? Sources.FirstOrDefault(s => s.Kind == SourceKind.Device) ?? Sources.FirstOrDefault();
+      SelectedSource = Sources.FirstOrDefault(s => s == initial.Source)
+        ?? Sources.FirstOrDefault(s => s.Kind == SourceKind.Device)
+        ?? Sources.FirstOrDefault();
       MediaPath = initial.MediaPath;
       ModeText = initial.ModeText;
       InputFormat = initial.InputFormat;

@@ -67,16 +67,11 @@ namespace MB.FramePacing.Charts.UnitTest
 
       // The clip is lossless 4:4:4 H.264, which browsers do not play: the export asks, and the answer makes a copy
       PlaybackQuestion? asked = null;
-      var result = await PlaybackExport.WriteAsync(
-        capture,
-        runs,
-        options,
-        question =>
-        {
-          asked = question;
-          return Task.FromResult(true);
-        }
-      );
+      var result = await PlaybackExport.WriteAsync(capture, runs, options, question =>
+      {
+        asked = question;
+        return Task.FromResult(true);
+      });
       Assert.That(asked?.Title, Does.Contain("playable copy"));
       Assert.That(result.Video.Kind, Is.EqualTo(PlaybackVideoKind.Transcoded));
       Assert.That(result.Pages, Is.EqualTo(new[] { Path.Combine(report.OutputDirectory, "playback", "run-1", "index.html") }));

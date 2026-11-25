@@ -89,8 +89,7 @@ namespace MB.FramePacing.App.Commands
     {
       if (File.Exists(path))
         return path;
-      string analysis =
-        (Directory.Exists(path) ? AnalysisFiles.Find(path) : null)
+      string analysis = (Directory.Exists(path) ? AnalysisFiles.Find(path) : null)
         ?? throw new TraceException($"{path} is neither a trace nor a capture folder with an analysis.");
       var traces = Directory.GetFiles(analysis, "*" + TraceAugmenter.FileSuffix).OrderBy(file => file, StringComparer.Ordinal).ToList();
       if (run is { } id)

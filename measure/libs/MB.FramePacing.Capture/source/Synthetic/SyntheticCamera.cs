@@ -180,28 +180,24 @@ namespace MB.FramePacing.Capture.Synthetic
       var o = Options;
       int timeSamples = o.TimeSamples;
       float samplesPerPixel = o.SpatialSamples * o.SpatialSamples * timeSamples;
-      Parallel.For(
-        0,
-        zone.PixelCount,
-        pixel =>
+      Parallel.For(0, zone.PixelCount, pixel =>
+      {
+        float sum = zone.ConstantSum[pixel] * timeSamples;
+        for (int k = zone.SampleStart[pixel]; k < zone.SampleStart[pixel + 1]; ++k)
         {
-          float sum = zone.ConstantSum[pixel] * timeSamples;
-          for (int k = zone.SampleStart[pixel]; k < zone.SampleStart[pixel + 1]; ++k)
+          int row = zone.SampleRow[k];
+          int mx = zone.SampleModuleX[k];
+          int my = zone.SampleModuleY[k];
+          for (int s = 0; s < timeSamples; ++s)
           {
-            int row = zone.SampleRow[k];
-            int mx = zone.SampleModuleX[k];
-            int my = zone.SampleModuleY[k];
-            for (int s = 0; s < timeSamples; ++s)
-            {
-              int index = (s * zone.RowCount) + row;
-              float now = Luma(zone.Current[index], mx, my);
-              float weight = zone.Weight[index];
-              sum += weight > 0.002f ? now + ((Luma(zone.Previous[index], mx, my) - now) * weight) : now;
-            }
+            int index = (s * zone.RowCount) + row;
+            float now = Luma(zone.Current[index], mx, my);
+            float weight = zone.Weight[index];
+            sum += weight > 0.002f ? now + ((Luma(zone.Previous[index], mx, my) - now) * weight) : now;
           }
-          m_scratch[zone.PixelOffset[pixel]] = sum / samplesPerPixel;
         }
-      );
+        m_scratch[zone.PixelOffset[pixel]] = sum / samplesPerPixel;
+      });
     }
 
     private float Luma(ModuleMatrix? matrix, int mx, int my)
@@ -223,36 +219,28 @@ namespace MB.FramePacing.Capture.Synthetic
       var kernel = GaussianKernel(o.BlurSigma);
       int radius = kernel.Length / 2;
       var horizontal = m_horizontal;
-      Parallel.For(
-        0,
-        height,
-        y =>
+      Parallel.For(0, height, y =>
+      {
+        for (int x = 0; x < width; ++x)
         {
-          for (int x = 0; x < width; ++x)
-          {
-            float sum = 0;
-            for (int k = -radius; k <= radius; ++k)
-              sum += kernel[k + radius] * m_scratch[(y * width) + Math.Clamp(x + k, 0, width - 1)];
-            horizontal[(y * width) + x] = sum;
-          }
+          float sum = 0;
+          for (int k = -radius; k <= radius; ++k)
+            sum += kernel[k + radius] * m_scratch[(y * width) + Math.Clamp(x + k, 0, width - 1)];
+          horizontal[(y * width) + x] = sum;
         }
-      );
+      });
       ulong seed = (ulong)o.Seed * 0x9E3779B97F4A7C15UL;
-      Parallel.For(
-        0,
-        height,
-        y =>
+      Parallel.For(0, height, y =>
+      {
+        for (int x = 0; x < width; ++x)
         {
-          for (int x = 0; x < width; ++x)
-          {
-            float sum = 0;
-            for (int k = -radius; k <= radius; ++k)
-              sum += kernel[k + radius] * horizontal[(Math.Clamp(y + k, 0, height - 1) * width) + x];
-            double noise = o.NoiseSigma > 0 ? o.NoiseSigma * Gaussianish(seed ^ (ulong)captureIndex, (ulong)((y * width) + x)) : 0;
-            target.Pixels[(y * target.Stride) + x] = (byte)Math.Clamp(Math.Round(sum + noise), 0, 255);
-          }
+          float sum = 0;
+          for (int k = -radius; k <= radius; ++k)
+            sum += kernel[k + radius] * horizontal[(Math.Clamp(y + k, 0, height - 1) * width) + x];
+          double noise = o.NoiseSigma > 0 ? o.NoiseSigma * Gaussianish(seed ^ (ulong)captureIndex, (ulong)((y * width) + x)) : 0;
+          target.Pixels[(y * target.Stride) + x] = (byte)Math.Clamp(Math.Round(sum + noise), 0, 255);
         }
-      );
+      });
     }
 
     private static float[] GaussianKernel(double sigma)

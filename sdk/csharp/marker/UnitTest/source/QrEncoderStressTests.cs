@@ -56,16 +56,12 @@ namespace MB.FramePacing.Marker.UnitTest
     private static void OnEveryCore(Func<int, Generator, string?> work)
     {
       string? failure = null;
-      Parallel.For(
-        0,
-        g_threads,
-        thread =>
-        {
-          string? result = work(thread, new Generator(Seed + ((ulong)thread * 0xD1B54A32D192ED03UL)));
-          if (result != null)
-            Interlocked.CompareExchange(ref failure, result, null);
-        }
-      );
+      Parallel.For(0, g_threads, thread =>
+      {
+        string? result = work(thread, new Generator(Seed + ((ulong)thread * 0xD1B54A32D192ED03UL)));
+        if (result != null)
+          Interlocked.CompareExchange(ref failure, result, null);
+      });
       Assert.That(failure, Is.Null);
     }
 

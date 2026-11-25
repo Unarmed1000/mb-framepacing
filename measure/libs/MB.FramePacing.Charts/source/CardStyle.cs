@@ -30,21 +30,17 @@ namespace MB.FramePacing.Charts
     public static IReadOnlyList<(string Selector, CardStyleRule Rule)> Rules => g_rules;
 
     /// <summary>The style of a shape with <paramref name="classes"/> (space separated); <paramref name="text"/> starts from the 'text' rule.</summary>
-    public static CardStyleRule Resolve(string classes, bool text) =>
-      g_resolved.GetOrAdd(
-        (classes, text),
-        key =>
+    public static CardStyleRule Resolve(string classes, bool text) => g_resolved.GetOrAdd((classes, text), key =>
+      {
+        var names = key.Classes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var style = CardStyleRule.Empty;
+        foreach (var (selector, rule) in g_rules)
         {
-          var names = key.Classes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-          var style = CardStyleRule.Empty;
-          foreach (var (selector, rule) in g_rules)
-          {
-            if (selector == "text" ? key.Text : names.Contains(selector, StringComparer.Ordinal))
-              style = style.Then(rule);
-          }
-          return style;
+          if (selector == "text" ? key.Text : names.Contains(selector, StringComparer.Ordinal))
+            style = style.Then(rule);
         }
-      );
+        return style;
+      });
 
     /// <summary>The rules of a style sheet: 'selector { name: value; ... }' blocks.</summary>
     public static IReadOnlyList<(string Selector, CardStyleRule Rule)> Parse(string sheet)
