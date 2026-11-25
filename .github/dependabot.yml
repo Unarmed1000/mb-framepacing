@@ -22,6 +22,11 @@ updates:
     groups:
       nuget:
         patterns: ["*"]
+    # The projects stay on long-term support .NET versions (net10.0, and 10.0.x in the workflows): the SDK's own tools stay on
+    # that major version too. Raise this with the next long-term support version
+    ignore:
+      - dependency-name: "Microsoft.DotNet.ApiCompat.Tool"
+        versions: [">= 11"]
 
   # Prettier
   - package-ecosystem: npm
