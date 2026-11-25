@@ -36,7 +36,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: CMake 4
-        uses: lukka/get-cmake@v4.5.0
+        uses: lukka/get-cmake@v4.5.1
 
       - name: ffmpeg (for the end-to-end import tests)
         shell: bash
@@ -203,7 +203,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: CMake 4
-        uses: lukka/get-cmake@v4.5.0
+        uses: lukka/get-cmake@v4.5.1
       - name: uv (Python from .python-version, the dev tools from uv.lock)
         uses: astral-sh/setup-uv@v10.4.0
       - name: Python dev tools (clang-format, clang-tidy)
@@ -244,7 +244,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: CMake 4
-        uses: lukka/get-cmake@v4.5.0
+        uses: lukka/get-cmake@v4.5.1
       - name: Measure and compare with the README
         shell: bash
         run: |
@@ -269,7 +269,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: CMake 4 (the test packages build with it)
-        uses: lukka/get-cmake@v4.5.0
+        uses: lukka/get-cmake@v4.5.1
       - name: uv (Python from .python-version, the dev tools from uv.lock)
         uses: astral-sh/setup-uv@v10.4.0
       - name: The recipe, built from this checkout (sdk/cpp/conan as a local-recipes-index remote)
