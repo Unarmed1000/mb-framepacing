@@ -21,9 +21,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 #include "mb/framepacing/data/capture/detail/CaptureDataFormat.hpp"
 
@@ -33,6 +35,15 @@ namespace FM = MB::FramePacing::Marker;
 
 namespace
 {
+  //! A path in the temporary folder that no other test uses, nor another run of the same test: ctest runs every test as a process
+  //! of its own, several at once with -j, and two builds may test at the same time.
+  std::filesystem::path UniqueTemporaryPath(const std::string_view name)
+  {
+    std::random_device device;
+    const uint64_t id = (uint64_t{device()} << 32u) | uint64_t{device()};
+    return std::filesystem::temp_directory_path() / ("mb_framepacing_data_test-" + std::to_string(id) + "-" + std::string(name));
+  }
+
   void Put(std::vector<uint8_t>& bytes, const std::size_t offset, const uint64_t value, const std::size_t size)
   {
     for (std::size_t i = 0; i < size; ++i)
@@ -143,7 +154,7 @@ TEST(CaptureData, RecordsReadBackAndAPartialLastRecordIsIgnored)
   }
   file.resize(file.size() + (FD::CaptureDataFormat::RecordSize / 2));
 
-  const auto path = std::filesystem::temp_directory_path() / "mb_framepacing_data_test.mbcd";
+  const auto path = UniqueTemporaryPath("captures.mbcd");
   {
     std::ofstream out(path, std::ios::binary);
     out.write(reinterpret_cast<const char*>(file.data()), static_cast<std::streamsize>(file.size()));
@@ -268,7 +279,7 @@ TEST(CaptureData, ARecordsMarkersDecode)
 
 TEST(CaptureData, WhatIsNoCaptureDataFileIsRefused)
 {
-  const auto path = std::filesystem::temp_directory_path() / "mb_framepacing_data_test-refused.mbcd";
+  const auto path = UniqueTemporaryPath("refused.mbcd");
   const auto write = [&path](const std::vector<uint8_t>& bytes)
   {
     std::ofstream out(path, std::ios::binary | std::ios::trunc);

@@ -18,6 +18,7 @@
 #include <fstream>
 #include <limits>
 #include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -30,6 +31,15 @@ namespace FM = MB::FramePacing::Marker;
 
 namespace
 {
+  //! A path in the temporary folder that no other test uses, nor another run of the same test: ctest runs every test as a process
+  //! of its own, several at once with -j, and two builds may test at the same time.
+  std::filesystem::path UniqueTemporaryPath(const std::string_view name)
+  {
+    std::random_device device;
+    const uint64_t id = (uint64_t{device()} << 32u) | uint64_t{device()};
+    return std::filesystem::temp_directory_path() / ("mb_framepacing_data_test-" + std::to_string(id) + "-" + std::string(name));
+  }
+
   constexpr std::string_view MinimalSummary = R"({
   "scanout": "SingleScanout",
   "analysedUtc": "2026-01-01T00:00:00Z",
@@ -135,7 +145,7 @@ namespace
 
   public:
     TemporaryFile(const std::string& name, const std::string& content)
-      : m_path(std::filesystem::temp_directory_path() / ("mb_framepacing_data_test-" + name))
+      : m_path(UniqueTemporaryPath(name))
     {
       std::ofstream out(m_path, std::ios::binary);
       out << content;
@@ -539,7 +549,7 @@ TEST(AnalysisOutput, FileNamesFollowTheRunIds)
 
 TEST(AnalysisOutput, TheAnalysisIsFoundInTheFolderOrItsAnalysisFolder)
 {
-  const auto folder = std::filesystem::temp_directory_path() / "mb_framepacing_data_test-find";
+  const auto folder = UniqueTemporaryPath("find");
   std::filesystem::remove_all(folder);
   std::filesystem::create_directories(folder / FD::AnalysisDirectoryName);
   EXPECT_FALSE(FD::FindAnalysis(folder).has_value()) << "no summary.json anywhere";
@@ -690,8 +700,12 @@ TEST(AnalysisOutput, ALengthOfTimeInAFramesCsvIsNeverNegative)
     }
     catch (const FD::DataFormatError& error)
     {
-      // The file and the line, then what any number outside its range is refused with
-      EXPECT_STREQ(error.what(), "'mb_framepacing_data_test-frames.csv' line 2: '-1' is not a whole number in its range") << column;
+      // The file and the line, then what any number outside its range is refused with (the file's name has a part of its own for
+      // every test, UniqueTemporaryPath)
+      const std::string what = error.what();
+      const std::size_t file = what.find("-frames.csv' line 2: ");
+      ASSERT_NE(file, std::string::npos) << what;
+      EXPECT_EQ(what.substr(file), "-frames.csv' line 2: '-1' is not a whole number in its range") << column;
     }
   }
 
